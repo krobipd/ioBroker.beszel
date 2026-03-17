@@ -11,7 +11,6 @@
                     "label": "label_url",
                     "help": "help_url",
                     "placeholder": "http://192.168.1.100:8090",
-                    "required": true,
                     "sm": 12,
                     "md": 8
                 },
@@ -28,14 +27,12 @@
                 "username": {
                     "type": "text",
                     "label": "label_username",
-                    "required": true,
                     "sm": 12,
                     "md": 6
                 },
                 "password": {
                     "type": "password",
                     "label": "label_password",
-                    "required": true,
                     "sm": 12,
                     "md": 6
                 },
