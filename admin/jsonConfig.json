@@ -57,6 +57,7 @@
                 "header_system": {
                     "type": "header",
                     "text": "header_system",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_uptime": {
@@ -83,6 +84,7 @@
                 "header_cpu": {
                     "type": "header",
                     "text": "header_cpu",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_cpu": {
@@ -109,6 +111,7 @@
                 "header_memory": {
                     "type": "header",
                     "text": "header_memory",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_memory": {
@@ -135,6 +138,7 @@
                 "header_disk": {
                     "type": "header",
                     "text": "header_disk",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_disk": {
@@ -161,6 +165,7 @@
                 "header_network": {
                     "type": "header",
                     "text": "header_network",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_network": {
@@ -173,6 +178,7 @@
                 "header_temperature": {
                     "type": "header",
                     "text": "header_temperature",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_temperature": {
@@ -192,6 +198,7 @@
                 "header_gpu": {
                     "type": "header",
                     "text": "header_gpu",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_gpu": {
@@ -204,6 +211,7 @@
                 "header_containers": {
                     "type": "header",
                     "text": "header_containers",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_containers": {
@@ -216,6 +224,7 @@
                 "header_battery": {
                     "type": "header",
                     "text": "header_battery",
+                    "size": 5,
                     "sm": 12
                 },
                 "metrics_battery": {
