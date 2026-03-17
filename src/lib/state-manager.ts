@@ -283,6 +283,7 @@ export class StateManager {
         `${sysId}.cpu_user`,
         `${sysId}.cpu_system`,
         `${sysId}.cpu_iowait`,
+        `${sysId}.cpu_steal`,
         `${sysId}.cpu_idle`,
       );
     }
@@ -409,7 +410,7 @@ export class StateManager {
 
     // CPU breakdown
     if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
-      const [user, sys, iowait, , idle] = stats.cpub;
+      const [user, sys, iowait, steal, idle] = stats.cpub;
       await this.createAndSetState(
         `${sysId}.cpu_user`,
         {
@@ -451,6 +452,20 @@ export class StateManager {
           write: false,
         } as IoBrokerStateCommon,
         iowait,
+      );
+      await this.createAndSetState(
+        `${sysId}.cpu_steal`,
+        {
+          name: "CPU Steal %",
+          type: "number",
+          role: "level",
+          unit: "%",
+          min: 0,
+          max: 100,
+          read: true,
+          write: false,
+        } as IoBrokerStateCommon,
+        steal,
       );
       await this.createAndSetState(
         `${sysId}.cpu_idle`,

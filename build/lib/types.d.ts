@@ -126,8 +126,6 @@ export interface SystemStats {
     bat?: [number, number];
     /** CPU breakdown [user, sys, iowait, steal, idle] % */
     cpub?: number[];
-    /** Bandwidth bytes [sent, recv] */
-    b?: [number, number];
 }
 /**
  * A system_stats record from /api/collections/system_stats/records

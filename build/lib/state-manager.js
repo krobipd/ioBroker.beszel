@@ -194,7 +194,7 @@ class StateManager {
             toDelete.push(`${sysId}.load_avg_1m`, `${sysId}.load_avg_5m`, `${sysId}.load_avg_15m`);
         }
         if (!config.metrics_cpuBreakdown) {
-            toDelete.push(`${sysId}.cpu_user`, `${sysId}.cpu_system`, `${sysId}.cpu_iowait`, `${sysId}.cpu_idle`);
+            toDelete.push(`${sysId}.cpu_user`, `${sysId}.cpu_system`, `${sysId}.cpu_iowait`, `${sysId}.cpu_steal`, `${sysId}.cpu_idle`);
         }
         if (!config.metrics_memory) {
             toDelete.push(`${sysId}.memory_percent`, `${sysId}.memory_used`, `${sysId}.memory_total`);
@@ -284,7 +284,7 @@ class StateManager {
         }
         // CPU breakdown
         if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
-            const [user, sys, iowait, , idle] = stats.cpub;
+            const [user, sys, iowait, steal, idle] = stats.cpub;
             await this.createAndSetState(`${sysId}.cpu_user`, {
                 name: "CPU User %",
                 type: "number",
@@ -315,6 +315,16 @@ class StateManager {
                 read: true,
                 write: false,
             }, iowait);
+            await this.createAndSetState(`${sysId}.cpu_steal`, {
+                name: "CPU Steal %",
+                type: "number",
+                role: "level",
+                unit: "%",
+                min: 0,
+                max: 100,
+                read: true,
+                write: false,
+            }, steal);
             await this.createAndSetState(`${sysId}.cpu_idle`, {
                 name: "CPU Idle %",
                 type: "number",
