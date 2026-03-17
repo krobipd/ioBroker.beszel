@@ -3,6 +3,19 @@
 		"name": "beszel",
 		"version": "0.1.2",
 		"news": {
+			"0.1.2": {
+				"en": "Fix: add missing cpu_steal state to CPU breakdown metric",
+				"de": "Fix: fehlender cpu_steal Datenpunkt bei CPU Breakdown ergänzt",
+				"ru": "Исправление: добавлено отсутствующее состояние cpu_steal в разбивке CPU",
+				"pt": "Correção: adicionado estado cpu_steal ausente na métrica de detalhamento da CPU",
+				"nl": "Fix: ontbrekende cpu_steal staat toegevoegd aan CPU breakdown metric",
+				"fr": "Correction: état cpu_steal manquant ajouté à la métrique de détail CPU",
+				"it": "Fix: aggiunto lo stato cpu_steal mancante nella metrica di dettaglio CPU",
+				"es": "Corrección: agregado el estado cpu_steal faltante en la métrica de desglose CPU",
+				"pl": "Poprawka: dodano brakujący stan cpu_steal w metryce szczegółów CPU",
+				"uk": "Виправлення: додано відсутній стан cpu_steal у деталізації CPU",
+				"zh-cn": "修复：在 CPU 详细指标中添加缺失的 cpu_steal 状态"
+			},
 			"0.1.1": {
 				"en": "Fix: disabled metric states are now removed on adapter restart",
 				"de": "Fix: deaktivierte Metric-Datenpunkte werden beim Neustart gelöscht",
