@@ -33,18 +33,6 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 
 ---
 
-## Installation
-
-Install via the ioBroker Admin UI:
-
-1. Open Admin → Adapters
-2. Search for **Beszel**
-3. Click Install
-
-Or from GitHub (Expert Mode → Install from GitHub → `krobipd/ioBroker.beszel`).
-
----
-
 ## Configuration
 
 ### Connection
