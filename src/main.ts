@@ -22,6 +22,26 @@ class BeszelAdapter extends utils.Adapter {
   private async onReady(): Promise<void> {
     const config = this.config as unknown as AdapterConfig;
 
+    // Ensure info objects exist before any setState calls
+    await this.setObjectNotExistsAsync("info", {
+      type: "channel",
+      common: { name: "Information" },
+      native: {},
+    });
+    await this.setObjectNotExistsAsync("info.connection", {
+      type: "state",
+      common: {
+        name: "Connection status",
+        type: "boolean",
+        role: "indicator.connected",
+        read: true,
+        write: false,
+        def: false,
+      },
+      native: {},
+    });
+    await this.setStateAsync("info.connection", { val: false, ack: true });
+
     // Validate required config
     if (!config.url || !config.username || !config.password) {
       this.log.error(

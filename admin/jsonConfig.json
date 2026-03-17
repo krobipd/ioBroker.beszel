@@ -2,7 +2,7 @@
     "type": "tabs",
     "items": {
         "tab_connection": {
-            "type": "tab",
+            "type": "panel",
             "label": "tab_connection",
             "items": {
                 "url": {
@@ -53,7 +53,7 @@
             }
         },
         "tab_metrics": {
-            "type": "tab",
+            "type": "panel",
             "label": "tab_metrics",
             "items": {
                 "header_system": {
