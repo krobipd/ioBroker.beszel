@@ -1,0 +1,852 @@
+// Beszel Server Monitoring v2.0 - Cheat Sheet v3.0 Patterns Applied
+// ✅ Discovery-based Cleanup (No complex lists!)
+// ✅ Silent Running Logging (Production-ready)
+// ✅ Battle-tested Patterns
+
+// === KONFIGURATION ===
+const CONFIG = {
+    BASE_PATH: '0_userdata.0.KI-Java-Geräte.beszel',
+    API_URL_PATH: '0_userdata.0.KI-Java-Geräte.beszel.settings.api_url',
+    USERNAME_PATH: '0_userdata.0.KI-Java-Geräte.beszel.settings.username',
+    PASSWORD_PATH: '0_userdata.0.KI-Java-Geräte.beszel.settings.password',
+    LOG_PREFIX: '[Beszel] ',
+    
+    UPDATE_INTERVAL: 90 * 1000, // 90 Sekunden
+    STARTUP_DELAY: 2000,
+    HTTP_TIMEOUT: 30000,
+    TOKEN_REFRESH_INTERVAL: 720 // 24h bei 2min Intervall
+};
+
+// === GLOBALE VARIABLEN ===
+let updateTimer = null;
+let initDone = false;
+let lastRunSuccessful = false;
+let firstSuccessfulRun = false;
+let runCounter = 0;
+
+// === UTILS ===
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Silent Running Logging (Cheat Sheet v3.0)
+function log(message, level = 'info') {
+    const logMessage = `${CONFIG.LOG_PREFIX}${message}`;
+    switch (level) {
+        case 'error': console.error(logMessage); break;
+        case 'warn': console.warn(logMessage); break;
+        case 'debug': console.log(logMessage); break;
+        default: console.log(logMessage);
+    }
+}
+
+function sanitizeSystemName(name) {
+    if (!name) return 'unknown';
+    return name.toString()
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .toLowerCase()
+        .substring(0, 50) || 'unknown';
+}
+
+function buildSystemDescription(system) {
+    const parts = [];
+    const info = system.info || {};
+    
+    // Hostname + CPU Model
+    if (info.h && info.h !== system.name) {
+        parts.push(info.h);
+    }
+    if (info.m) {
+        parts.push(info.m);
+    }
+    
+    // OS + CPU Details  
+    if (info.k) {
+        const osName = info.os === 1 ? 'macOS' : 'OS';
+        parts.push(`${osName} ${info.k}`);
+    }
+    if (info.c && info.t) {
+        parts.push(`${info.c}c/${info.t}t`);
+    }
+    
+    return parts.join(' • ');
+}
+
+function formatNetworkSpeed(mbpsValue) {
+    if (mbpsValue < 0.001) return '0 B';
+    if (mbpsValue < 1) return `${Math.round(mbpsValue * 1024)} KB`;
+    if (mbpsValue < 1024) return `${mbpsValue.toFixed(1)} MB`;
+    return `${(mbpsValue / 1024).toFixed(1)} GB`;
+}
+
+function isValidConfig(url, username, password) {
+    return url && url.trim().length > 0 && 
+           username && username.trim().length > 0 && 
+           password && password.trim().length > 0;
+}
+
+// === STATE MANAGEMENT (Cheat Sheet Pattern) ===
+class StateManager {
+    static pendingUpdates = new Map();
+    static batchTimer = null;
+    
+    static async set(id, value, ack = true) {
+        try {
+            if (!existsState(id)) {
+                await this.create(id, value);
+            }
+            await setStateAsync(id, { val: value, ack: ack });
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    static batch(id, value, ack = true) {
+        this.pendingUpdates.set(id, { value, ack });
+        
+        if (this.batchTimer) {
+            clearTimeout(this.batchTimer);
+        }
+        
+        this.batchTimer = setTimeout(() => this.flushBatch(), 100);
+    }
+    
+    static async flushBatch() {
+        if (this.pendingUpdates.size === 0) return;
+        
+        const updates = Array.from(this.pendingUpdates.entries());
+        this.pendingUpdates.clear();
+        this.batchTimer = null;
+        
+        for (const [id, { value, ack }] of updates) {
+            await this.set(id, value, ack);
+            await delay(10);
+        }
+    }
+    
+    static async create(id, value, config = {}) {
+        try {
+            const common = {
+                name: config.name || id.split('.').pop(),
+                desc: config.desc || '',
+                type: typeof value === 'boolean' ? 'boolean' : 
+                      typeof value === 'number' ? 'number' : 'string',
+                role: config.role || 'state',
+                read: config.read !== false,
+                write: config.write !== false
+            };
+            
+            if (config.unit) common.unit = config.unit;
+            if (config.min !== undefined) common.min = config.min;
+            if (config.max !== undefined) common.max = config.max;
+            
+            await createStateAsync(id, value, false, common);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    static async createFolder(id, name, isDevice = false) {
+        try {
+            if (!existsObject(id)) {
+                await setObject(id, {
+                    type: isDevice ? 'device' : 'channel',
+                    common: { name: name || id.split('.').pop() },
+                    native: {}
+                });
+            }
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    static async createDevice(id, name, description = '', onlineStateId = '') {
+        try {
+            if (!existsObject(id)) {
+                const deviceConfig = {
+                    type: 'device',
+                    common: { 
+                        name: name,
+                        desc: description
+                    },
+                    native: {}
+                };
+                
+                // Online-Status für Device-Färbung hinzufügen
+                if (onlineStateId) {
+                    deviceConfig.common.statusStates = {
+                        onlineId: onlineStateId
+                    };
+                }
+                
+                await setObject(id, deviceConfig);
+            }
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    static get(id, defaultValue = null) {
+        try {
+            if (!existsState(id)) return defaultValue;
+            const state = getState(id);
+            return state ? state.val : defaultValue;
+        } catch (error) {
+            return defaultValue;
+        }
+    }
+}
+
+// === HTTP CLIENT ===
+async function fetchData(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const https = require('https');
+        const http = require('http');
+        const urlLib = require('url');
+        
+        const parsedUrl = urlLib.parse(url);
+        const isHttps = parsedUrl.protocol === 'https:';
+        const httpModule = isHttps ? https : http;
+        
+        const req = httpModule.request({
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port || (isHttps ? 443 : 80),
+            path: parsedUrl.path,
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            timeout: CONFIG.HTTP_TIMEOUT
+        }, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    if (res.statusCode >= 400) {
+                        reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+                        return;
+                    }
+                    
+                    const result = data ? JSON.parse(data) : {};
+                    resolve(result);
+                } catch (error) {
+                    reject(new Error(`JSON parse error: ${error.message}`));
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            reject(error);
+        });
+        
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
+        });
+        
+        if (options.body) {
+            req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+        }
+        
+        req.end();
+    });
+}
+
+// === AUTH TOKEN MANAGEMENT (Silent) ===
+async function getAuthToken() {
+    const apiUrl = StateManager.get(CONFIG.API_URL_PATH, '');
+    const username = StateManager.get(CONFIG.USERNAME_PATH, '');
+    const password = StateManager.get(CONFIG.PASSWORD_PATH, '');
+    
+    // Gespeicherten Token laden
+    let savedToken = StateManager.get(`${CONFIG.BASE_PATH}.settings.auth_token`, '');
+    
+    // Token alle 24h oder bei fehlendem Token erneuern
+    if (!savedToken || runCounter % CONFIG.TOKEN_REFRESH_INTERVAL === 0) {
+        try {
+            const url = `${apiUrl}/api/collections/users/auth-with-password`;
+            const response = await fetchData(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    identity: username,
+                    password: password
+                })
+            });
+            
+            if (response.token) {
+                await StateManager.set(`${CONFIG.BASE_PATH}.settings.auth_token`, response.token);
+                // ✅ Silent - kein Log bei normalem Token Refresh
+                return response.token;
+            }
+        } catch (error) {
+            log(`Token refresh failed: ${error.message}`, 'error');
+            return null;
+        }
+    }
+    
+    return savedToken;
+}
+
+// === DISCOVERY-BASED CLEANUP PATTERN ===
+async function discoverSystems() {
+    try {
+        const selectorPattern = `${CONFIG.BASE_PATH}.systems.*`;
+        const allStates = $(selectorPattern).toArray();
+        const discoveredSystems = [];
+        
+        allStates.forEach(stateId => {
+            const parts = stateId.split('.');
+            // Struktur: 0_userdata.0.KI-Java-Geräte.beszel.systems.SYSTEM_ID.state_name
+            if (parts.length >= 6 && parts[4] === 'systems') {
+                const systemId = parts[5];
+                if (discoveredSystems.indexOf(systemId) === -1) {
+                    discoveredSystems.push(systemId);
+                }
+            }
+        });
+        
+        return discoveredSystems; // ✅ Komplett silent
+        
+    } catch (error) {
+        log(`System discovery failed: ${error.message}`, 'error');
+        return [];
+    }
+}
+
+async function cleanupOldSystems(activeSystemIds) {
+    try {
+        // ✅ DISCOVERY: Automatische Erkennung ohne Listen
+        const discovered = await discoverSystems();
+        
+        if (discovered.length === 0) {
+            return { discovered: 0, deleted: 0 };
+        }
+        
+        // ✅ SIMPLE WHITE-LIST: Alles nicht aktive löschen
+        const toDelete = [];
+        
+        for (const systemId of discovered) {
+            if (!activeSystemIds.includes(systemId)) {
+                const systemPath = `${CONFIG.BASE_PATH}.systems.${systemId}`;
+                if (existsObject(systemPath)) {
+                    toDelete.push({ id: systemId, path: systemPath });
+                }
+            }
+        }
+        
+        if (toDelete.length > 0) {
+            log(`Cleanup: Delete ${toDelete.length} old systems`, 'info');
+            
+            let deletedCount = 0;
+            
+            for (const system of toDelete) {
+                try {
+                    await new Promise(resolve => {
+                        deleteObject(system.path, true, (err) => {
+                            if (err) {
+                                log(`Failed to delete system ${system.id}`, 'warn');
+                            } else {
+                                deletedCount++;
+                            }
+                            resolve();
+                        });
+                    });
+                    
+                    await delay(200);
+                    
+                } catch (error) {
+                    log(`Delete error for ${system.id}: ${error.message}`, 'warn');
+                }
+            }
+            
+            log(`🧹 Cleanup completed: ${deletedCount}/${toDelete.length} systems removed`, 'info');
+            
+            return { discovered: discovered.length, deleted: deletedCount };
+        }
+        
+        return { discovered: discovered.length, deleted: 0 };
+        
+    } catch (error) {
+        log(`Cleanup failed: ${error.message}`, 'error');
+        return { discovered: 0, deleted: 0 };
+    }
+}
+
+// === SYSTEM DEVICE CREATION ===
+async function createSystemDevice(systemName, systemDescription) {
+    const systemId = sanitizeSystemName(systemName);
+    const devicePath = `${CONFIG.BASE_PATH}.systems.${systemId}`;
+    const onlineStateId = `${devicePath}.online`;
+    
+    // Device erstellen mit StateManager + Online-Status
+    await StateManager.createDevice(devicePath, systemName, systemDescription, onlineStateId);
+    
+    // System States Definition (DRY Pattern)
+    const systemStates = [
+        {
+            name: '.uptime_text',
+            value: '',
+            config: {
+                name: 'Betriebszeit',
+                desc: 'System-Laufzeit in Tagen und Stunden (z.B. 14d 6h)',
+                role: 'text',
+                write: false
+            }
+        },
+        {
+            name: '.online',
+            value: false,
+            config: {
+                name: 'Online-Status',
+                desc: 'System ist erreichbar und antwortet',
+                role: 'indicator.reachable',
+                write: false
+            }
+        },
+        {
+            name: '.cpu_usage',
+            value: 0,
+            config: {
+                name: 'CPU-Auslastung',
+                desc: 'Aktuelle Prozessor-Auslastung in Prozent',
+                role: 'level',
+                unit: '%',
+                min: 0,
+                max: 100,
+                write: false
+            }
+        },
+        {
+            name: '.memory_usage',
+            value: 0,
+            config: {
+                name: 'Arbeitsspeicher-Auslastung',
+                desc: 'Aktuelle RAM-Auslastung in Prozent',
+                role: 'level',
+                unit: '%',
+                min: 0,
+                max: 100,
+                write: false
+            }
+        },
+        {
+            name: '.memory_text',
+            value: '',
+            config: {
+                name: 'Arbeitsspeicher-Details',
+                desc: 'Verwendeter von verfügbarem Arbeitsspeicher (z.B. 9.8 von 16 GB)',
+                role: 'text',
+                write: false
+            }
+        },
+        {
+            name: '.disk_usage',
+            value: 0,
+            config: {
+                name: 'Festplatten-Auslastung',
+                desc: 'Aktuelle Speicher-Auslastung in Prozent',
+                role: 'level',
+                unit: '%',
+                min: 0,
+                max: 100,
+                write: false
+            }
+        },
+        {
+            name: '.disk_read_speed',
+            value: 0,
+            config: {
+                name: 'Festplatten-Leseaktivität',
+                desc: 'Aktuelle Lese-Performance der Festplatten',
+                role: 'value',
+                unit: 'MB/s',
+                write: false
+            }
+        },
+        {
+            name: '.disk_write_speed',
+            value: 0,
+            config: {
+                name: 'Festplatten-Schreibaktivität',
+                desc: 'Aktuelle Schreib-Performance der Festplatten',
+                role: 'value',
+                unit: 'MB/s',
+                write: false
+            }
+        },
+        {
+            name: '.network_traffic',
+            value: '',
+            config: {
+                name: 'Netzwerk-Datenverkehr',
+                desc: 'Aktueller Upload und Download (z.B. 100 KB ↑ / 3 MB ↓)',
+                role: 'text',
+                write: false
+            }
+        },
+        {
+            name: '.temperature',
+            value: 0,
+            config: {
+                name: 'System-Temperatur',
+                desc: 'Durchschnittstemperatur der wärmsten Komponenten',
+                role: 'value.temperature',
+                unit: '°C',
+                write: false
+            }
+        }
+    ];
+    
+    // States erstellen
+    for (const state of systemStates) {
+        await StateManager.create(`${devicePath}${state.name}`, state.value, state.config);
+    }
+    
+    return devicePath;
+}
+
+// === DATA PROCESSING ===
+async function updateSystemData(systems) {
+    const systemIds = [];
+    
+    for (const system of systems) {
+        try {
+            const systemId = sanitizeSystemName(system.name);
+            systemIds.push(systemId);
+            
+            const devicePath = `${CONFIG.BASE_PATH}.systems.${systemId}`;
+            
+            // Device erstellen falls nötig
+            if (!existsObject(devicePath)) {
+                const systemDescription = buildSystemDescription(system);
+                await createSystemDevice(system.name, systemDescription);
+            }
+            
+            // System-Info aus systems API (statische Daten)
+            const info = system.info || {};
+            
+            // Uptime benutzerfreundlich umrechnen
+            const uptimeSeconds = info.u || 0;
+            const uptimeDays = Math.floor(uptimeSeconds / 86400);
+            const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
+            const uptimeText = uptimeDays > 0 ? `${uptimeDays}d ${uptimeHours}h` : `${uptimeHours}h`;
+            
+            StateManager.batch(`${devicePath}.uptime_text`, uptimeText);
+            StateManager.batch(`${devicePath}.online`, system.status === 'up');
+            
+        } catch (error) {
+            log(`Failed to process system ${system.name}: ${error.message}`, 'error');
+        }
+    }
+    
+    return systemIds;
+}
+
+async function updateSystemStats(stats, systemIds, systemIdMapping) {
+    for (const stat of stats) {
+        try {
+            // Mapping von original system.id zu sanitized name
+            const systemName = systemIdMapping.get(stat.system);
+            if (!systemName) continue;
+            
+            const systemId = sanitizeSystemName(systemName);
+            if (!systemIds.includes(systemId)) continue;
+            
+            const devicePath = `${CONFIG.BASE_PATH}.systems.${systemId}`;
+            const statData = stat.stats || {};
+            
+            // Performance-Daten aus system_stats API
+            StateManager.batch(`${devicePath}.cpu_usage`, statData.cpu || 0);
+            StateManager.batch(`${devicePath}.disk_usage`, statData.dp || 0);
+            StateManager.batch(`${devicePath}.disk_read_speed`, statData.dr || 0);
+            StateManager.batch(`${devicePath}.disk_write_speed`, statData.dw || 0);
+            
+            // Memory - Prozent und Details
+            StateManager.batch(`${devicePath}.memory_usage`, statData.mp || 0);
+            if (statData.mu && statData.m) {
+                const memoryText = `${statData.mu.toFixed(1)} von ${statData.m} GB`;
+                StateManager.batch(`${devicePath}.memory_text`, memoryText);
+            }
+            
+            // Network Traffic formatieren
+            const sendMBps = statData.ns || 0;   // API liefert MB/s
+            const receiveMBps = statData.nr || 0; // API liefert MB/s
+            const sendFormatted = formatNetworkSpeed(sendMBps);
+            const receiveFormatted = formatNetworkSpeed(receiveMBps);
+            const networkTraffic = `${sendFormatted} ↑ / ${receiveFormatted} ↓`;
+            StateManager.batch(`${devicePath}.network_traffic`, networkTraffic);
+            
+            // Temperatur-Durchschnitt berechnen
+            if (statData.t && typeof statData.t === 'object') {
+                const temps = Object.values(statData.t).filter(v => typeof v === 'number' && !isNaN(v));
+                if (temps.length > 0) {
+                    temps.sort((a, b) => b - a);
+                    const top3 = temps.slice(0, 3);
+                    const avgTemp = parseFloat((top3.reduce((a, b) => a + b, 0) / top3.length).toFixed(1));
+                    StateManager.batch(`${devicePath}.temperature`, avgTemp);
+                }
+            }
+            
+        } catch (error) {
+            log(`Failed to process stats for ${stat.system}: ${error.message}`, 'error');
+        }
+    }
+    
+    await StateManager.flushBatch();
+}
+
+// === MAIN FUNCTION (Silent Running Pattern) ===
+async function updateMonitoring() {
+    try {
+        runCounter++;
+        
+        const apiUrl = StateManager.get(CONFIG.API_URL_PATH, '');
+        const username = StateManager.get(CONFIG.USERNAME_PATH, '');
+        const password = StateManager.get(CONFIG.PASSWORD_PATH, '');
+        
+        if (!isValidConfig(apiUrl, username, password)) {
+            if (!firstSuccessfulRun) {
+                log('Configuration missing - please configure URL, username and password in settings', 'error');
+            }
+            lastRunSuccessful = false;
+            return;
+        }
+        
+        // Auth Token abrufen (silent)
+        const token = await getAuthToken();
+        if (!token) {
+            lastRunSuccessful = false;
+            return;
+        }
+        
+        // Systeme abrufen
+        const systemsUrl = `${apiUrl}/api/collections/systems/records`;
+        const systemsData = await fetchData(systemsUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (!Array.isArray(systemsData.items)) {
+            log('Invalid systems response format', 'error');
+            lastRunSuccessful = false;
+            return;
+        }
+        
+        const systems = systemsData.items;
+        if (systems.length === 0) {
+            log('No systems found', 'warn');
+            lastRunSuccessful = false;
+            return;
+        }
+        
+        // System-Daten verarbeiten
+        const activeSystemIds = await updateSystemData(systems);
+        
+        // Mapping für Stats erstellen (original ID → system name)
+        const systemIdMapping = new Map();
+        for (const system of systems) {
+            systemIdMapping.set(system.id, system.name);
+        }
+        
+        // Stats für online Systeme abrufen
+        const onlineSystemIds = [];
+        for (const system of systems) {
+            if (system.status === 'up') {
+                onlineSystemIds.push(system.id);
+            }
+        }
+        
+        if (onlineSystemIds.length > 0) {
+            const statsUrl = `${apiUrl}/api/collections/system_stats/records?sort=-updated&perPage=100`;
+            const statsData = await fetchData(statsUrl, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (Array.isArray(statsData.items)) {
+                // Neueste Stats pro System filtern
+                const relevantStats = statsData.items.filter(stat => onlineSystemIds.includes(stat.system));
+                const latestStats = {};
+                
+                for (const stat of relevantStats) {
+                    if (!latestStats[stat.system] || new Date(stat.updated) > new Date(latestStats[stat.system].updated)) {
+                        latestStats[stat.system] = stat;
+                    }
+                }
+                
+                await updateSystemStats(Object.values(latestStats), activeSystemIds, systemIdMapping);
+            }
+        }
+        
+        // ✅ DISCOVERY-BASED CLEANUP (No complex lists!)
+        await cleanupOldSystems(activeSystemIds);
+        
+        await StateManager.set(`${CONFIG.BASE_PATH}.settings.last_update`, Date.now());
+        
+        // ✅ SILENT RUNNING PATTERN (Cheat Sheet Best Practice)
+        if (!firstSuccessfulRun || !lastRunSuccessful) {
+            log(`Monitoring updated: ${systems.length} systems, ${onlineSystemIds.length} online`, 'info');
+            firstSuccessfulRun = true;
+        }
+        
+        lastRunSuccessful = true;
+        
+    } catch (error) {
+        if (error.message.includes('401') || error.message.includes('403')) {
+            log(`Authentication failed - check credentials: ${error.message}`, 'error');
+        } else if (error.message.includes('timeout')) {
+            log(`Request timeout: ${error.message}`, 'error');
+        } else {
+            log(`Monitoring failed: ${error.message}`, 'error');
+        }
+        lastRunSuccessful = false;
+    }
+}
+
+function startUpdates() {
+    if (updateTimer) {
+        clearInterval(updateTimer);
+    }
+    
+    updateTimer = setInterval(updateMonitoring, CONFIG.UPDATE_INTERVAL);
+    // ✅ Silent - kein Log nötig
+    
+    setTimeout(updateMonitoring, 3000);
+}
+
+function stopUpdates() {
+    if (updateTimer) {
+        clearInterval(updateTimer);
+        updateTimer = null;
+        log('Server monitoring stopped', 'info');
+    }
+}
+
+// === SETUP FUNCTIONS (Simplified) ===
+async function setupUI() {
+    // Main Device
+    await StateManager.createFolder(CONFIG.BASE_PATH, 'Beszel Server Monitoring', true);
+    
+    // Settings Channel
+    await StateManager.createFolder(`${CONFIG.BASE_PATH}.settings`, 'Einstellungen');
+    
+    // Systems Channel
+    await StateManager.createFolder(`${CONFIG.BASE_PATH}.systems`, 'Überwachte Systeme');
+    
+    // DRY State Creation Pattern - Only essential states!
+    const settingsStates = [
+        { path: CONFIG.API_URL_PATH, value: '', config: {
+            name: 'Beszel Server URL',
+            desc: 'URL des Beszel-Servers (z.B. http://10.47.4.2:8090)',
+            role: 'text.url',
+            write: true
+        }},
+        { path: CONFIG.USERNAME_PATH, value: '', config: {
+            name: 'Benutzername',
+            desc: 'Benutzername für die Anmeldung am Beszel-Server',
+            role: 'text',
+            write: true
+        }},
+        { path: CONFIG.PASSWORD_PATH, value: '', config: {
+            name: 'Passwort',
+            desc: 'Passwort für die Anmeldung am Beszel-Server',
+            role: 'password',
+            write: true
+        }},
+        { path: `${CONFIG.BASE_PATH}.settings.auth_token`, value: '', config: {
+            name: 'Authentifizierungs-Token (Intern)',
+            desc: 'Automatisch generierter API-Token für die Authentifizierung',
+            role: 'text',
+            write: false
+        }},
+        { path: `${CONFIG.BASE_PATH}.settings.last_update`, value: 0, config: {
+            name: 'Letzte Aktualisierung',
+            desc: 'Zeitstempel der letzten erfolgreichen Aktualisierung',
+            role: 'date',
+            write: false
+        }}
+    ];
+    
+    for (const state of settingsStates) {
+        await StateManager.create(state.path, state.value, state.config);
+    }
+}
+
+// === Event Handler Pattern (Silent) ===
+function setupEventHandlers() {
+    // ✅ Silent Event Handlers - kein Debug-Spam
+    on({ id: CONFIG.API_URL_PATH, change: 'ne' }, async (obj) => {
+        const newValue = obj.state.val?.trim() || '';
+        if (newValue) {
+            await StateManager.set(`${CONFIG.BASE_PATH}.settings.auth_token`, '');
+            setTimeout(updateMonitoring, 1000);
+        }
+    });
+    
+    on({ id: CONFIG.USERNAME_PATH, change: 'ne' }, async (obj) => {
+        const newValue = obj.state.val?.trim() || '';
+        if (newValue) {
+            await StateManager.set(`${CONFIG.BASE_PATH}.settings.auth_token`, '');
+            setTimeout(updateMonitoring, 1000);
+        }
+    });
+    
+    on({ id: CONFIG.PASSWORD_PATH, change: 'ne' }, async (obj) => {
+        const newValue = obj.state.val?.trim() || '';
+        if (newValue) {
+            await StateManager.set(`${CONFIG.BASE_PATH}.settings.auth_token`, '');
+            setTimeout(updateMonitoring, 1000);
+        }
+    });
+}
+
+// === Initialization Pattern ===
+async function init() {
+    if (initDone) return;
+    initDone = true;
+    
+    try {
+        log('Starting Beszel Server Monitoring v2.0...', 'info');
+        
+        await setupUI();
+        setupEventHandlers();
+        
+        const apiUrl = StateManager.get(CONFIG.API_URL_PATH, '');
+        const username = StateManager.get(CONFIG.USERNAME_PATH, '');
+        const password = StateManager.get(CONFIG.PASSWORD_PATH, '');
+        
+        if (!isValidConfig(apiUrl, username, password)) {
+            log('No configuration found - please configure URL, username and password in settings', 'error');
+            return;
+        }
+        
+        startUpdates();
+        
+        log('*** BESZEL MONITORING v2.0 READY! ***', 'info');
+        
+    } catch (error) {
+        log(`Initialization failed: ${error.message}`, 'error');
+        initDone = false;
+    }
+}
+
+// === Cleanup Pattern ===
+onStop(() => {
+    stopUpdates();
+    
+    if (StateManager.batchTimer) {
+        clearTimeout(StateManager.batchTimer);
+    }
+    
+    log('Beszel monitoring script stopped', 'info');
+}, 3000);
+
+// === START ===
+setTimeout(init, CONFIG.STARTUP_DELAY);

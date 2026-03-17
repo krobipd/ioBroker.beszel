@@ -1,0 +1,233 @@
+{
+    "type": "tabs",
+    "items": {
+        "tab_connection": {
+            "type": "tab",
+            "label": "tab_connection",
+            "items": {
+                "url": {
+                    "type": "text",
+                    "label": "label_url",
+                    "help": "help_url",
+                    "placeholder": "http://192.168.1.100:8090",
+                    "required": true,
+                    "sm": 12,
+                    "md": 8
+                },
+                "pollInterval": {
+                    "type": "number",
+                    "label": "label_pollInterval",
+                    "help": "help_pollInterval",
+                    "min": 10,
+                    "max": 300,
+                    "default": 60,
+                    "sm": 12,
+                    "md": 4
+                },
+                "username": {
+                    "type": "text",
+                    "label": "label_username",
+                    "required": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "password": {
+                    "type": "password",
+                    "label": "label_password",
+                    "required": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "checkConnection": {
+                    "type": "sendTo",
+                    "command": "checkConnection",
+                    "jsonData": "{\"url\": \"${data.url}\", \"username\": \"${data.username}\", \"password\": \"${data.password}\"}",
+                    "label": "btn_checkConnection",
+                    "result": {
+                        "okText": "msg_connectionOk",
+                        "errorText": "msg_connectionFailed"
+                    },
+                    "sm": 12,
+                    "md": 4
+                }
+            }
+        },
+        "tab_metrics": {
+            "type": "tab",
+            "label": "tab_metrics",
+            "items": {
+                "header_system": {
+                    "type": "header",
+                    "text": "header_system",
+                    "sm": 12
+                },
+                "metrics_uptime": {
+                    "type": "checkbox",
+                    "label": "metric_uptime",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_agentVersion": {
+                    "type": "checkbox",
+                    "label": "metric_agentVersion",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_services": {
+                    "type": "checkbox",
+                    "label": "metric_services",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_cpu": {
+                    "type": "header",
+                    "text": "header_cpu",
+                    "sm": 12
+                },
+                "metrics_cpu": {
+                    "type": "checkbox",
+                    "label": "metric_cpu",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_loadAvg": {
+                    "type": "checkbox",
+                    "label": "metric_loadAvg",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_cpuBreakdown": {
+                    "type": "checkbox",
+                    "label": "metric_cpuBreakdown",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_memory": {
+                    "type": "header",
+                    "text": "header_memory",
+                    "sm": 12
+                },
+                "metrics_memory": {
+                    "type": "checkbox",
+                    "label": "metric_memory",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_memoryDetails": {
+                    "type": "checkbox",
+                    "label": "metric_memoryDetails",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_swap": {
+                    "type": "checkbox",
+                    "label": "metric_swap",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_disk": {
+                    "type": "header",
+                    "text": "header_disk",
+                    "sm": 12
+                },
+                "metrics_disk": {
+                    "type": "checkbox",
+                    "label": "metric_disk",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_diskSpeed": {
+                    "type": "checkbox",
+                    "label": "metric_diskSpeed",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_extraFs": {
+                    "type": "checkbox",
+                    "label": "metric_extraFs",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_network": {
+                    "type": "header",
+                    "text": "header_network",
+                    "sm": 12
+                },
+                "metrics_network": {
+                    "type": "checkbox",
+                    "label": "metric_network",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_temperature": {
+                    "type": "header",
+                    "text": "header_temperature",
+                    "sm": 12
+                },
+                "metrics_temperature": {
+                    "type": "checkbox",
+                    "label": "metric_temperature",
+                    "default": true,
+                    "sm": 12,
+                    "md": 6
+                },
+                "metrics_temperatureDetails": {
+                    "type": "checkbox",
+                    "label": "metric_temperatureDetails",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_gpu": {
+                    "type": "header",
+                    "text": "header_gpu",
+                    "sm": 12
+                },
+                "metrics_gpu": {
+                    "type": "checkbox",
+                    "label": "metric_gpu",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_containers": {
+                    "type": "header",
+                    "text": "header_containers",
+                    "sm": 12
+                },
+                "metrics_containers": {
+                    "type": "checkbox",
+                    "label": "metric_containers",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                },
+                "header_battery": {
+                    "type": "header",
+                    "text": "header_battery",
+                    "sm": 12
+                },
+                "metrics_battery": {
+                    "type": "checkbox",
+                    "label": "metric_battery",
+                    "default": false,
+                    "sm": 12,
+                    "md": 6
+                }
+            }
+        }
+    }
+}

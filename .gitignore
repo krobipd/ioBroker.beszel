@@ -1,0 +1,12 @@
+node_modules/
+build/test/
+build/src/
+*.txt
+*.log
+npm-debug.log*
+.env
+.env.local
+.DS_Store
+.nyc_output
+coverage/
+*.tsbuildinfo

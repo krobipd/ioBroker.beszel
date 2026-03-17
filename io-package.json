@@ -1,0 +1,132 @@
+{
+	"common": {
+		"name": "beszel",
+		"version": "0.1.0",
+		"news": {
+			"0.1.0": {
+				"en": "Initial release",
+				"de": "Erstveröffentlichung",
+				"ru": "Первый выпуск",
+				"pt": "Lançamento inicial",
+				"nl": "Eerste release",
+				"fr": "Première version",
+				"it": "Prima versione",
+				"es": "Versión inicial",
+				"pl": "Pierwsze wydanie",
+				"uk": "Перший випуск",
+				"zh-cn": "初始版本"
+			}
+		},
+		"titleLang": {
+			"en": "Beszel Monitor",
+			"de": "Beszel Monitor",
+			"ru": "Монитор Beszel",
+			"pt": "Monitor Beszel",
+			"nl": "Beszel Monitor",
+			"fr": "Moniteur Beszel",
+			"it": "Monitor Beszel",
+			"es": "Monitor Beszel",
+			"pl": "Monitor Beszel",
+			"uk": "Монітор Beszel",
+			"zh-cn": "Beszel 监控"
+		},
+		"desc": {
+			"en": "Connects to a Beszel Hub and exposes server metrics as ioBroker states",
+			"de": "Verbindet sich mit einem Beszel Hub und stellt Server-Metriken als ioBroker-Datenpunkte bereit",
+			"ru": "Подключается к Beszel Hub и предоставляет метрики сервера как состояния ioBroker",
+			"pt": "Conecta-se a um Beszel Hub e expõe métricas do servidor como estados ioBroker",
+			"nl": "Verbindt met een Beszel Hub en stelt servermetrisch beschikbaar als ioBroker-staten",
+			"fr": "Se connecte à un Beszel Hub et expose les métriques du serveur comme états ioBroker",
+			"it": "Si connette a un Beszel Hub ed espone le metriche del server come stati ioBroker",
+			"es": "Se conecta a un Beszel Hub y expone métricas del servidor como estados ioBroker",
+			"pl": "Łączy się z Beszel Hub i udostępnia metryki serwera jako stany ioBroker",
+			"uk": "Підключається до Beszel Hub та надає метрики сервера як стани ioBroker",
+			"zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
+		},
+		"authors": [
+			"krobi <krobi@power-dreams.com>"
+		],
+		"licenseInformation": {
+			"license": "MIT",
+			"type": "free"
+		},
+		"platform": "Javascript/Node.js",
+		"icon": "beszel.svg",
+		"extIcon": "https://raw.githubusercontent.com/krobipd/iobroker.beszel/main/admin/beszel.svg",
+		"readme": "https://github.com/krobipd/iobroker.beszel/blob/main/README.md",
+		"enabled": true,
+		"tier": 3,
+		"loglevel": "info",
+		"mode": "daemon",
+		"type": "monitoring",
+		"compact": true,
+		"connectionType": "local",
+		"dataSource": "poll",
+		"adminUI": {
+			"config": "json"
+		},
+		"supportedMessages": {
+			"stopInstance": true,
+			"checkConnection": true
+		},
+		"dependencies": [
+			{
+				"js-controller": ">=7.0.0"
+			}
+		],
+		"globalDependencies": [
+			{
+				"admin": ">=7.6.20"
+			}
+		],
+		"instanceObjects": [
+			{
+				"_id": "info",
+				"type": "channel",
+				"common": {
+					"name": "Information"
+				},
+				"native": {}
+			},
+			{
+				"_id": "info.connection",
+				"type": "state",
+				"common": {
+					"name": "Connection status",
+					"type": "boolean",
+					"role": "indicator.connected",
+					"read": true,
+					"write": false,
+					"def": false
+				},
+				"native": {}
+			}
+		]
+	},
+	"encryptedNative": ["password"],
+	"protectedNative": ["password"],
+	"native": {
+		"url": "",
+		"username": "",
+		"password": "",
+		"pollInterval": 60,
+		"metrics_uptime": true,
+		"metrics_agentVersion": false,
+		"metrics_services": false,
+		"metrics_cpu": true,
+		"metrics_loadAvg": true,
+		"metrics_cpuBreakdown": false,
+		"metrics_memory": true,
+		"metrics_memoryDetails": false,
+		"metrics_swap": false,
+		"metrics_disk": true,
+		"metrics_diskSpeed": true,
+		"metrics_extraFs": false,
+		"metrics_network": true,
+		"metrics_temperature": true,
+		"metrics_temperatureDetails": false,
+		"metrics_gpu": false,
+		"metrics_containers": false,
+		"metrics_battery": false
+	}
+}
