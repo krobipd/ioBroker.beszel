@@ -1,5 +1,5 @@
 # Changelog
-## **WORK IN PROGRESS**
+## 0.1.6 (2026-03-18)
 
 - Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call
 - Fix duplicate container filter (was filtered in main.ts and again in updateContainers)

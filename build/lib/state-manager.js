@@ -665,9 +665,27 @@ class StateManager {
      * @param la - Load average tuple [1m, 5m, 15m], or undefined
      */
     async createLoadAvgStates(sysId, la) {
-        await this.createAndSetState(`${sysId}.load_avg_1m`, { name: "Load Average 1m", type: "number", role: "value", read: true, write: false }, la?.[0] ?? null);
-        await this.createAndSetState(`${sysId}.load_avg_5m`, { name: "Load Average 5m", type: "number", role: "value", read: true, write: false }, la?.[1] ?? null);
-        await this.createAndSetState(`${sysId}.load_avg_15m`, { name: "Load Average 15m", type: "number", role: "value", read: true, write: false }, la?.[2] ?? null);
+        await this.createAndSetState(`${sysId}.load_avg_1m`, {
+            name: "Load Average 1m",
+            type: "number",
+            role: "value",
+            read: true,
+            write: false,
+        }, la?.[0] ?? null);
+        await this.createAndSetState(`${sysId}.load_avg_5m`, {
+            name: "Load Average 5m",
+            type: "number",
+            role: "value",
+            read: true,
+            write: false,
+        }, la?.[1] ?? null);
+        await this.createAndSetState(`${sysId}.load_avg_15m`, {
+            name: "Load Average 15m",
+            type: "number",
+            role: "value",
+            read: true,
+            write: false,
+        }, la?.[2] ?? null);
     }
     async createAndSetState(id, common, value) {
         await this.adapter.setObjectNotExistsAsync(id, {
