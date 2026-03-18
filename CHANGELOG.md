@@ -1,4 +1,10 @@
 # Changelog
+## **WORK IN PROGRESS**
+
+- Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call
+- Fix duplicate container filter (was filtered in main.ts and again in updateContainers)
+- Extract load avg state creation into helper to eliminate code duplication
+
 ## 0.1.5 (2026-03-17)
 
 - Migrate to @alcalzone/release-script for automated releases

@@ -6,9 +6,6 @@ import type {
   SystemStats,
 } from "./types.js";
 
-type IoBrokerStateCommon = ioBroker.StateCommon;
-type IoBrokerObjectCommon = ioBroker.ObjectCommon;
-
 /**
  * Manages creation, update and cleanup of ioBroker objects and states for Beszel systems.
  */
@@ -55,7 +52,7 @@ export class StateManager {
     // Create device object
     await this.adapter.setObjectNotExistsAsync(sysId, {
       type: "device",
-      common: { name: system.name } as IoBrokerObjectCommon,
+      common: { name: system.name } as ioBroker.ObjectCommon,
       native: { id: system.id, host: system.host },
     });
 
@@ -69,7 +66,7 @@ export class StateManager {
         role: "indicator.reachable",
         read: true,
         write: false,
-      } as IoBrokerStateCommon,
+      } as ioBroker.StateCommon,
       isUp,
     );
 
@@ -81,7 +78,7 @@ export class StateManager {
         role: "text",
         read: true,
         write: false,
-      } as IoBrokerStateCommon,
+      } as ioBroker.StateCommon,
       system.status,
     );
 
@@ -98,7 +95,7 @@ export class StateManager {
           unit: "s",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         uptime,
       );
 
@@ -110,7 +107,7 @@ export class StateManager {
           role: "text",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         uptime !== null ? this.formatUptime(uptime) : null,
       );
     }
@@ -125,7 +122,7 @@ export class StateManager {
           role: "text",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         system.info.v ?? null,
       );
     }
@@ -141,7 +138,7 @@ export class StateManager {
           role: "value",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         sv?.[0] ?? null,
       );
 
@@ -153,7 +150,7 @@ export class StateManager {
           role: "value.warning",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         sv?.[1] ?? null,
       );
     }
@@ -164,46 +161,13 @@ export class StateManager {
     }
 
     // Load avg fallback to system.info.la if no stats
-    if (config.metrics_loadAvg && !stats && system.info.la) {
-      const la = system.info.la;
-      await this.createAndSetState(
-        `${sysId}.load_avg_1m`,
-        {
-          name: "Load Average 1m",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as IoBrokerStateCommon,
-        la[0],
-      );
-      await this.createAndSetState(
-        `${sysId}.load_avg_5m`,
-        {
-          name: "Load Average 5m",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as IoBrokerStateCommon,
-        la[1],
-      );
-      await this.createAndSetState(
-        `${sysId}.load_avg_15m`,
-        {
-          name: "Load Average 15m",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as IoBrokerStateCommon,
-        la[2],
-      );
+    if (config.metrics_loadAvg && !stats) {
+      await this.createLoadAvgStates(sysId, system.info.la);
     }
 
     // Containers
     if (config.metrics_containers) {
-      await this.updateContainers(sysId, system.id, containers, config);
+      await this.updateContainers(sysId, system.id, containers);
     } else {
       await this.deleteChannelIfExists(`${sysId}.containers`);
     }
@@ -368,47 +332,14 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.cpu ?? null,
       );
     }
 
     // Load avg — prefer stats.la, fallback to system.info.la
     if (config.metrics_loadAvg) {
-      const la = stats.la ?? system.info.la;
-      await this.createAndSetState(
-        `${sysId}.load_avg_1m`,
-        {
-          name: "Load Average 1m",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as IoBrokerStateCommon,
-        la?.[0] ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.load_avg_5m`,
-        {
-          name: "Load Average 5m",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as IoBrokerStateCommon,
-        la?.[1] ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.load_avg_15m`,
-        {
-          name: "Load Average 15m",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as IoBrokerStateCommon,
-        la?.[2] ?? null,
-      );
+      await this.createLoadAvgStates(sysId, stats.la ?? system.info.la);
     }
 
     // CPU breakdown
@@ -425,7 +356,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         user,
       );
       await this.createAndSetState(
@@ -439,7 +370,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         sys,
       );
       await this.createAndSetState(
@@ -453,7 +384,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         iowait,
       );
       await this.createAndSetState(
@@ -467,7 +398,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         steal,
       );
       await this.createAndSetState(
@@ -481,7 +412,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         idle,
       );
     }
@@ -499,7 +430,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.mp ?? null,
       );
       await this.createAndSetState(
@@ -511,7 +442,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.mu ?? null,
       );
       await this.createAndSetState(
@@ -523,7 +454,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.m ?? null,
       );
     }
@@ -539,7 +470,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.mb ?? null,
       );
       await this.createAndSetState(
@@ -551,7 +482,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.mz ?? null,
       );
     }
@@ -567,7 +498,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.su ?? null,
       );
       await this.createAndSetState(
@@ -579,7 +510,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.s ?? null,
       );
     }
@@ -597,7 +528,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.dp ?? null,
       );
       await this.createAndSetState(
@@ -609,7 +540,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.du ?? null,
       );
       await this.createAndSetState(
@@ -621,7 +552,7 @@ export class StateManager {
           unit: "GB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.d ?? null,
       );
     }
@@ -637,7 +568,7 @@ export class StateManager {
           unit: "MB/s",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.dr ?? null,
       );
       await this.createAndSetState(
@@ -649,7 +580,7 @@ export class StateManager {
           unit: "MB/s",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.dw ?? null,
       );
     }
@@ -665,7 +596,7 @@ export class StateManager {
           unit: "MB/s",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.ns ?? null,
       );
       await this.createAndSetState(
@@ -677,7 +608,7 @@ export class StateManager {
           unit: "MB/s",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         stats.nr ?? null,
       );
     }
@@ -694,7 +625,7 @@ export class StateManager {
           unit: "°C",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         avgTemp,
       );
     }
@@ -713,7 +644,7 @@ export class StateManager {
             unit: "°C",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           temp,
         );
       }
@@ -735,7 +666,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         bat?.[0] ?? null,
       );
       await this.createAndSetState(
@@ -746,7 +677,7 @@ export class StateManager {
           role: "indicator",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         bat ? bat[1] > 0 : null,
       );
     }
@@ -769,7 +700,7 @@ export class StateManager {
             max: 100,
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           gpuData.u ?? null,
         );
         await this.createAndSetState(
@@ -781,7 +712,7 @@ export class StateManager {
             unit: "GB",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           gpuData.mu ?? null,
         );
         await this.createAndSetState(
@@ -793,7 +724,7 @@ export class StateManager {
             unit: "GB",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           gpuData.mt ?? null,
         );
         await this.createAndSetState(
@@ -805,7 +736,7 @@ export class StateManager {
             unit: "W",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           gpuData.p ?? null,
         );
       }
@@ -842,7 +773,7 @@ export class StateManager {
             max: 100,
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           percent,
         );
         await this.createAndSetState(
@@ -854,7 +785,7 @@ export class StateManager {
             unit: "GB",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           used,
         );
         await this.createAndSetState(
@@ -866,7 +797,7 @@ export class StateManager {
             unit: "GB",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           total,
         );
         await this.createAndSetState(
@@ -878,7 +809,7 @@ export class StateManager {
             unit: "MB/s",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           fsData.r ?? null,
         );
         await this.createAndSetState(
@@ -890,7 +821,7 @@ export class StateManager {
             unit: "MB/s",
             read: true,
             write: false,
-          } as IoBrokerStateCommon,
+          } as ioBroker.StateCommon,
           fsData.w ?? null,
         );
       }
@@ -903,7 +834,6 @@ export class StateManager {
     sysId: string,
     systemId: string,
     allContainers: BeszelContainer[],
-    _config: AdapterConfig,
   ): Promise<void> {
     const sysContainers = allContainers.filter((c) => c.system === systemId);
     if (sysContainers.length === 0) {
@@ -926,7 +856,7 @@ export class StateManager {
           role: "text",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         container.status,
       );
 
@@ -938,7 +868,7 @@ export class StateManager {
           role: "text",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         healthLabels[container.health] ?? "unknown",
       );
 
@@ -953,7 +883,7 @@ export class StateManager {
           max: 100,
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         container.cpu,
       );
 
@@ -966,7 +896,7 @@ export class StateManager {
           unit: "MB",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         container.memory,
       );
 
@@ -978,7 +908,7 @@ export class StateManager {
           role: "text",
           read: true,
           write: false,
-        } as IoBrokerStateCommon,
+        } as ioBroker.StateCommon,
         container.image,
       );
     }
@@ -987,7 +917,7 @@ export class StateManager {
   private async ensureChannel(id: string, name: string): Promise<void> {
     await this.adapter.setObjectNotExistsAsync(id, {
       type: "channel",
-      common: { name } as IoBrokerObjectCommon,
+      common: { name } as ioBroker.ObjectCommon,
       native: {},
     });
   }
@@ -1003,9 +933,54 @@ export class StateManager {
     }
   }
 
+  /**
+   * Create or update the three load average states.
+   *
+   * @param sysId - State ID prefix (e.g. "systems.my_server")
+   * @param la - Load average tuple [1m, 5m, 15m], or undefined
+   */
+  private async createLoadAvgStates(
+    sysId: string,
+    la: [number, number, number] | undefined,
+  ): Promise<void> {
+    await this.createAndSetState(
+      `${sysId}.load_avg_1m`,
+      {
+        name: "Load Average 1m",
+        type: "number",
+        role: "value",
+        read: true,
+        write: false,
+      } as ioBroker.StateCommon,
+      la?.[0] ?? null,
+    );
+    await this.createAndSetState(
+      `${sysId}.load_avg_5m`,
+      {
+        name: "Load Average 5m",
+        type: "number",
+        role: "value",
+        read: true,
+        write: false,
+      } as ioBroker.StateCommon,
+      la?.[1] ?? null,
+    );
+    await this.createAndSetState(
+      `${sysId}.load_avg_15m`,
+      {
+        name: "Load Average 15m",
+        type: "number",
+        role: "value",
+        read: true,
+        write: false,
+      } as ioBroker.StateCommon,
+      la?.[2] ?? null,
+    );
+  }
+
   private async createAndSetState(
     id: string,
-    common: IoBrokerStateCommon,
+    common: ioBroker.StateCommon,
     value: ioBroker.StateValue,
   ): Promise<void> {
     await this.adapter.setObjectNotExistsAsync(id, {

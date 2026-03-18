@@ -109,33 +109,12 @@ class StateManager {
             await this.updateStatsStates(sysId, system, stats, config);
         }
         // Load avg fallback to system.info.la if no stats
-        if (config.metrics_loadAvg && !stats && system.info.la) {
-            const la = system.info.la;
-            await this.createAndSetState(`${sysId}.load_avg_1m`, {
-                name: "Load Average 1m",
-                type: "number",
-                role: "value",
-                read: true,
-                write: false,
-            }, la[0]);
-            await this.createAndSetState(`${sysId}.load_avg_5m`, {
-                name: "Load Average 5m",
-                type: "number",
-                role: "value",
-                read: true,
-                write: false,
-            }, la[1]);
-            await this.createAndSetState(`${sysId}.load_avg_15m`, {
-                name: "Load Average 15m",
-                type: "number",
-                role: "value",
-                read: true,
-                write: false,
-            }, la[2]);
+        if (config.metrics_loadAvg && !stats) {
+            await this.createLoadAvgStates(sysId, system.info.la);
         }
         // Containers
         if (config.metrics_containers) {
-            await this.updateContainers(sysId, system.id, containers, config);
+            await this.updateContainers(sysId, system.id, containers);
         }
         else {
             await this.deleteChannelIfExists(`${sysId}.containers`);
@@ -262,28 +241,7 @@ class StateManager {
         }
         // Load avg — prefer stats.la, fallback to system.info.la
         if (config.metrics_loadAvg) {
-            const la = stats.la ?? system.info.la;
-            await this.createAndSetState(`${sysId}.load_avg_1m`, {
-                name: "Load Average 1m",
-                type: "number",
-                role: "value",
-                read: true,
-                write: false,
-            }, la?.[0] ?? null);
-            await this.createAndSetState(`${sysId}.load_avg_5m`, {
-                name: "Load Average 5m",
-                type: "number",
-                role: "value",
-                read: true,
-                write: false,
-            }, la?.[1] ?? null);
-            await this.createAndSetState(`${sysId}.load_avg_15m`, {
-                name: "Load Average 15m",
-                type: "number",
-                role: "value",
-                read: true,
-                write: false,
-            }, la?.[2] ?? null);
+            await this.createLoadAvgStates(sysId, stats.la ?? system.info.la);
         }
         // CPU breakdown
         if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
@@ -631,7 +589,7 @@ class StateManager {
             await this.deleteChannelIfExists(`${sysId}.filesystems`);
         }
     }
-    async updateContainers(sysId, systemId, allContainers, _config) {
+    async updateContainers(sysId, systemId, allContainers) {
         const sysContainers = allContainers.filter((c) => c.system === systemId);
         if (sysContainers.length === 0) {
             return;
@@ -699,6 +657,17 @@ class StateManager {
         catch {
             // ignore
         }
+    }
+    /**
+     * Create or update the three load average states.
+     *
+     * @param sysId - State ID prefix (e.g. "systems.my_server")
+     * @param la - Load average tuple [1m, 5m, 15m], or undefined
+     */
+    async createLoadAvgStates(sysId, la) {
+        await this.createAndSetState(`${sysId}.load_avg_1m`, { name: "Load Average 1m", type: "number", role: "value", read: true, write: false }, la?.[0] ?? null);
+        await this.createAndSetState(`${sysId}.load_avg_5m`, { name: "Load Average 5m", type: "number", role: "value", read: true, write: false }, la?.[1] ?? null);
+        await this.createAndSetState(`${sysId}.load_avg_15m`, { name: "Load Average 15m", type: "number", role: "value", read: true, write: false }, la?.[2] ?? null);
     }
     async createAndSetState(id, common, value) {
         await this.adapter.setObjectNotExistsAsync(id, {

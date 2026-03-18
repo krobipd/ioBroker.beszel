@@ -43,6 +43,13 @@ export declare class StateManager {
     private updateContainers;
     private ensureChannel;
     private deleteChannelIfExists;
+    /**
+     * Create or update the three load average states.
+     *
+     * @param sysId - State ID prefix (e.g. "systems.my_server")
+     * @param la - Load average tuple [1m, 5m, 15m], or undefined
+     */
+    private createLoadAvgStates;
     private createAndSetState;
     private computeTopAvgTemp;
     private formatUptime;

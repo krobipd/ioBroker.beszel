@@ -74,7 +74,6 @@ class BeszelAdapter extends utils.Adapter {
         // Validate required config
         if (!config.url || !config.username || !config.password) {
             this.log.error("Beszel adapter: URL, username, and password are required. Please configure the adapter.");
-            await this.setStateAsync("info.connection", { val: false, ack: true });
             return;
         }
         this.client = new beszel_client_js_1.BeszelClient(config.url, config.username, config.password);
@@ -160,8 +159,7 @@ class BeszelAdapter extends utils.Adapter {
             // Update each system
             for (const system of systems) {
                 const stats = statsMap.get(system.id);
-                const sysContainers = containers.filter((c) => c.system === system.id);
-                await this.stateManager.updateSystem(system, stats, sysContainers, config);
+                await this.stateManager.updateSystem(system, stats, containers, config);
             }
             // Cleanup stale systems
             await this.stateManager.cleanupSystems(systems.map((s) => s.name));
