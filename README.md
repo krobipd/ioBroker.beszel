@@ -8,6 +8,8 @@
 ![Installations](https://iobroker.live/badges/beszel-installed.svg)
 [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
+![Logo](https://raw.githubusercontent.com/krobipd/ioBroker.beszel/main/admin/beszel.svg)
+
 Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server monitoring metrics for all registered systems as ioBroker states.
 
 ---
@@ -126,7 +128,7 @@ beszel.0.
 - Add system count to startup log message
 
 ### 0.1.6 (2026-03-18)
-- Code cleanup: remove dead code, fix duplicate container filter, extract load avg helper (DRY)
+- Code cleanup: remove dead code, fix duplicate container filter, extract load avg helper
 
 ### 0.1.5 (2026-03-17)
 - Migrate to @alcalzone/release-script, enable npm Trusted Publishing
@@ -134,19 +136,7 @@ beszel.0.
 ### 0.1.4 (2026-03-17)
 - Fix all repochecker issues; rename repo to ioBroker.beszel; add responsive grid sizes
 
-### 0.1.3 (2026-03-17)
-- Fix all JSDoc warnings; update dependencies
-
-### 0.1.2 (2026-03-17)
-- Fix: add missing cpu_steal state to CPU breakdown metric
-
-### 0.1.1 (2026-03-17)
-- Fix: disabled metric states are now deleted on adapter restart
-
-### 0.1.0 (2026-03-17)
-- Initial release
-
-Full details: [CHANGELOG.md](CHANGELOG.md)
+Older changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
