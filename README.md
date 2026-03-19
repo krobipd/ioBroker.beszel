@@ -151,10 +151,10 @@ If this adapter is useful to you, consider supporting its development via the Pa
 
 ## License
 
-Copyright (c) 2026 krobi <krobi@power-dreams.com>
+MIT License - see [LICENSE](LICENSE)
 
-MIT License — see [LICENSE](LICENSE)
+Copyright (c) 2026 krobi <krobi@power-dreams.com>
 
 ---
 
-*Developed with support from Claude.ai*
+*Developed with assistance from Claude.ai*
