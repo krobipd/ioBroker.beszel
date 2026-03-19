@@ -49,10 +49,15 @@ export class StateManager {
   ): Promise<void> {
     const sysId = `systems.${this.sanitize(system.name)}`;
 
-    // Create device object
-    await this.adapter.setObjectNotExistsAsync(sysId, {
+    // Create/update device object with online indicator
+    await this.adapter.extendObjectAsync(sysId, {
       type: "device",
-      common: { name: system.name } as ioBroker.ObjectCommon,
+      common: {
+        name: system.name,
+        statusStates: {
+          onlineId: `${this.adapter.namespace}.${sysId}.online`,
+        },
+      } as ioBroker.DeviceCommon,
       native: { id: system.id, host: system.host },
     });
 

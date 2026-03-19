@@ -1,4 +1,12 @@
 # Changelog
+## 0.1.8 (2026-03-19)
+
+- Add online/offline indicator to system device folders (statusStates.onlineId)
+
+## 0.1.7 (2026-03-19)
+
+- Add system count to startup log message
+
 ## 0.1.6 (2026-03-18)
 
 - Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call

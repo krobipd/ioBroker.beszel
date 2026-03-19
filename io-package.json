@@ -1,8 +1,34 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.1.6",
+    "version": "0.1.8",
     "news": {
+      "0.1.8": {
+        "en": "Add online/offline indicator to system device folders",
+        "de": "Online/Offline-Anzeige zu System-Geräteordnern hinzugefügt",
+        "ru": "Добавлен индикатор онлайн/офлайн в папки системных устройств",
+        "pt": "Adicionar indicador online/offline às pastas de dispositivos do sistema",
+        "nl": "Online/offline-indicator toegevoegd aan systeemapparaapmappen",
+        "fr": "Ajout d'un indicateur en ligne/hors ligne aux dossiers d'appareils système",
+        "it": "Aggiunto indicatore online/offline alle cartelle dei dispositivi di sistema",
+        "es": "Agregar indicador en línea/fuera de línea a las carpetas de dispositivos del sistema",
+        "pl": "Dodano wskaźnik online/offline do folderów urządzeń systemowych",
+        "uk": "Додано індикатор онлайн/офлайн до папок системних пристроїв",
+        "zh-cn": "为系统设备文件夹添加在线/离线指示器"
+      },
+      "0.1.7": {
+        "en": "Add system count to startup log message",
+        "de": "Systemanzahl zur Startprotokollmeldung hinzugefügt",
+        "ru": "Добавлено количество систем в сообщение журнала запуска",
+        "pt": "Adicionar contagem de sistemas à mensagem de log de inicialização",
+        "nl": "Systeemaantal toegevoegd aan opstartlogboekbericht",
+        "fr": "Ajout du nombre de systèmes au message de journal de démarrage",
+        "it": "Aggiunto conteggio sistemi al messaggio di log di avvio",
+        "es": "Agregar recuento de sistemas al mensaje de registro de inicio",
+        "pl": "Dodano liczbę systemów do komunikatu dziennika startowego",
+        "uk": "Додано кількість систем до повідомлення журналу запуску",
+        "zh-cn": "在启动日志消息中添加系统数量"
+      },
       "0.1.6": {
         "en": "Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call\nFix duplicate container filter (was filtered in main.ts and again in updateContainers)\nExtract load avg state creation into helper to eliminate code duplication",
         "de": "Code-Reinigung: entfernen Sie ungenutzte Typ-Aliase, tot `_config` Parameter, redundantes Set Mitgliedstaat\nBefestigen Sie doppelten Behälterfilter (in main.ts und wieder in updateContainers gefiltert)\nExtrahieren Sie die Last avg Zustand Kreation in Helfer, um Code-Dualplikation zu beseitigen",

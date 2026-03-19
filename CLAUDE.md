@@ -7,7 +7,7 @@ ioBroker adapter for [Beszel](https://github.com/henrygd/beszel) server monitori
 - **Adapter name:** `beszel`
 - **NPM package:** `iobroker.beszel`
 - **GitHub:** `krobipd/ioBroker.beszel`
-- **Version:** `0.1.0`
+- **Version:** `0.1.8`
 - **Author:** krobi <krobi@power-dreams.com>
 - **Mode:** daemon (polling)
 - **No extra runtime dependencies** — uses only `@iobroker/adapter-core` + Node.js built-in `http`/`https`
@@ -86,6 +86,19 @@ npm run build           # Full build (rm -rf build + tsc)
 npm run build:test      # Build for tests (includes test/ directory)
 npm run check           # TypeScript type check only (no emit)
 npm run lint            # ESLint
-npm test                # Build + run Mocha tests
-npm run version:patch   # Bump patch version + git tag
+npm test                # Build + run Mocha tests (ACHTUNG: überschreibt Production-Build!)
+npm run release patch   # Release via @alcalzone/release-script
+```
+
+## Release-Workflow
+
+`manual-review` Plugin blockiert interaktiv → manueller Workaround:
+```bash
+# 1. CHANGELOG.md unter ## **WORK IN PROGRESS** befüllen
+# 2. npm run build  (NICHT npm test!)
+# 3. Version in package.json + io-package.json bumpen
+# 4. CHANGELOG + README (Badge + Changelog-Section) aktualisieren
+# 5. io-package.json news (alle 11 Sprachen) hinzufügen
+# 6. git add ... && git commit -m "chore: release vX.Y.Z"
+# 7. git tag vX.Y.Z && git push && git push origin vX.Y.Z
 ```

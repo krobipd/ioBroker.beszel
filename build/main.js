@@ -41,6 +41,7 @@ class BeszelAdapter extends utils.Adapter {
     stateManager = null;
     pollTimer = null;
     isPolling = false;
+    lastSystemCount = 0;
     constructor(options = {}) {
         super({
             ...options,
@@ -101,7 +102,7 @@ class BeszelAdapter extends utils.Adapter {
         this.pollTimer = setInterval(() => {
             void this.poll();
         }, intervalMs);
-        this.log.info(`Beszel adapter started. Polling every ${config.pollInterval ?? 60}s from ${config.url}`);
+        this.log.info(`Beszel adapter started — ${this.lastSystemCount} system(s), polling every ${config.pollInterval ?? 60}s`);
     }
     async onUnload(callback) {
         try {
@@ -163,6 +164,7 @@ class BeszelAdapter extends utils.Adapter {
             }
             // Cleanup stale systems
             await this.stateManager.cleanupSystems(systems.map((s) => s.name));
+            this.lastSystemCount = systems.length;
             this.log.debug(`Polled ${systems.length} systems successfully`);
         }
         catch (err) {

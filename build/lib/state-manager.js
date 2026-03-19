@@ -35,10 +35,15 @@ class StateManager {
      */
     async updateSystem(system, stats, containers, config) {
         const sysId = `systems.${this.sanitize(system.name)}`;
-        // Create device object
-        await this.adapter.setObjectNotExistsAsync(sysId, {
+        // Create/update device object with online indicator
+        await this.adapter.extendObjectAsync(sysId, {
             type: "device",
-            common: { name: system.name },
+            common: {
+                name: system.name,
+                statusStates: {
+                    onlineId: `${this.adapter.namespace}.${sysId}.online`,
+                },
+            },
             native: { id: system.id, host: system.host },
         });
         // Always: online + status
