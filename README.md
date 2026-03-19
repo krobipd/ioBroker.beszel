@@ -1,12 +1,12 @@
 # ioBroker.beszel
 
-![Version](https://img.shields.io/badge/version-0.1.6-blue)
+[![npm version](https://img.shields.io/npm/v/iobroker.beszel)](https://www.npmjs.com/package/iobroker.beszel)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
-![npm downloads](https://img.shields.io/npm/dt/iobroker.beszel)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![npm downloads](https://img.shields.io/npm/dt/iobroker.beszel)](https://www.npmjs.com/package/iobroker.beszel)
 ![Installations](https://iobroker.live/badges/beszel-installed.svg)
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
 Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server monitoring metrics for all registered systems as ioBroker states.
 
@@ -149,9 +149,7 @@ Full details: [CHANGELOG.md](CHANGELOG.md)
 - [ioBroker Forum](https://forum.iobroker.net/)
 - [GitHub Issues](https://github.com/krobipd/ioBroker.beszel/issues)
 
-If this adapter is useful to you, consider a small donation:
-
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
+If this adapter is useful to you, consider supporting its development via the PayPal badge at the top of this page.
 
 ---
 
