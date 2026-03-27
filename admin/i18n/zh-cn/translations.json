@@ -37,9 +37,8 @@
     "metric_gpu": "GPU 指标（使用率、内存、功耗）",
     "metric_containers": "容器监控（Docker / Podman）",
     "metric_battery": "电池状态",
-    "aboutTab": "关于",
-    "aboutHeader": "支持此适配器",
     "aboutInfo": "此适配器免费且开源。如果您觉得有用，请考虑通过小额捐款支持开发。",
     "donateKofi": "在Ko-fi上支持",
-    "donatePaypal": "通过PayPal捐赠"
+    "donatePaypal": "通过PayPal捐赠",
+    "supportHeader": "支持"
 }

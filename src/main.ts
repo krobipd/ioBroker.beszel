@@ -6,7 +6,7 @@ import type { AdapterConfig } from "./lib/types.js";
 class BeszelAdapter extends utils.Adapter {
   private client: BeszelClient | null = null;
   private stateManager: StateManager | null = null;
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ioBroker.Interval | undefined = undefined;
   private isPolling = false;
   private lastSystemCount = 0;
 
@@ -80,7 +80,7 @@ class BeszelAdapter extends utils.Adapter {
 
     // Set up recurring poll
     const intervalMs = Math.max(10, config.pollInterval ?? 60) * 1000;
-    this.pollTimer = setInterval(() => {
+    this.pollTimer = this.setInterval(() => {
       void this.poll();
     }, intervalMs);
 
@@ -89,13 +89,13 @@ class BeszelAdapter extends utils.Adapter {
     );
   }
 
-  private async onUnload(callback: () => void): Promise<void> {
+  private onUnload(callback: () => void): void {
     try {
       if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
+        this.clearInterval(this.pollTimer);
+        this.pollTimer = undefined;
       }
-      await this.setStateAsync("info.connection", { val: false, ack: true });
+      void this.setState("info.connection", { val: false, ack: true });
     } catch {
       // ignore
     }

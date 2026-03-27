@@ -37,9 +37,8 @@
     "metric_gpu": "GPU-Metriken (Auslastung, Speicher, Leistung)",
     "metric_containers": "Container-Überwachung (Docker / Podman)",
     "metric_battery": "Akkustatus",
-    "aboutTab": "Info",
-    "aboutHeader": "Diesen Adapter unterstützen",
     "aboutInfo": "Dieser Adapter ist kostenlos und Open Source. Wenn er dir nützlich ist, unterstütze die Entwicklung gerne mit einer kleinen Spende.",
     "donateKofi": "Unterstützen auf Ko-fi",
-    "donatePaypal": "Über PayPal spenden"
+    "donatePaypal": "Über PayPal spenden",
+    "supportHeader": "Unterstützung"
 }

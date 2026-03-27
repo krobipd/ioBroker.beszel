@@ -39,7 +39,7 @@ const state_manager_js_1 = require("./lib/state-manager.js");
 class BeszelAdapter extends utils.Adapter {
     client = null;
     stateManager = null;
-    pollTimer = null;
+    pollTimer = undefined;
     isPolling = false;
     lastSystemCount = 0;
     constructor(options = {}) {
@@ -99,18 +99,18 @@ class BeszelAdapter extends utils.Adapter {
         await this.poll();
         // Set up recurring poll
         const intervalMs = Math.max(10, config.pollInterval ?? 60) * 1000;
-        this.pollTimer = setInterval(() => {
+        this.pollTimer = this.setInterval(() => {
             void this.poll();
         }, intervalMs);
         this.log.info(`Beszel adapter started — ${this.lastSystemCount} system(s), polling every ${config.pollInterval ?? 60}s`);
     }
-    async onUnload(callback) {
+    onUnload(callback) {
         try {
             if (this.pollTimer) {
-                clearInterval(this.pollTimer);
-                this.pollTimer = null;
+                this.clearInterval(this.pollTimer);
+                this.pollTimer = undefined;
             }
-            await this.setStateAsync("info.connection", { val: false, ack: true });
+            void this.setState("info.connection", { val: false, ack: true });
         }
         catch {
             // ignore

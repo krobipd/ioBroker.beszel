@@ -1,220 +1,220 @@
 {
-    "common": {
-        "name": "beszel",
-        "version": "0.1.9",
-        "news": {
-            "0.1.9": {
-                "en": "Logging cleanup: stale system removal moved to debug level",
-                "de": "Logging-Bereinigung: Entfernung veralteter Systeme auf Debug-Level verschoben",
-                "ru": "Очистка логирования: удаление устаревших систем перенесено на уровень debug",
-                "pt": "Limpeza de logging: remoção de sistemas obsoletos movida para nível debug",
-                "nl": "Logging opruiming: verwijdering van verouderde systemen verplaatst naar debug-niveau",
-                "fr": "Nettoyage du logging: suppression des systèmes obsolètes déplacée au niveau debug",
-                "it": "Pulizia logging: rimozione di sistemi obsoleti spostata al livello debug",
-                "es": "Limpieza de logging: eliminación de sistemas obsoletos movida al nivel debug",
-                "pl": "Czyszczenie logowania: usuwanie przestarzałych systemów przeniesione na poziom debug",
-                "uk": "Очищення логування: видалення застарілих систем переміщено на рівень debug",
-                "zh-cn": "日志清理：将过期系统的删除移至debug级别"
-            },
-            "0.1.8": {
-                "en": "Add online/offline indicator to system device folders",
-                "de": "Online/Offline-Anzeige zu System-Geräteordnern hinzugefügt",
-                "ru": "Добавлен индикатор онлайн/офлайн в папки системных устройств",
-                "pt": "Adicionar indicador online/offline às pastas de dispositivos do sistema",
-                "nl": "Online/offline-indicator toegevoegd aan systeemapparaapmappen",
-                "fr": "Ajout d'un indicateur en ligne/hors ligne aux dossiers d'appareils système",
-                "it": "Aggiunto indicatore online/offline alle cartelle dei dispositivi di sistema",
-                "es": "Agregar indicador en línea/fuera de línea a las carpetas de dispositivos del sistema",
-                "pl": "Dodano wskaźnik online/offline do folderów urządzeń systemowych",
-                "uk": "Додано індикатор онлайн/офлайн до папок системних пристроїв",
-                "zh-cn": "为系统设备文件夹添加在线/离线指示器"
-            },
-            "0.1.6": {
-                "en": "Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call\nFix duplicate container filter (was filtered in main.ts and again in updateContainers)\nExtract load avg state creation into helper to eliminate code duplication",
-                "de": "Code-Reinigung: entfernen Sie ungenutzte Typ-Aliase, tot `_config` Parameter, redundantes Set Mitgliedstaat\nBefestigen Sie doppelten Behälterfilter (in main.ts und wieder in updateContainers gefiltert)\nExtrahieren Sie die Last avg Zustand Kreation in Helfer, um Code-Dualplikation zu beseitigen",
-                "ru": "Очистка кода: удаление неиспользуемых псевдонимов типа, мертвый параметр «_config» Государственный призыв\nИсправьте дублированный контейнерный фильтр (был отфильтрован в main.ts и снова в UpdateContainers)\nЭкстракт загрузки avg создания состояния в помощник для устранения дублирования кода",
-                "pt": "Limpeza de código: remover aliases de tipo não utilizados, parâmetro '_config' morto, conjunto redundante Chamada de Estado\nCorrigir filtro de recipiente duplicado (foi filtrado em main.ts e novamente em updateContainers)\nExtrair a criação do estado de avg de carga no helper para eliminar a duplicação de código",
-                "nl": "Code opruiming: verwijder ongebruikte type aliassen, dode parameter, redundante set Staatsoproep\nFix dubbele container filter (was gefilterd in main.ts en opnieuw in update Containers)\nUitpakken laden avg toestand aanmaken in helper om code duplicatie te elimineren",
-                "fr": "Nettoyage du code: supprimer les alias de type inutilisés, le paramètre mort `_config`, un ensemble redondant Appel d'État\nCorrection du filtre conteneur dupliqué (a été filtré dans main.ts et à nouveau dans updateContainers)\nExtraire la création d'état de charge avg dans helper pour éliminer la duplication de code",
-                "it": "Pulizia del codice: rimuovere alias di tipo non utilizzati, morto `_config` parametro, set ridondante Chiamata di Stato\nFissare il filtro del contenitore duplicato (era filtrato in main.ts e di nuovo in updateContainers)\nEstrarre la creazione di stato avg di carico in helper per eliminare la duplicazione di codice",
-                "es": "Limpieza del código: eliminar alias de tipo no utilizados, parámetro muerto `_config`, conjunto redundante Llamamiento del Estado\nFijar filtro de contenedor duplicado (fue filtrado en main.ts y de nuevo en actualizaciónContainers)\nExtraer la carga avg estado creación en helper para eliminar duplicación de código",
-                "pl": "Czyszczenie kodu: usuń nieużywane aliasy typu, nieaktywny parametr '_ config', zbędny zestaw Wezwanie państwa\nFix duplikat filtr pojemnika (został filtrowany w main.ts i ponownie w updateContainer)\nWyciąg obciążenia avg stan tworzenia w helper w celu wyeliminowania powielania kodu",
-                "uk": "Чистка коду: видалення невикористаного типу псевдонімів, відмерлого параметра `_config``, надлишковий набір Державний дзвінок\nВиправлення дублікатів фільтра контейнера (відфільтровано в основних.ts і знову в оновленні\nВитягувати завантаження avg державного створення в помічник для усунення дублювання коду",
-                "zh-cn": "代码清除: 删除未使用的类型别名, 已死 QQconfig 参数, 冗余集 国家电话\n修复重复的容器过滤器(在主.ts和在更新容器中再次过滤)\n提取加载 avg 状态创建到帮助器, 以消除代码重复"
-            },
-            "0.1.5": {
-                "en": "Migrate to @alcalzone/release-script for automated releases\nEnable npm Trusted Publishing (OIDC), remove legacy npm token",
-                "de": "Migration auf @alcalzone/Release-script für automatisierte Versionen\nAktiviere npm Trusted Publishing (OIDC), legacy npm token",
-                "ru": "Migrate to @alcalzone/releasescript для автоматизированных релизов\nВключить npm Trusted Publishing (OIDC), удалить устаревший токен npm",
-                "pt": "Migrar para @alcalzone/release-script para versões automatizadas\nActivar a publicação confiável do npm (OIDC), remover o símbolo legado do npm",
-                "nl": "Migreren naar @alcalzone/release-script voor geautomatiseerde releases\nNpm Trusted Publishing (OIDC) inschakelen, legacy npm token verwijderen",
-                "fr": "Migrer vers @alcalzone/release-script pour les versions automatisées\nActiver npm Trusted Publishing (OIDC), supprimer le legs npm token",
-                "it": "Migrare a @alcalzone/release-script per le versioni automatizzate\nAbilitare npm Trusted Publishing (OIDC), rimuovere il token npm legacy",
-                "es": "Migrar a @alcalzone/release-script para versiones automatizadas\nActivar npm Trusted Publishing (OIDC), eliminar el legado npm token",
-                "pl": "Migrate to @ alcalzone / release- script for automatic releases\nWłącz npm Zaufane Publishing (OIDC), usuń poprzednią npm token",
-                "uk": "Migrate to @alcalzone/видання для автоматизованих релізів\nУвімкнути npm Trusted Publishing (OIDC), видалити дані npm token",
-                "zh-cn": "移动到 @alcalzone/ 释放- 标记用于自动发布\n启用 npm 信任的出版( OIDC), 删除遗留 npm 令牌"
-            },
-            "0.1.4": {
-                "en": "Fix all repochecker issues; rename repo to ioBroker.beszel; add responsive grid sizes",
-                "de": "Alle Repochecker-Fehler behoben; Repo umbenannt zu ioBroker.beszel; responsive Grid-Größen ergänzt",
-                "ru": "Исправлены все ошибки репочекера; репозиторий переименован в ioBroker.beszel",
-                "pt": "Corrigidos todos os problemas do repochecker; repositório renomeado para ioBroker.beszel",
-                "nl": "Alle repochecker-problemen opgelost; repository hernoemd naar ioBroker.beszel",
-                "fr": "Correction de tous les problèmes du repochecker; dépôt renommé en ioBroker.beszel",
-                "it": "Corretti tutti i problemi del repochecker; repository rinominato in ioBroker.beszel",
-                "es": "Corregidos todos los problemas del repochecker; repositorio renombrado a ioBroker.beszel",
-                "pl": "Poprawiono wszystkie błędy repochecker; repozytorium zmieniono na ioBroker.beszel",
-                "uk": "Виправлено всі помилки репочекера; репозиторій перейменовано на ioBroker.beszel",
-                "zh-cn": "修复所有 repochecker 问题；仓库重命名为 ioBroker.beszel"
-            },
-            "0.1.3": {
-                "en": "Fix all JSDoc warnings; update dependencies",
-                "de": "Alle JSDoc-Warnungen behoben; Abhängigkeiten aktualisiert",
-                "ru": "Исправлены все предупреждения JSDoc; обновлены зависимости",
-                "pt": "Corrigidos todos os avisos JSDoc; dependências atualizadas",
-                "nl": "Alle JSDoc-waarschuwingen opgelost; afhankelijkheden bijgewerkt",
-                "fr": "Correction de tous les avertissements JSDoc; dépendances mises à jour",
-                "it": "Corretti tutti gli avvisi JSDoc; dipendenze aggiornate",
-                "es": "Corregidas todas las advertencias JSDoc; dependencias actualizadas",
-                "pl": "Poprawiono wszystkie ostrzeżenia JSDoc; zaktualizowano zależności",
-                "uk": "Виправлено всі попередження JSDoc; оновлено залежності",
-                "zh-cn": "修复所有 JSDoc 警告；更新依赖项"
-            },
-            "0.1.2": {
-                "en": "Fix: add missing cpu_steal state to CPU breakdown metric",
-                "de": "Fix: fehlender cpu_steal Datenpunkt bei CPU Breakdown ergänzt",
-                "ru": "Исправление: добавлено отсутствующее состояние cpu_steal в разбивке CPU",
-                "pt": "Correção: adicionado estado cpu_steal ausente na métrica de detalhamento da CPU",
-                "nl": "Fix: ontbrekende cpu_steal staat toegevoegd aan CPU breakdown metric",
-                "fr": "Correction: état cpu_steal manquant ajouté à la métrique de détail CPU",
-                "it": "Fix: aggiunto lo stato cpu_steal mancante nella metrica di dettaglio CPU",
-                "es": "Corrección: agregado el estado cpu_steal faltante en la métrica de desglose CPU",
-                "pl": "Poprawka: dodano brakujący stan cpu_steal w metryce szczegółów CPU",
-                "uk": "Виправлення: додано відсутній стан cpu_steal у деталізації CPU",
-                "zh-cn": "修复：在 CPU 详细指标中添加缺失的 cpu_steal 状态"
-            }
-        },
-        "titleLang": {
-            "en": "Beszel Monitor",
-            "de": "Beszel Monitor",
-            "ru": "Монитор Beszel",
-            "pt": "Monitor Beszel",
-            "nl": "Beszel Monitor",
-            "fr": "Moniteur Beszel",
-            "it": "Monitor Beszel",
-            "es": "Monitor Beszel",
-            "pl": "Monitor Beszel",
-            "uk": "Монітор Beszel",
-            "zh-cn": "Beszel 监控"
-        },
-        "desc": {
-            "en": "Connects to a Beszel Hub and exposes server metrics as ioBroker states",
-            "de": "Verbindet sich mit einem Beszel Hub und stellt Server-Metriken als ioBroker-Datenpunkte bereit",
-            "ru": "Подключается к Beszel Hub и предоставляет метрики сервера как состояния ioBroker",
-            "pt": "Conecta-se a um Beszel Hub e expõe métricas do servidor como estados ioBroker",
-            "nl": "Verbindt met een Beszel Hub en stelt servermetrisch beschikbaar als ioBroker-staten",
-            "fr": "Se connecte à un Beszel Hub et expose les métriques du serveur comme états ioBroker",
-            "it": "Si connette a un Beszel Hub ed espone le metriche del server come stati ioBroker",
-            "es": "Se conecta a un Beszel Hub y expone métricas del servidor como estados ioBroker",
-            "pl": "Łączy się z Beszel Hub i udostępnia metryki serwera jako stany ioBroker",
-            "uk": "Підключається до Beszel Hub та надає метрики сервера як стани ioBroker",
-            "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
-        },
-        "authors": [
-            "krobi <krobi@power-dreams.com>"
-        ],
-        "keywords": [
-            "beszel",
-            "monitoring",
-            "server",
-            "metrics",
-            "hardware"
-        ],
-        "licenseInformation": {
-            "license": "MIT",
-            "type": "free"
-        },
-        "platform": "Javascript/Node.js",
-        "icon": "beszel.svg",
-        "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.beszel/main/admin/beszel.svg",
-        "readme": "https://github.com/krobipd/ioBroker.beszel/blob/main/README.md",
-        "enabled": true,
-        "tier": 3,
-        "loglevel": "info",
-        "mode": "daemon",
-        "type": "hardware",
-        "compact": true,
-        "connectionType": "local",
-        "dataSource": "poll",
-        "adminUI": {
-            "config": "json"
-        },
-        "supportedMessages": {
-            "stopInstance": true
-        },
-        "dependencies": [
-            {
-                "js-controller": ">=7.0.0"
-            }
-        ],
-        "globalDependencies": [
-            {
-                "admin": ">=7.6.20"
-            }
-        ]
+  "common": {
+    "name": "beszel",
+    "version": "0.2.0",
+    "news": {
+      "0.2.0": {
+        "en": "Use adapter timer methods, synchronous onUnload, merge About into Connection tab, add Windows/macOS CI, full MIT license in README",
+        "de": "Adapter-Timer-Methoden, synchrones onUnload, About-Tab in Verbindung integriert, Windows/macOS CI, vollständiger MIT-Lizenztext in README",
+        "ru": "Методы таймера адаптера, синхронный onUnload, вкладка О программе объединена с Подключение, CI для Windows/macOS, полный текст лицензии MIT в README",
+        "pt": "Métodos de timer do adaptador, onUnload síncrono, aba Sobre integrada em Conexão, CI Windows/macOS, texto completo da licença MIT no README",
+        "nl": "Adapter-timermethoden, synchrone onUnload, Over-tab samengevoegd met Verbinding, Windows/macOS CI, volledige MIT-licentietekst in README",
+        "fr": "Méthodes de timer adaptateur, onUnload synchrone, onglet À propos fusionné dans Connexion, CI Windows/macOS, texte complet de licence MIT dans README",
+        "it": "Metodi timer adattatore, onUnload sincrono, scheda Info integrata in Connessione, CI Windows/macOS, testo completo licenza MIT nel README",
+        "es": "Métodos de temporizador del adaptador, onUnload síncrono, pestaña Acerca de integrada en Conexión, CI Windows/macOS, texto completo de licencia MIT en README",
+        "pl": "Metody timera adaptera, synchroniczne onUnload, zakładka O nas zintegrowana z Połączenie, CI Windows/macOS, pełny tekst licencji MIT w README",
+        "uk": "Методи таймера адаптера, синхронний onUnload, вкладка Про програму об'єднана з Підключення, CI для Windows/macOS, повний текст ліцензії MIT в README",
+        "zh-cn": "使用适配器定时器方法，同步onUnload，将关于标签合并到连接标签，添加Windows/macOS CI，README中完整MIT许可证文本"
+      },
+      "0.1.9": {
+        "en": "Logging cleanup: stale system removal moved to debug level",
+        "de": "Logging-Bereinigung: Entfernung veralteter Systeme auf Debug-Level verschoben",
+        "ru": "Очистка логирования: удаление устаревших систем перенесено на уровень debug",
+        "pt": "Limpeza de logging: remoção de sistemas obsoletos movida para nível debug",
+        "nl": "Logging opruiming: verwijdering van verouderde systemen verplaatst naar debug-niveau",
+        "fr": "Nettoyage du logging: suppression des systèmes obsolètes déplacée au niveau debug",
+        "it": "Pulizia logging: rimozione di sistemi obsoleti spostata al livello debug",
+        "es": "Limpieza de logging: eliminación de sistemas obsoletos movida al nivel debug",
+        "pl": "Czyszczenie logowania: usuwanie przestarzałych systemów przeniesione na poziom debug",
+        "uk": "Очищення логування: видалення застарілих систем переміщено на рівень debug",
+        "zh-cn": "日志清理：将过期系统的删除移至debug级别"
+      },
+      "0.1.8": {
+        "en": "Add online/offline indicator to system device folders",
+        "de": "Online/Offline-Anzeige zu System-Geräteordnern hinzugefügt",
+        "ru": "Добавлен индикатор онлайн/офлайн в папки системных устройств",
+        "pt": "Adicionar indicador online/offline às pastas de dispositivos do sistema",
+        "nl": "Online/offline-indicator toegevoegd aan systeemapparaapmappen",
+        "fr": "Ajout d'un indicateur en ligne/hors ligne aux dossiers d'appareils système",
+        "it": "Aggiunto indicatore online/offline alle cartelle dei dispositivi di sistema",
+        "es": "Agregar indicador en línea/fuera de línea a las carpetas de dispositivos del sistema",
+        "pl": "Dodano wskaźnik online/offline do folderów urządzeń systemowych",
+        "uk": "Додано індикатор онлайн/офлайн до папок системних пристроїв",
+        "zh-cn": "为系统设备文件夹添加在线/离线指示器"
+      },
+      "0.1.6": {
+        "en": "Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call\nFix duplicate container filter (was filtered in main.ts and again in updateContainers)\nExtract load avg state creation into helper to eliminate code duplication",
+        "de": "Code-Reinigung: entfernen Sie ungenutzte Typ-Aliase, tot `_config` Parameter, redundantes Set Mitgliedstaat\nBefestigen Sie doppelten Behälterfilter (in main.ts und wieder in updateContainers gefiltert)\nExtrahieren Sie die Last avg Zustand Kreation in Helfer, um Code-Dualplikation zu beseitigen",
+        "ru": "Очистка кода: удаление неиспользуемых псевдонимов типа, мертвый параметр «_config» Государственный призыв\nИсправьте дублированный контейнерный фильтр (был отфильтрован в main.ts и снова в UpdateContainers)\nЭкстракт загрузки avg создания состояния в помощник для устранения дублирования кода",
+        "pt": "Limpeza de código: remover aliases de tipo não utilizados, parâmetro '_config' morto, conjunto redundante Chamada de Estado\nCorrigir filtro de recipiente duplicado (foi filtrado em main.ts e novamente em updateContainers)\nExtrair a criação do estado de avg de carga no helper para eliminar a duplicação de código",
+        "nl": "Code opruiming: verwijder ongebruikte type aliassen, dode parameter, redundante set Staatsoproep\nFix dubbele container filter (was gefilterd in main.ts en opnieuw in update Containers)\nUitpakken laden avg toestand aanmaken in helper om code duplicatie te elimineren",
+        "fr": "Nettoyage du code: supprimer les alias de type inutilisés, le paramètre mort `_config`, un ensemble redondant Appel d'État\nCorrection du filtre conteneur dupliqué (a été filtré dans main.ts et à nouveau dans updateContainers)\nExtraire la création d'état de charge avg dans helper pour éliminer la duplication de code",
+        "it": "Pulizia del codice: rimuovere alias di tipo non utilizzati, morto `_config` parametro, set ridondante Chiamata di Stato\nFissare il filtro del contenitore duplicato (era filtrato in main.ts e di nuovo in updateContainers)\nEstrarre la creazione di stato avg di carico in helper per eliminare la duplicazione di codice",
+        "es": "Limpieza del código: eliminar alias de tipo no utilizados, parámetro muerto `_config`, conjunto redundante Llamamiento del Estado\nFijar filtro de contenedor duplicado (fue filtrado en main.ts y de nuevo en actualizaciónContainers)\nExtraer la carga avg estado creación en helper para eliminar duplicación de código",
+        "pl": "Czyszczenie kodu: usuń nieużywane aliasy typu, nieaktywny parametr '_ config', zbędny zestaw Wezwanie państwa\nFix duplikat filtr pojemnika (został filtrowany w main.ts i ponownie w updateContainer)\nWyciąg obciążenia avg stan tworzenia w helper w celu wyeliminowania powielania kodu",
+        "uk": "Чистка коду: видалення невикористаного типу псевдонімів, відмерлого параметра `_config``, надлишковий набір Державний дзвінок\nВиправлення дублікатів фільтра контейнера (відфільтровано в основних.ts і знову в оновленні\nВитягувати завантаження avg державного створення в помічник для усунення дублювання коду",
+        "zh-cn": "代码清除: 删除未使用的类型别名, 已死 QQconfig 参数, 冗余集 国家电话\n修复重复的容器过滤器(在主.ts和在更新容器中再次过滤)\n提取加载 avg 状态创建到帮助器, 以消除代码重复"
+      },
+      "0.1.5": {
+        "en": "Migrate to @alcalzone/release-script for automated releases\nEnable npm Trusted Publishing (OIDC), remove legacy npm token",
+        "de": "Migration auf @alcalzone/Release-script für automatisierte Versionen\nAktiviere npm Trusted Publishing (OIDC), legacy npm token",
+        "ru": "Migrate to @alcalzone/releasescript для автоматизированных релизов\nВключить npm Trusted Publishing (OIDC), удалить устаревший токен npm",
+        "pt": "Migrar para @alcalzone/release-script para versões automatizadas\nActivar a publicação confiável do npm (OIDC), remover o símbolo legado do npm",
+        "nl": "Migreren naar @alcalzone/release-script voor geautomatiseerde releases\nNpm Trusted Publishing (OIDC) inschakelen, legacy npm token verwijderen",
+        "fr": "Migrer vers @alcalzone/release-script pour les versions automatisées\nActiver npm Trusted Publishing (OIDC), supprimer le legs npm token",
+        "it": "Migrare a @alcalzone/release-script per le versioni automatizzate\nAbilitare npm Trusted Publishing (OIDC), rimuovere il token npm legacy",
+        "es": "Migrar a @alcalzone/release-script para versiones automatizadas\nActivar npm Trusted Publishing (OIDC), eliminar el legado npm token",
+        "pl": "Migrate to @ alcalzone / release- script for automatic releases\nWłącz npm Zaufane Publishing (OIDC), usuń poprzednią npm token",
+        "uk": "Migrate to @alcalzone/видання для автоматизованих релізів\nУвімкнути npm Trusted Publishing (OIDC), видалити дані npm token",
+        "zh-cn": "移动到 @alcalzone/ 释放- 标记用于自动发布\n启用 npm 信任的出版( OIDC), 删除遗留 npm 令牌"
+      },
+      "0.1.4": {
+        "en": "Fix all repochecker issues; rename repo to ioBroker.beszel; add responsive grid sizes",
+        "de": "Alle Repochecker-Fehler behoben; Repo umbenannt zu ioBroker.beszel; responsive Grid-Größen ergänzt",
+        "ru": "Исправлены все ошибки репочекера; репозиторий переименован в ioBroker.beszel",
+        "pt": "Corrigidos todos os problemas do repochecker; repositório renomeado para ioBroker.beszel",
+        "nl": "Alle repochecker-problemen opgelost; repository hernoemd naar ioBroker.beszel",
+        "fr": "Correction de tous les problèmes du repochecker; dépôt renommé en ioBroker.beszel",
+        "it": "Corretti tutti i problemi del repochecker; repository rinominato in ioBroker.beszel",
+        "es": "Corregidos todos los problemas del repochecker; repositorio renombrado a ioBroker.beszel",
+        "pl": "Poprawiono wszystkie błędy repochecker; repozytorium zmieniono na ioBroker.beszel",
+        "uk": "Виправлено всі помилки репочекера; репозиторій перейменовано на ioBroker.beszel",
+        "zh-cn": "修复所有 repochecker 问题；仓库重命名为 ioBroker.beszel"
+      },
+      "0.1.3": {
+        "en": "Fix all JSDoc warnings; update dependencies",
+        "de": "Alle JSDoc-Warnungen behoben; Abhängigkeiten aktualisiert",
+        "ru": "Исправлены все предупреждения JSDoc; обновлены зависимости",
+        "pt": "Corrigidos todos os avisos JSDoc; dependências atualizadas",
+        "nl": "Alle JSDoc-waarschuwingen opgelost; afhankelijkheden bijgewerkt",
+        "fr": "Correction de tous les avertissements JSDoc; dépendances mises à jour",
+        "it": "Corretti tutti gli avvisi JSDoc; dipendenze aggiornate",
+        "es": "Corregidas todas las advertencias JSDoc; dependencias actualizadas",
+        "pl": "Poprawiono wszystkie ostrzeżenia JSDoc; zaktualizowano zależności",
+        "uk": "Виправлено всі попередження JSDoc; оновлено залежності",
+        "zh-cn": "修复所有 JSDoc 警告；更新依赖项"
+      }
     },
-    "instanceObjects": [
-        {
-            "_id": "info",
-            "type": "channel",
-            "common": {
-                "name": "Information"
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.connection",
-            "type": "state",
-            "common": {
-                "name": "Connection status",
-                "type": "boolean",
-                "role": "indicator.connected",
-                "read": true,
-                "write": false,
-                "def": false
-            },
-            "native": {}
-        }
+    "titleLang": {
+      "en": "Beszel Monitor",
+      "de": "Beszel Monitor",
+      "ru": "Монитор Beszel",
+      "pt": "Monitor Beszel",
+      "nl": "Beszel Monitor",
+      "fr": "Moniteur Beszel",
+      "it": "Monitor Beszel",
+      "es": "Monitor Beszel",
+      "pl": "Monitor Beszel",
+      "uk": "Монітор Beszel",
+      "zh-cn": "Beszel 监控"
+    },
+    "desc": {
+      "en": "Connects to a Beszel Hub and exposes server metrics as ioBroker states",
+      "de": "Verbindet sich mit einem Beszel Hub und stellt Server-Metriken als ioBroker-Datenpunkte bereit",
+      "ru": "Подключается к Beszel Hub и предоставляет метрики сервера как состояния ioBroker",
+      "pt": "Conecta-se a um Beszel Hub e expõe métricas do servidor como estados ioBroker",
+      "nl": "Verbindt met een Beszel Hub en stelt servermetrisch beschikbaar als ioBroker-staten",
+      "fr": "Se connecte à un Beszel Hub et expose les métriques du serveur comme états ioBroker",
+      "it": "Si connette a un Beszel Hub ed espone le metriche del server come stati ioBroker",
+      "es": "Se conecta a un Beszel Hub y expone métricas del servidor como estados ioBroker",
+      "pl": "Łączy się z Beszel Hub i udostępnia metryki serwera jako stany ioBroker",
+      "uk": "Підключається до Beszel Hub та надає метрики сервера як стани ioBroker",
+      "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
+    },
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
     ],
-    "encryptedNative": [
-        "password"
+    "keywords": [
+      "beszel",
+      "monitoring",
+      "server",
+      "metrics",
+      "hardware"
     ],
-    "protectedNative": [
-        "password"
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free"
+    },
+    "platform": "Javascript/Node.js",
+    "icon": "beszel.svg",
+    "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.beszel/main/admin/beszel.svg",
+    "readme": "https://github.com/krobipd/ioBroker.beszel/blob/main/README.md",
+    "enabled": true,
+    "tier": 3,
+    "loglevel": "info",
+    "mode": "daemon",
+    "type": "hardware",
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "poll",
+    "adminUI": {
+      "config": "json"
+    },
+    "supportedMessages": {
+      "stopInstance": true
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=7.0.0"
+      }
     ],
-    "native": {
-        "url": "",
-        "username": "",
-        "password": "",
-        "pollInterval": 60,
-        "metrics_uptime": true,
-        "metrics_agentVersion": false,
-        "metrics_services": false,
-        "metrics_cpu": true,
-        "metrics_loadAvg": true,
-        "metrics_cpuBreakdown": false,
-        "metrics_memory": true,
-        "metrics_memoryDetails": false,
-        "metrics_swap": false,
-        "metrics_disk": true,
-        "metrics_diskSpeed": true,
-        "metrics_extraFs": false,
-        "metrics_network": true,
-        "metrics_temperature": true,
-        "metrics_temperatureDetails": false,
-        "metrics_gpu": false,
-        "metrics_containers": false,
-        "metrics_battery": false
+    "globalDependencies": [
+      {
+        "admin": ">=7.6.20"
+      }
+    ]
+  },
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": "Information"
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "name": "Connection status",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
     }
+  ],
+  "encryptedNative": [
+    "password"
+  ],
+  "protectedNative": [
+    "password"
+  ],
+  "native": {
+    "url": "",
+    "username": "",
+    "password": "",
+    "pollInterval": 60,
+    "metrics_uptime": true,
+    "metrics_agentVersion": false,
+    "metrics_services": false,
+    "metrics_cpu": true,
+    "metrics_loadAvg": true,
+    "metrics_cpuBreakdown": false,
+    "metrics_memory": true,
+    "metrics_memoryDetails": false,
+    "metrics_swap": false,
+    "metrics_disk": true,
+    "metrics_diskSpeed": true,
+    "metrics_extraFs": false,
+    "metrics_network": true,
+    "metrics_temperature": true,
+    "metrics_temperatureDetails": false,
+    "metrics_gpu": false,
+    "metrics_containers": false,
+    "metrics_battery": false
+  }
 }

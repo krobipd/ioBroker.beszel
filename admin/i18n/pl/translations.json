@@ -37,9 +37,8 @@
     "metric_gpu": "Metryki GPU (użycie, pamięć, moc)",
     "metric_containers": "Monitorowanie kontenerów (Docker / Podman)",
     "metric_battery": "Stan baterii",
-    "aboutTab": "O programie",
-    "aboutHeader": "Wesprzyj ten adapter",
     "aboutInfo": "Ten adapter jest darmowy i otwartoźródłowy. Jeśli jest dla ciebie przydatny, rozważ wsparcie rozwoju małą darowizną.",
     "donateKofi": "Wesprzyj na Ko-fi",
-    "donatePaypal": "Przekaż darowiznę przez PayPal"
+    "donatePaypal": "Przekaż darowiznę przez PayPal",
+    "supportHeader": "Wsparcie"
 }
