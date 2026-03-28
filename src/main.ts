@@ -216,9 +216,7 @@ class BeszelAdapter extends utils.Adapter {
         this.client?.invalidateToken();
         this.authFailCount++;
         if (this.authFailCount <= 3) {
-          this.log.error(
-            "Authentication failed — check username and password",
-          );
+          this.log.error("Authentication failed — check username and password");
         } else if (this.authFailCount === 4) {
           this.log.error(
             "Authentication keeps failing — suppressing further auth errors",
