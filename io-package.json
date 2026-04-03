@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "news": {
+      "0.2.2": {
+        "en": "Modernize dev tooling (esbuild, TypeScript 5.9 pin, testing-action-check v2)",
+        "de": "Dev-Tooling modernisiert (esbuild, TypeScript 5.9 Pin, testing-action-check v2)",
+        "ru": "Модернизация инструментов разработки (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "pt": "Modernização das ferramentas de desenvolvimento (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "nl": "Ontwikkeltools gemoderniseerd (esbuild, TypeScript 5.9 pin, testing-action-check v2)",
+        "fr": "Modernisation des outils de développement (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "it": "Modernizzazione degli strumenti di sviluppo (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "es": "Modernización de herramientas de desarrollo (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "pl": "Modernizacja narzędzi programistycznych (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "uk": "Модернізація інструментів розробки (esbuild, TypeScript 5.9, testing-action-check v2)",
+        "zh-cn": "开发工具现代化（esbuild、TypeScript 5.9 固定、testing-action-check v2）"
+      },
       "0.2.1": {
         "en": "Error handling: dedup repeated errors, auth backoff, protect against empty system list deletion",
         "de": "Fehlerbehandlung: Doppelte Fehler unterdrücken, Auth-Backoff, Schutz gegen Löschung bei leerer Systemliste",
@@ -80,19 +93,6 @@
         "pl": "Migrate to @ alcalzone / release- script for automatic releases\nWłącz npm Zaufane Publishing (OIDC), usuń poprzednią npm token",
         "uk": "Migrate to @alcalzone/видання для автоматизованих релізів\nУвімкнути npm Trusted Publishing (OIDC), видалити дані npm token",
         "zh-cn": "移动到 @alcalzone/ 释放- 标记用于自动发布\n启用 npm 信任的出版( OIDC), 删除遗留 npm 令牌"
-      },
-      "0.1.4": {
-        "en": "Fix all repochecker issues; rename repo to ioBroker.beszel; add responsive grid sizes",
-        "de": "Alle Repochecker-Fehler behoben; Repo umbenannt zu ioBroker.beszel; responsive Grid-Größen ergänzt",
-        "ru": "Исправлены все ошибки репочекера; репозиторий переименован в ioBroker.beszel",
-        "pt": "Corrigidos todos os problemas do repochecker; repositório renomeado para ioBroker.beszel",
-        "nl": "Alle repochecker-problemen opgelost; repository hernoemd naar ioBroker.beszel",
-        "fr": "Correction de tous les problèmes du repochecker; dépôt renommé en ioBroker.beszel",
-        "it": "Corretti tutti i problemi del repochecker; repository rinominato in ioBroker.beszel",
-        "es": "Corregidos todos los problemas del repochecker; repositorio renombrado a ioBroker.beszel",
-        "pl": "Poprawiono wszystkie błędy repochecker; repozytorium zmieniono na ioBroker.beszel",
-        "uk": "Виправлено всі помилки репочекера; репозиторій перейменовано на ioBroker.beszel",
-        "zh-cn": "修复所有 repochecker 问题；仓库重命名为 ioBroker.beszel"
       }
     },
     "titleLang": {

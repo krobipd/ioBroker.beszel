@@ -122,6 +122,9 @@ beszel.0.
 
 ## Changelog
 
+### 0.2.2 (2026-04-03)
+- Modernize dev tooling (esbuild, TypeScript 5.9 pin, testing-action-check v2)
+
 ### 0.2.1 (2026-03-28)
 - Error deduplication, auth backoff, protect against empty system list deletion
 
@@ -139,9 +142,6 @@ beszel.0.
 
 ### 0.1.6 (2026-03-18)
 - Code cleanup: remove dead code, fix duplicate container filter, extract load avg helper
-
-### 0.1.5 (2026-03-17)
-- Migrate to @alcalzone/release-script, enable npm Trusted Publishing
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 
