@@ -7,7 +7,7 @@ ioBroker adapter for [Beszel](https://github.com/henrygd/beszel) server monitori
 - **Adapter name:** `beszel`
 - **NPM package:** `iobroker.beszel`
 - **GitHub:** `krobipd/ioBroker.beszel`
-- **Version:** `0.2.1`
+- **Version:** `0.2.2`
 - **Author:** krobi <krobi@power-dreams.com>
 - **Mode:** daemon (polling)
 - **No extra runtime dependencies** — uses only `@iobroker/adapter-core` + Node.js built-in `http`/`https`
