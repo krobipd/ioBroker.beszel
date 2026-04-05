@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "news": {
+      "0.2.3": {
+        "en": "Remove redundant scripts and unused devDependencies, compress documentation",
+        "de": "Redundante Scripts und ungenutzte DevDependencies entfernt, Dokumentation komprimiert",
+        "ru": "Удалены избыточные скрипты и неиспользуемые devDependencies, документация сжата",
+        "pt": "Scripts redundantes e devDependencies não utilizadas removidos, documentação comprimida",
+        "nl": "Redundante scripts en ongebruikte devDependencies verwijderd, documentatie gecomprimeerd",
+        "fr": "Scripts redondants et devDependencies inutilisées supprimés, documentation compressée",
+        "it": "Script ridondanti e devDependencies inutilizzate rimossi, documentazione compressa",
+        "es": "Scripts redundantes y devDependencies no utilizadas eliminados, documentación comprimida",
+        "pl": "Usunięto zbędne skrypty i nieużywane devDependencies, skompresowano dokumentację",
+        "uk": "Видалено зайві скрипти та невикористані devDependencies, документацію стиснуто",
+        "zh-cn": "删除冗余脚本和未使用的开发依赖，压缩文档"
+      },
       "0.2.2": {
         "en": "Modernize dev tooling (esbuild, TypeScript 5.9 pin, testing-action-check v2)",
         "de": "Dev-Tooling modernisiert (esbuild, TypeScript 5.9 Pin, testing-action-check v2)",
@@ -80,19 +93,6 @@
         "pl": "Czyszczenie kodu: usuń nieużywane aliasy typu, nieaktywny parametr '_ config', zbędny zestaw Wezwanie państwa\nFix duplikat filtr pojemnika (został filtrowany w main.ts i ponownie w updateContainer)\nWyciąg obciążenia avg stan tworzenia w helper w celu wyeliminowania powielania kodu",
         "uk": "Чистка коду: видалення невикористаного типу псевдонімів, відмерлого параметра `_config``, надлишковий набір Державний дзвінок\nВиправлення дублікатів фільтра контейнера (відфільтровано в основних.ts і знову в оновленні\nВитягувати завантаження avg державного створення в помічник для усунення дублювання коду",
         "zh-cn": "代码清除: 删除未使用的类型别名, 已死 QQconfig 参数, 冗余集 国家电话\n修复重复的容器过滤器(在主.ts和在更新容器中再次过滤)\n提取加载 avg 状态创建到帮助器, 以消除代码重复"
-      },
-      "0.1.5": {
-        "en": "Migrate to @alcalzone/release-script for automated releases\nEnable npm Trusted Publishing (OIDC), remove legacy npm token",
-        "de": "Migration auf @alcalzone/Release-script für automatisierte Versionen\nAktiviere npm Trusted Publishing (OIDC), legacy npm token",
-        "ru": "Migrate to @alcalzone/releasescript для автоматизированных релизов\nВключить npm Trusted Publishing (OIDC), удалить устаревший токен npm",
-        "pt": "Migrar para @alcalzone/release-script para versões automatizadas\nActivar a publicação confiável do npm (OIDC), remover o símbolo legado do npm",
-        "nl": "Migreren naar @alcalzone/release-script voor geautomatiseerde releases\nNpm Trusted Publishing (OIDC) inschakelen, legacy npm token verwijderen",
-        "fr": "Migrer vers @alcalzone/release-script pour les versions automatisées\nActiver npm Trusted Publishing (OIDC), supprimer le legs npm token",
-        "it": "Migrare a @alcalzone/release-script per le versioni automatizzate\nAbilitare npm Trusted Publishing (OIDC), rimuovere il token npm legacy",
-        "es": "Migrar a @alcalzone/release-script para versiones automatizadas\nActivar npm Trusted Publishing (OIDC), eliminar el legado npm token",
-        "pl": "Migrate to @ alcalzone / release- script for automatic releases\nWłącz npm Zaufane Publishing (OIDC), usuń poprzednią npm token",
-        "uk": "Migrate to @alcalzone/видання для автоматизованих релізів\nУвімкнути npm Trusted Publishing (OIDC), видалити дані npm token",
-        "zh-cn": "移动到 @alcalzone/ 释放- 标记用于自动发布\n启用 npm 信任的出版( OIDC), 删除遗留 npm 令牌"
       }
     },
     "titleLang": {

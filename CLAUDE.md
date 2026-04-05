@@ -1,115 +1,68 @@
 # CLAUDE.md — ioBroker.beszel
 
-## Project Overview
+> Gemeinsame ioBroker-Wissensbasis: `../CLAUDE.md` (lokal, nicht im Git). Standards dort, Projekt-Spezifisches hier.
 
-ioBroker adapter for [Beszel](https://github.com/henrygd/beszel) server monitoring.
+## Projekt
 
-- **Adapter name:** `beszel`
-- **NPM package:** `iobroker.beszel`
-- **GitHub:** `krobipd/ioBroker.beszel`
-- **Version:** `0.2.2`
-- **Author:** krobi <krobi@power-dreams.com>
-- **Mode:** daemon (polling)
-- **No extra runtime dependencies** — uses only `@iobroker/adapter-core` + Node.js built-in `http`/`https`
+**ioBroker Beszel Monitor** — Verbindet sich mit Beszel Hub (PocketBase) für Server-Monitoring.
 
-## Beszel API
+- **Version:** 0.2.3 (April 2026)
+- **GitHub:** https://github.com/krobipd/ioBroker.beszel
+- **npm:** https://www.npmjs.com/package/iobroker.beszel
+- **Repository PR:** ioBroker/ioBroker.repositories#5645
+- **Runtime-Deps:** nur `@iobroker/adapter-core` (HTTP via Node.js built-in)
 
-### Base URL
-User-configured (e.g. `http://192.168.1.100:8090`).
-
-### Authentication
-- `POST /api/collections/users/auth-with-password`
-- Body: `{ identity, password }`
-- Returns `{ token, record }`
-- Token valid ~7 days; adapter refreshes after 23h or on 401
-
-### Collections
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/collections/systems/records?perPage=200&sort=name` | All monitored systems |
-| `GET /api/collections/system_stats/records?sort=-updated&perPage=200&filter=type%3D'1m'` | Latest 1-min stats per system |
-| `GET /api/collections/containers/records?perPage=500&sort=system%2Cname` | Container metrics |
-
-### Key fields
-- `systems`: `id, name, status (up/down/paused/pending), host, info { u, v, sv, la, bat }`
-- `system_stats`: `id, system (ref to systems.id), type, stats { cpu, mu, m, mp, mb, mz, su, s, du, d, dp, dr, dw, ns, nr, t, la, g, efs, bat, cpub, b }`
-- `containers`: `id, system, name, status, health (0-3), cpu, memory, image`
-
-## Source Files
-
-| File | Purpose |
-|------|---------|
-| `src/main.ts` | Adapter class (lifecycle, polling, message handling) |
-| `src/lib/types.ts` | TypeScript interfaces for Beszel API + adapter config |
-| `src/lib/beszel-client.ts` | HTTP client (auth, systems, stats, containers) |
-| `src/lib/state-manager.ts` | Create/update/cleanup ioBroker states |
-
-## State Structure
+## Architektur
 
 ```
-beszel.0.
-├── info.connection          (bool, indicator.connected)
-└── systems.{sanitized_name}/
-    ├── online               (bool, always)
-    ├── status               (string, always)
-    ├── uptime / uptime_text (if metrics_uptime)
-    ├── cpu_usage            (if metrics_cpu)
-    ├── load_avg_*           (if metrics_loadAvg)
-    ├── memory_*             (if metrics_memory)
-    ├── disk_*               (if metrics_disk / metrics_diskSpeed)
-    ├── network_*            (if metrics_network)
-    ├── temperature          (if metrics_temperature — avg top 3 sensors)
-    ├── temperatures/        (if metrics_temperatureDetails)
-    ├── gpu/                 (if metrics_gpu)
-    ├── filesystems/         (if metrics_extraFs)
-    └── containers/          (if metrics_containers)
+src/main.ts              → Adapter (Lifecycle, Polling, Message-Handler)
+src/lib/beszel-client.ts → HTTP Client (Auth, Systems, Stats, Containers)
+src/lib/state-manager.ts → ioBroker States erstellen/updaten/cleanup
+src/lib/types.ts         → TypeScript Interfaces (API + Config)
 ```
 
-## Config Options (native)
+## Design-Entscheidungen
 
-All boolean metric flags default to `false` except:
-`metrics_uptime`, `metrics_cpu`, `metrics_loadAvg`, `metrics_memory`, `metrics_disk`, `metrics_diskSpeed`, `metrics_network`, `metrics_temperature` — these default to `true`.
+1. **Keine Runtime-Deps** außer adapter-core — HTTP via Node.js built-in http/https
+2. **Token in Memory** — nie in ioBroker States gespeichert, Refresh nach 23h
+3. **Error-Dedup** — `classifyError` + `lastErrorCode`, wiederkehrende Fehler nur debug
+4. **Auth-Backoff** — nach 3 fehlgeschlagenen Versuchen weitere Auth-Fehler unterdrückt
+5. **Empty-Systems-Guard** — leere API-Antwort löscht NICHT alle Geräte
+6. **Metric-Cleanup** — deaktivierte Metriken werden beim Start gelöscht
+7. **Load-Avg Fallback** — `stats.la` bevorzugt, Fallback auf `system.info.la`
+8. **Temperatur** — Durchschnitt der 3 heißesten Sensoren
+9. **Name-Sanitization** — lowercase, non-alphanumeric → `_`, max 50 chars
 
-## Important Notes
+## Metric-Toggles
 
-1. `build/` is committed to git (`.gitignore` excludes only `build/test/`)
-2. `encryptedNative`/`protectedNative` are on **root level** of `io-package.json`
-3. Token is stored in memory only — never in ioBroker states
-4. Load avg: prefer `stats.la`, fallback to `system.info.la`
-5. Temperature: compute average of top 3 hottest sensors for `temperature` state
-6. Name sanitization: lowercase, non-alphanumeric → `_`, max 50 chars, trim underscores
+20+ konfigurierbare Metriken (global für alle Systeme). Standard-on: uptime, cpu, loadAvg, memory, disk, diskSpeed, network, temperature. Alle anderen default off.
 
-## Test Coverage
+## Tests (183)
 
 ```
-test/
-├── testBeszelClient.ts  → API client (auth, token, errors, response parsing) (36 Tests)
-├── testStateManager.ts  → StateManager (sanitize, system, stats, GPU, filesystem, containers, cleanup) (90 Tests)
-└── testPackageFiles.ts  → @iobroker/testing Package-Validierung (57 Tests)
-
-Total: 183 Tests (alle TypeScript)
+test/testBeszelClient.ts  → API Client (Auth, Token, Errors, Responses) (36 Tests)
+test/testStateManager.ts  → StateManager (Sanitize, System, Stats, GPU, FS, Containers, Cleanup) (90 Tests)
+test/testPackageFiles.ts  → @iobroker/testing (57 Tests)
 ```
 
-## Build Commands
+Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Callback-API).
+
+## Versionshistorie
+
+| Version | Highlights |
+|---------|------------|
+| 0.2.3 | Redundante Scripts/DevDeps entfernt, Doku komprimiert |
+| 0.2.2 | Dev-Tooling modernisiert (esbuild, TS 5.9 Pin) |
+| 0.2.1 | Error-Dedup, Auth-Backoff, Empty-Systems-Guard |
+| 0.2.0 | Adapter-Timer, sync onUnload, About→Connection merged, CI cross-platform |
+| 0.1.4 | Alle Repochecker-Fehler gefixt |
+| 0.1.0 | Initial Release |
+
+## Befehle
 
 ```bash
-npm run build           # Full build (rm -rf build + tsc)
-npm run build:test      # Build for tests (includes test/ directory)
-npm run check           # TypeScript type check only (no emit)
-npm run lint            # ESLint
-npm test                # Build + run Mocha tests (ACHTUNG: überschreibt Production-Build!)
-npm run release patch   # Release via @alcalzone/release-script
-```
-
-## Release-Workflow
-
-`manual-review` Plugin blockiert interaktiv → manueller Workaround:
-```bash
-# 1. CHANGELOG.md unter ## **WORK IN PROGRESS** befüllen
-# 2. npm run build  (NICHT npm test!)
-# 3. Version in package.json + io-package.json bumpen
-# 4. CHANGELOG + README (Badge + Changelog-Section) aktualisieren
-# 5. io-package.json news (alle 11 Sprachen) hinzufügen
-# 6. git add ... && git commit -m "chore: release vX.Y.Z"
-# 7. git tag vX.Y.Z && git push && git push origin vX.Y.Z
+npm run build        # Production (esbuild)
+npm run build:test   # Test build (tsc)
+npm test             # Build + mocha
+npm run lint         # ESLint + Prettier
 ```

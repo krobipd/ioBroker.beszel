@@ -122,6 +122,9 @@ beszel.0.
 
 ## Changelog
 
+### 0.2.3 (2026-04-05)
+- Remove redundant scripts, unused devDependencies, compress documentation
+
 ### 0.2.2 (2026-04-03)
 - Modernize dev tooling (esbuild, TypeScript 5.9 pin, testing-action-check v2)
 
@@ -139,9 +142,6 @@ beszel.0.
 
 ### 0.1.7 (2026-03-19)
 - Add system count to startup log message
-
-### 0.1.6 (2026-03-18)
-- Code cleanup: remove dead code, fix duplicate container filter, extract load avg helper
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 
