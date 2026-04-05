@@ -6,7 +6,7 @@
 
 **ioBroker Beszel Monitor** — Verbindet sich mit Beszel Hub (PocketBase) für Server-Monitoring.
 
-- **Version:** 0.2.3 (April 2026)
+- **Version:** 0.2.4 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.beszel
 - **npm:** https://www.npmjs.com/package/iobroker.beszel
 - **Repository PR:** ioBroker/ioBroker.repositories#5645
@@ -51,6 +51,7 @@ Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Call
 
 | Version | Highlights |
 |---------|------------|
+| 0.2.4 | Cleaner Log-Messages, redundanter Adapter-Name-Prefix entfernt |
 | 0.2.3 | Redundante Scripts/DevDeps entfernt, Doku komprimiert |
 | 0.2.2 | Dev-Tooling modernisiert (esbuild, TS 5.9 Pin) |
 | 0.2.1 | Error-Dedup, Auth-Backoff, Empty-Systems-Guard |
