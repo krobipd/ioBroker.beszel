@@ -122,6 +122,9 @@ beszel.0.
 
 ## Changelog
 
+### 0.2.4 (2026-04-05)
+- Cleaner log messages, remove redundant adapter name prefix
+
 ### 0.2.3 (2026-04-05)
 - Remove redundant scripts, unused devDependencies, compress documentation
 
@@ -139,9 +142,6 @@ beszel.0.
 
 ### 0.1.8 (2026-03-19)
 - Add online/offline indicator to system device folders
-
-### 0.1.7 (2026-03-19)
-- Add system count to startup log message
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

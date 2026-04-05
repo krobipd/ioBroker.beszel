@@ -1,4 +1,8 @@
 # Changelog
+## 0.2.4 (2026-04-05)
+
+- Cleaner log messages, remove redundant adapter name prefix
+
 ## 0.2.3 (2026-04-05)
 
 - Remove redundant scripts (`build:ts`, `prepare`, `test:ci`)

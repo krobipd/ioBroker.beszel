@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "news": {
+      "0.2.4": {
+        "en": "Cleaner log messages, remove redundant adapter name prefix",
+        "de": "Sauberere Log-Meldungen, redundanten Adapter-Namen-Präfix entfernt",
+        "ru": "Чистые сообщения журнала, удалён избыточный префикс имени адаптера",
+        "pt": "Mensagens de log mais limpas, prefixo redundante do nome do adaptador removido",
+        "nl": "Schonere logberichten, overbodige adapternaamprefix verwijderd",
+        "fr": "Messages de log plus propres, préfixe de nom d'adaptateur redondant supprimé",
+        "it": "Messaggi di log più puliti, prefisso ridondante del nome adattatore rimosso",
+        "es": "Mensajes de registro más limpios, prefijo redundante del nombre del adaptador eliminado",
+        "pl": "Czystsze komunikaty dziennika, usunięto zbędny prefiks nazwy adaptera",
+        "uk": "Чистіші повідомлення журналу, видалено зайвий префікс назви адаптера",
+        "zh-cn": "更清洁的日志消息，删除冗余的适配器名称前缀"
+      },
       "0.2.3": {
         "en": "Remove redundant scripts and unused devDependencies, compress documentation",
         "de": "Redundante Scripts und ungenutzte DevDependencies entfernt, Dokumentation komprimiert",
@@ -80,19 +93,6 @@
         "pl": "Dodano wskaźnik online/offline do folderów urządzeń systemowych",
         "uk": "Додано індикатор онлайн/офлайн до папок системних пристроїв",
         "zh-cn": "为系统设备文件夹添加在线/离线指示器"
-      },
-      "0.1.6": {
-        "en": "Code cleanup: remove unused type aliases, dead `_config` parameter, redundant setState call\nFix duplicate container filter (was filtered in main.ts and again in updateContainers)\nExtract load avg state creation into helper to eliminate code duplication",
-        "de": "Code-Reinigung: entfernen Sie ungenutzte Typ-Aliase, tot `_config` Parameter, redundantes Set Mitgliedstaat\nBefestigen Sie doppelten Behälterfilter (in main.ts und wieder in updateContainers gefiltert)\nExtrahieren Sie die Last avg Zustand Kreation in Helfer, um Code-Dualplikation zu beseitigen",
-        "ru": "Очистка кода: удаление неиспользуемых псевдонимов типа, мертвый параметр «_config» Государственный призыв\nИсправьте дублированный контейнерный фильтр (был отфильтрован в main.ts и снова в UpdateContainers)\nЭкстракт загрузки avg создания состояния в помощник для устранения дублирования кода",
-        "pt": "Limpeza de código: remover aliases de tipo não utilizados, parâmetro '_config' morto, conjunto redundante Chamada de Estado\nCorrigir filtro de recipiente duplicado (foi filtrado em main.ts e novamente em updateContainers)\nExtrair a criação do estado de avg de carga no helper para eliminar a duplicação de código",
-        "nl": "Code opruiming: verwijder ongebruikte type aliassen, dode parameter, redundante set Staatsoproep\nFix dubbele container filter (was gefilterd in main.ts en opnieuw in update Containers)\nUitpakken laden avg toestand aanmaken in helper om code duplicatie te elimineren",
-        "fr": "Nettoyage du code: supprimer les alias de type inutilisés, le paramètre mort `_config`, un ensemble redondant Appel d'État\nCorrection du filtre conteneur dupliqué (a été filtré dans main.ts et à nouveau dans updateContainers)\nExtraire la création d'état de charge avg dans helper pour éliminer la duplication de code",
-        "it": "Pulizia del codice: rimuovere alias di tipo non utilizzati, morto `_config` parametro, set ridondante Chiamata di Stato\nFissare il filtro del contenitore duplicato (era filtrato in main.ts e di nuovo in updateContainers)\nEstrarre la creazione di stato avg di carico in helper per eliminare la duplicazione di codice",
-        "es": "Limpieza del código: eliminar alias de tipo no utilizados, parámetro muerto `_config`, conjunto redundante Llamamiento del Estado\nFijar filtro de contenedor duplicado (fue filtrado en main.ts y de nuevo en actualizaciónContainers)\nExtraer la carga avg estado creación en helper para eliminar duplicación de código",
-        "pl": "Czyszczenie kodu: usuń nieużywane aliasy typu, nieaktywny parametr '_ config', zbędny zestaw Wezwanie państwa\nFix duplikat filtr pojemnika (został filtrowany w main.ts i ponownie w updateContainer)\nWyciąg obciążenia avg stan tworzenia w helper w celu wyeliminowania powielania kodu",
-        "uk": "Чистка коду: видалення невикористаного типу псевдонімів, відмерлого параметра `_config``, надлишковий набір Державний дзвінок\nВиправлення дублікатів фільтра контейнера (відфільтровано в основних.ts і знову в оновленні\nВитягувати завантаження avg державного створення в помічник для усунення дублювання коду",
-        "zh-cn": "代码清除: 删除未使用的类型别名, 已死 QQconfig 参数, 冗余集 国家电话\n修复重复的容器过滤器(在主.ts和在更新容器中再次过滤)\n提取加载 avg 状态创建到帮助器, 以消除代码重复"
       }
     },
     "titleLang": {
