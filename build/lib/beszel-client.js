@@ -31,9 +31,9 @@ __export(beszel_client_exports, {
   BeszelClient: () => BeszelClient
 });
 module.exports = __toCommonJS(beszel_client_exports);
-var http = __toESM(require("http"));
-var https = __toESM(require("https"));
-var import_url = require("url");
+var http = __toESM(require("node:http"));
+var https = __toESM(require("node:https"));
+var import_node_url = require("node:url");
 const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1e3;
 class BeszelClient {
   baseUrl;
@@ -142,7 +142,7 @@ class BeszelClient {
     return new Promise((resolve, reject) => {
       let parsedUrl;
       try {
-        parsedUrl = new import_url.URL(this.baseUrl + path);
+        parsedUrl = new import_node_url.URL(this.baseUrl + path);
       } catch {
         reject(new Error(`Invalid URL: ${this.baseUrl + path}`));
         return;

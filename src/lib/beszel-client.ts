@@ -1,6 +1,6 @@
-import * as http from "http";
-import * as https from "https";
-import { URL } from "url";
+import * as http from "node:http";
+import * as https from "node:https";
+import { URL } from "node:url";
 import type {
   AuthResponse,
   BeszelContainer,

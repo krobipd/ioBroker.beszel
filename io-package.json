@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "news": {
+      "0.2.6": {
+        "en": "Use node: prefix for built-in modules (S5043)",
+        "de": "node:-Präfix für eingebaute Module (S5043)",
+        "ru": "Префикс node: для встроенных модулей (S5043)",
+        "pt": "Prefixo node: para módulos nativos (S5043)",
+        "nl": "node: prefix voor ingebouwde modules (S5043)",
+        "fr": "Préfixe node: pour les modules natifs (S5043)",
+        "it": "Prefisso node: per moduli nativi (S5043)",
+        "es": "Prefijo node: para módulos nativos (S5043)",
+        "pl": "Prefiks node: dla wbudowanych modułów (S5043)",
+        "uk": "Префікс node: для вбудованих модулів (S5043)",
+        "zh-cn": "为内置模块使用node:前缀 (S5043)"
+      },
       "0.2.5": {
         "en": "Restore standard GitHub-based tests, remove CHANGELOG.md, add FORBIDDEN_CHARS reference, fix Dependabot cooldown",
         "de": "Standard GitHub-Tests wiederhergestellt, CHANGELOG.md entfernt, FORBIDDEN_CHARS-Referenz, Dependabot-Cooldown",
@@ -80,19 +93,6 @@
         "pl": "Metody timera adaptera, synchroniczne onUnload, zakładka O nas zintegrowana z Połączenie, CI Windows/macOS, pełny tekst licencji MIT w README",
         "uk": "Методи таймера адаптера, синхронний onUnload, вкладка Про програму об'єднана з Підключення, CI для Windows/macOS, повний текст ліцензії MIT в README",
         "zh-cn": "使用适配器定时器方法，同步onUnload，将关于标签合并到连接标签，添加Windows/macOS CI，README中完整MIT许可证文本"
-      },
-      "0.1.9": {
-        "en": "Logging cleanup: stale system removal moved to debug level",
-        "de": "Logging-Bereinigung: Entfernung veralteter Systeme auf Debug-Level verschoben",
-        "ru": "Очистка логирования: удаление устаревших систем перенесено на уровень debug",
-        "pt": "Limpeza de logging: remoção de sistemas obsoletos movida para nível debug",
-        "nl": "Logging opruiming: verwijdering van verouderde systemen verplaatst naar debug-niveau",
-        "fr": "Nettoyage du logging: suppression des systèmes obsolètes déplacée au niveau debug",
-        "it": "Pulizia logging: rimozione di sistemi obsoleti spostata al livello debug",
-        "es": "Limpieza de logging: eliminación de sistemas obsoletos movida al nivel debug",
-        "pl": "Czyszczenie logowania: usuwanie przestarzałych systemów przeniesione na poziom debug",
-        "uk": "Очищення логування: видалення застарілих систем переміщено на рівень debug",
-        "zh-cn": "日志清理：将过期系统的删除移至debug级别"
       }
     },
     "titleLang": {

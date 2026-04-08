@@ -122,8 +122,11 @@ beszel.0.
 
 ## Changelog
 
+### 0.2.6 (2026-04-08)
+- Use `node:` prefix for built-in modules (http, https, url)
+
 ### 0.2.5 (2026-04-08)
-- Restore standard GitHub-based tests, remove CHANGELOG.md, add FORBIDDEN_CHARS reference, fix Dependabot cooldown
+- Restore standard GitHub-based tests, remove CHANGELOG.md, add FORBIDDEN_CHARS reference
 
 ### 0.2.4 (2026-04-05)
 - Cleaner log messages, remove redundant adapter name prefix
@@ -133,9 +136,6 @@ beszel.0.
 
 ### 0.2.2 (2026-04-03)
 - Modernize dev tooling (esbuild, TypeScript 5.9 pin, testing-action-check v2)
-
-### 0.2.1 (2026-03-28)
-- Error deduplication, auth backoff, protect against empty system list deletion
 
 Older changelog: [CHANGELOG_OLD.md](CHANGELOG_OLD.md)
 
