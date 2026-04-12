@@ -32,6 +32,7 @@ class BeszelAdapter extends utils.Adapter {
   lastSystemCount = 0;
   lastErrorCode = "";
   authFailCount = 0;
+  failedSystems = /* @__PURE__ */ new Set();
   constructor(options = {}) {
     super({
       ...options,
@@ -100,26 +101,39 @@ class BeszelAdapter extends utils.Adapter {
   }
   async onMessage(obj) {
     var _a, _b, _c;
-    if (obj.command === "checkConnection") {
-      const config = obj.message;
-      const url = (_a = config.url) != null ? _a : "";
-      const username = (_b = config.username) != null ? _b : "";
-      const password = (_c = config.password) != null ? _c : "";
-      if (!url || !username || !password) {
-        this.sendTo(
-          obj.from,
-          obj.command,
-          {
-            success: false,
-            message: "URL, username and password are required"
-          },
-          obj.callback
-        );
-        return;
+    if (!obj.callback) {
+      return;
+    }
+    try {
+      if (obj.command === "checkConnection") {
+        const config = obj.message;
+        const url = (_a = config.url) != null ? _a : "";
+        const username = (_b = config.username) != null ? _b : "";
+        const password = (_c = config.password) != null ? _c : "";
+        if (!url || !username || !password) {
+          this.sendTo(
+            obj.from,
+            obj.command,
+            {
+              success: false,
+              message: "URL, username and password are required"
+            },
+            obj.callback
+          );
+          return;
+        }
+        const testClient = new import_beszel_client.BeszelClient(url, username, password);
+        const result = await testClient.checkConnection();
+        this.sendTo(obj.from, obj.command, result, obj.callback);
       }
-      const testClient = new import_beszel_client.BeszelClient(url, username, password);
-      const result = await testClient.checkConnection();
-      this.sendTo(obj.from, obj.command, result, obj.callback);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.sendTo(
+        obj.from,
+        obj.command,
+        { success: false, message: msg },
+        obj.callback
+      );
     }
   }
   /**
@@ -135,7 +149,7 @@ class BeszelAdapter extends utils.Adapter {
     if (code === "UNAUTHORIZED") {
       return "UNAUTHORIZED";
     }
-    if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ECONNRESET" || code === "ENETUNREACH" || code === "EAI_AGAIN") {
+    if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ECONNRESET" || code === "ENETUNREACH" || code === "EHOSTUNREACH" || code === "EAI_AGAIN") {
       return "NETWORK";
     }
     if (code === "ETIMEDOUT" || err.message.includes("timed out")) {
@@ -163,8 +177,24 @@ class BeszelAdapter extends utils.Adapter {
       const statsMap = await this.client.getLatestStats(systemIds);
       await this.setStateAsync("info.connection", { val: true, ack: true });
       for (const system of systems) {
-        const stats = statsMap.get(system.id);
-        await this.stateManager.updateSystem(system, stats, containers, config);
+        try {
+          const stats = statsMap.get(system.id);
+          await this.stateManager.updateSystem(
+            system,
+            stats,
+            containers,
+            config
+          );
+          this.failedSystems.delete(system.name);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (this.failedSystems.has(system.name)) {
+            this.log.debug(`Failed to update system "${system.name}": ${msg}`);
+          } else {
+            this.log.warn(`Failed to update system "${system.name}": ${msg}`);
+            this.failedSystems.add(system.name);
+          }
+        }
       }
       if (systems.length > 0 || this.lastSystemCount === 0) {
         await this.stateManager.cleanupSystems(systems.map((s) => s.name));

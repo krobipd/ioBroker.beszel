@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "news": {
+      "0.3.1": {
+        "en": "Fix response stream error handling, isolate per-system poll failures, harden onMessage error handling",
+        "de": "Response-Stream-Fehlerbehandlung gefixt, per-System Poll-Fehler isoliert, onMessage-Fehlerbehandlung gehärtet",
+        "ru": "Исправлена обработка ошибок потока ответа, изолированы ошибки опроса по системам, усилена обработка ошибок onMessage",
+        "pt": "Corrigido tratamento de erros do stream de resposta, falhas de polling isoladas por sistema, tratamento de erros onMessage reforçado",
+        "nl": "Response stream foutafhandeling gerepareerd, per-systeem poll fouten geïsoleerd, onMessage foutafhandeling versterkt",
+        "fr": "Correction de la gestion des erreurs du flux de réponse, isolation des erreurs de sondage par système, renforcement de la gestion des erreurs onMessage",
+        "it": "Corretta gestione errori stream risposta, errori di polling isolati per sistema, gestione errori onMessage rafforzata",
+        "es": "Corregido manejo de errores del flujo de respuesta, errores de sondeo aislados por sistema, manejo de errores onMessage reforzado",
+        "pl": "Naprawiono obsługę błędów strumienia odpowiedzi, izolacja błędów odpytywania per system, wzmocniona obsługa błędów onMessage",
+        "uk": "Виправлено обробку помилок потоку відповіді, ізольовано помилки опитування per-system, посилено обробку помилок onMessage",
+        "zh-cn": "修复响应流错误处理，隔离每系统轮询失败，加固onMessage错误处理"
+      },
       "0.3.0": {
         "en": "Breaking: Reorganize state tree into channels (info, cpu, memory, disk, network, temperature, battery). Automatic migration of legacy states.",
         "de": "Breaking: State-Tree in Channels reorganisiert (info, cpu, memory, disk, network, temperature, battery). Automatische Migration alter States.",
@@ -80,19 +93,6 @@
         "pl": "Usunięto zbędne skrypty i nieużywane devDependencies, skompresowano dokumentację",
         "uk": "Видалено зайві скрипти та невикористані devDependencies, документацію стиснуто",
         "zh-cn": "删除冗余脚本和未使用的开发依赖，压缩文档"
-      },
-      "0.2.2": {
-        "en": "Modernize dev tooling (esbuild, TypeScript 5.9 pin, testing-action-check v2)",
-        "de": "Dev-Tooling modernisiert (esbuild, TypeScript 5.9 Pin, testing-action-check v2)",
-        "ru": "Модернизация инструментов разработки (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "pt": "Modernização das ferramentas de desenvolvimento (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "nl": "Ontwikkeltools gemoderniseerd (esbuild, TypeScript 5.9 pin, testing-action-check v2)",
-        "fr": "Modernisation des outils de développement (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "it": "Modernizzazione degli strumenti di sviluppo (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "es": "Modernización de herramientas de desarrollo (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "pl": "Modernizacja narzędzi programistycznych (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "uk": "Модернізація інструментів розробки (esbuild, TypeScript 5.9, testing-action-check v2)",
-        "zh-cn": "开发工具现代化（esbuild、TypeScript 5.9 固定、testing-action-check v2）"
       }
     },
     "titleLang": {

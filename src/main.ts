@@ -11,6 +11,7 @@ class BeszelAdapter extends utils.Adapter {
   private lastSystemCount = 0;
   private lastErrorCode = "";
   private authFailCount = 0;
+  private failedSystems = new Set<string>();
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({
@@ -96,28 +97,41 @@ class BeszelAdapter extends utils.Adapter {
   }
 
   private async onMessage(obj: ioBroker.Message): Promise<void> {
-    if (obj.command === "checkConnection") {
-      const config = obj.message as Partial<AdapterConfig>;
-      const url = config.url ?? "";
-      const username = config.username ?? "";
-      const password = config.password ?? "";
+    if (!obj.callback) {
+      return;
+    }
+    try {
+      if (obj.command === "checkConnection") {
+        const config = obj.message as Partial<AdapterConfig>;
+        const url = config.url ?? "";
+        const username = config.username ?? "";
+        const password = config.password ?? "";
 
-      if (!url || !username || !password) {
-        this.sendTo(
-          obj.from,
-          obj.command,
-          {
-            success: false,
-            message: "URL, username and password are required",
-          },
-          obj.callback,
-        );
-        return;
+        if (!url || !username || !password) {
+          this.sendTo(
+            obj.from,
+            obj.command,
+            {
+              success: false,
+              message: "URL, username and password are required",
+            },
+            obj.callback,
+          );
+          return;
+        }
+
+        const testClient = new BeszelClient(url, username, password);
+        const result = await testClient.checkConnection();
+        this.sendTo(obj.from, obj.command, result, obj.callback);
       }
-
-      const testClient = new BeszelClient(url, username, password);
-      const result = await testClient.checkConnection();
-      this.sendTo(obj.from, obj.command, result, obj.callback);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.sendTo(
+        obj.from,
+        obj.command,
+        { success: false, message: msg },
+        obj.callback,
+      );
     }
   }
 
@@ -139,6 +153,7 @@ class BeszelAdapter extends utils.Adapter {
       code === "ECONNREFUSED" ||
       code === "ECONNRESET" ||
       code === "ENETUNREACH" ||
+      code === "EHOSTUNREACH" ||
       code === "EAI_AGAIN"
     ) {
       return "NETWORK";
@@ -176,10 +191,26 @@ class BeszelAdapter extends utils.Adapter {
       // Update connection state
       await this.setStateAsync("info.connection", { val: true, ack: true });
 
-      // Update each system
+      // Update each system (isolated: one failure must not block others)
       for (const system of systems) {
-        const stats = statsMap.get(system.id);
-        await this.stateManager.updateSystem(system, stats, containers, config);
+        try {
+          const stats = statsMap.get(system.id);
+          await this.stateManager.updateSystem(
+            system,
+            stats,
+            containers,
+            config,
+          );
+          this.failedSystems.delete(system.name);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (this.failedSystems.has(system.name)) {
+            this.log.debug(`Failed to update system "${system.name}": ${msg}`);
+          } else {
+            this.log.warn(`Failed to update system "${system.name}": ${msg}`);
+            this.failedSystems.add(system.name);
+          }
+        }
       }
 
       // Cleanup stale systems — but only if we actually got results.

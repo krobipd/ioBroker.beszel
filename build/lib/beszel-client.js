@@ -169,6 +169,7 @@ class BeszelClient {
       };
       const req = transport.request(options, (res) => {
         const chunks = [];
+        res.on("error", (err) => reject(err));
         res.on("data", (chunk) => chunks.push(chunk));
         res.on("end", () => {
           var _a;

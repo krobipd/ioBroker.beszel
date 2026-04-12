@@ -180,6 +180,7 @@ export class BeszelClient {
 
       const req = transport.request(options, (res) => {
         const chunks: Buffer[] = [];
+        res.on("error", (err) => reject(err));
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
         res.on("end", () => {
           const raw = Buffer.concat(chunks).toString("utf8");

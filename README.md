@@ -172,6 +172,12 @@ beszel.0.
 
 ## Changelog
 
+### 0.3.1 (2026-04-12)
+- Fix: handle response stream errors (prevents unhandled exceptions on connection drop)
+- Fix: isolate per-system poll failures (one broken system no longer blocks all others)
+- Fix: harden onMessage with try/catch and callback guard
+- Fix: classify EHOSTUNREACH as network error for proper log deduplication
+
 ### 0.3.0 (2026-04-12)
 - **Breaking:** Reorganize state tree into channels (info, cpu, memory, disk, network, temperature, battery)
 - Automatic migration removes legacy flat state paths on first start
