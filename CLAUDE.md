@@ -29,11 +29,12 @@ src/lib/types.ts         → TypeScript Interfaces (API + Config)
 4. **Auth-Backoff** — nach 3 fehlgeschlagenen Versuchen weitere Auth-Fehler unterdrückt
 5. **Empty-Systems-Guard** — leere API-Antwort löscht NICHT alle Geräte
 6. **Metric-Cleanup** — deaktivierte Metriken werden beim Start gelöscht
-10. **Channel-basierter State-Tree** — States in Channels organisiert (info, cpu, memory, disk, network, temperature, battery)
-11. **Legacy-Migration** — `migrateLegacyStates()` löscht alte flache State-Pfade aus pre-0.3.0
-7. **Load-Avg Fallback** — `stats.la` bevorzugt, Fallback auf `system.info.la`
-8. **Temperatur** — Durchschnitt der 3 heißesten Sensoren
-9. **Name-Sanitization** — lowercase, non-alphanumeric → `_`, max 50 chars
+7. **Channel-basierter State-Tree** — States in Channels organisiert (info, cpu, memory, disk, network, temperature, battery)
+8. **Legacy-Migration** — `migrateLegacyStates()` löscht alte flache State-Pfade aus pre-0.3.0
+9. **State-Common Factories** — `percentCommon`, `numCommon`, `textCommon`, `boolCommon` eliminieren Boilerplate
+10. **Load-Avg Fallback** — `stats.la` bevorzugt, Fallback auf `system.info.la`
+11. **Temperatur** — Durchschnitt der 3 heißesten Sensoren
+12. **Name-Sanitization** — lowercase, non-alphanumeric → `_`, max 50 chars
 
 ## Metric-Toggles
 
@@ -54,7 +55,7 @@ Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Call
 
 | Version | Highlights |
 |---------|------------|
-| 0.3.0 | **Breaking:** Channel-basierter State-Tree, Legacy-Migration, vollständige State-Tree-Doku |
+| 0.3.0 | **Breaking:** Channel-basierter State-Tree, Legacy-Migration, DRY-Refactor (state-common factories), role-Fix |
 | 0.2.7 | README State-Tree Fix, no-floating-promises, CI checkout entfernt |
 | 0.2.6 | node: Prefix für built-in Module (S5043) |
 | 0.2.5 | Review-Fixes: Standard-Tests (plain JS), CHANGELOG.md entfernt, FORBIDDEN_CHARS-Ref |

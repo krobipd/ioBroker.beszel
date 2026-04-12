@@ -175,6 +175,7 @@ beszel.0.
 ### 0.3.0 (2026-04-12)
 - **Breaking:** Reorganize state tree into channels (info, cpu, memory, disk, network, temperature, battery)
 - Automatic migration removes legacy flat state paths on first start
+- Fix: read-only percentage states use correct `value` role instead of `level`
 - Complete state tree documentation in README
 
 ### 0.2.7 (2026-04-12)

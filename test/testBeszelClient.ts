@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as http from "http";
+import * as http from "node:http";
 import { BeszelClient } from "../src/lib/beszel-client";
 
 // ---------------------------------------------------------------------------

@@ -72,8 +72,6 @@ export interface SystemInfo {
   la?: [number, number, number];
   /** Battery [percent, charge_state] */
   bat?: [number, number];
-  /** Connection type */
-  ct?: number;
 }
 
 /**

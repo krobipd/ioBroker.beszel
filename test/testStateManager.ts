@@ -442,7 +442,7 @@ describe("StateManager", () => {
         it("should set correct role and unit for cpu_usage", async () => {
             await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
             const obj = adapter.objects.get("systems.my_server.cpu.usage");
-            expect(obj?.common.role).to.equal("level");
+            expect(obj?.common.role).to.equal("value");
             expect(obj?.common.unit).to.equal("%");
         });
     });

@@ -1,5 +1,8 @@
 # Older Changes
 
+## 0.2.1 (2026-03-28)
+- Error deduplication, auth backoff after 3 failures, empty-systems guard
+
 ## 0.2.0 (2026-03-28)
 - Use adapter timer methods (setInterval/clearInterval) instead of native timers
 - Fix onUnload to be synchronous (prevents SIGKILL on shutdown)

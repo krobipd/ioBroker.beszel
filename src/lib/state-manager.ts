@@ -34,6 +34,30 @@ export class StateManager {
   }
 
   /**
+   * Return sanitized names of all existing system devices.
+   */
+  public async getExistingSystemNames(): Promise<string[]> {
+    const objects = await this.adapter.getObjectViewAsync("system", "device", {
+      startkey: `${this.adapter.namespace}.systems.`,
+      endkey: `${this.adapter.namespace}.systems.\u9999`,
+    });
+    if (!objects?.rows) {
+      return [];
+    }
+    const names: string[] = [];
+    for (const row of objects.rows) {
+      const id = row.id.startsWith(`${this.adapter.namespace}.`)
+        ? row.id.slice(this.adapter.namespace.length + 1)
+        : row.id;
+      const parts = id.split(".");
+      if (parts.length === 2 && parts[0] === "systems") {
+        names.push(parts[1]);
+      }
+    }
+    return names;
+  }
+
+  /**
    * Update all states for a single system.
    *
    * @param system Beszel system record
@@ -65,57 +89,28 @@ export class StateManager {
     await this.ensureChannel(`${sysId}.info`, "Info");
 
     // Always: online + status
-    const isUp = system.status === "up";
     await this.createAndSetState(
       `${sysId}.info.online`,
-      {
-        name: "Online",
-        type: "boolean",
-        role: "indicator.reachable",
-        read: true,
-        write: false,
-      } as ioBroker.StateCommon,
-      isUp,
+      this.boolCommon("Online", "indicator.reachable"),
+      system.status === "up",
     );
-
     await this.createAndSetState(
       `${sysId}.info.status`,
-      {
-        name: "Status",
-        type: "string",
-        role: "text",
-        read: true,
-        write: false,
-      } as ioBroker.StateCommon,
+      this.textCommon("Status"),
       system.status,
     );
 
     // Uptime
     if (config.metrics_uptime) {
       const uptime = system.info.u ?? null;
-
       await this.createAndSetState(
         `${sysId}.info.uptime`,
-        {
-          name: "Uptime",
-          type: "number",
-          role: "value",
-          unit: "s",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Uptime", "s"),
         uptime,
       );
-
       await this.createAndSetState(
         `${sysId}.info.uptime_text`,
-        {
-          name: "Uptime (formatted)",
-          type: "string",
-          role: "text",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.textCommon("Uptime (formatted)"),
         uptime !== null ? this.formatUptime(uptime) : null,
       );
     }
@@ -124,13 +119,7 @@ export class StateManager {
     if (config.metrics_agentVersion) {
       await this.createAndSetState(
         `${sysId}.info.agent_version`,
-        {
-          name: "Agent Version",
-          type: "string",
-          role: "text",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.textCommon("Agent Version"),
         system.info.v ?? null,
       );
     }
@@ -140,25 +129,12 @@ export class StateManager {
       const sv = system.info.sv;
       await this.createAndSetState(
         `${sysId}.info.services_total`,
-        {
-          name: "Services Total",
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Services Total"),
         sv?.[0] ?? null,
       );
-
       await this.createAndSetState(
         `${sysId}.info.services_failed`,
-        {
-          name: "Services Failed",
-          type: "number",
-          role: "value.warning",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Services Failed"),
         sv?.[1] ?? null,
       );
     }
@@ -177,8 +153,6 @@ export class StateManager {
     // Containers
     if (config.metrics_containers) {
       await this.updateContainers(sysId, system.id, containers);
-    } else {
-      await this.deleteChannelIfExists(`${sysId}.containers`);
     }
   }
 
@@ -188,35 +162,15 @@ export class StateManager {
    * @param activeSystemNames Sanitized names of currently active systems
    */
   public async cleanupSystems(activeSystemNames: string[]): Promise<void> {
-    const activeIds = new Set(
-      activeSystemNames.map((n) => `systems.${this.sanitize(n)}`),
-    );
+    const activeSet = new Set(activeSystemNames.map((n) => this.sanitize(n)));
+    const existing = await this.getExistingSystemNames();
 
-    const objects = await this.adapter.getObjectViewAsync("system", "device", {
-      startkey: `${this.adapter.namespace}.systems.`,
-      endkey: `${this.adapter.namespace}.systems.\u9999`,
-    });
-
-    if (!objects?.rows) {
-      return;
-    }
-
-    for (const row of objects.rows) {
-      const id = row.id;
-      // Extract the relative id part
-      const relativeId = id.startsWith(`${this.adapter.namespace}.`)
-        ? id.slice(this.adapter.namespace.length + 1)
-        : id;
-
-      // Only delete direct children of "systems." (one level deep)
-      const parts = relativeId.split(".");
-      if (
-        parts.length === 2 &&
-        parts[0] === "systems" &&
-        !activeIds.has(relativeId)
-      ) {
-        this.adapter.log.debug(`Removing stale system: ${relativeId}`);
-        await this.adapter.delObjectAsync(relativeId, { recursive: true });
+    for (const name of existing) {
+      if (!activeSet.has(name)) {
+        this.adapter.log.debug(`Removing stale system: systems.${name}`);
+        await this.adapter.delObjectAsync(`systems.${name}`, {
+          recursive: true,
+        });
       }
     }
   }
@@ -362,12 +316,8 @@ export class StateManager {
    * Must be called once during onReady before the first poll.
    */
   public async migrateLegacyStates(): Promise<void> {
-    const objects = await this.adapter.getObjectViewAsync("system", "device", {
-      startkey: `${this.adapter.namespace}.systems.`,
-      endkey: `${this.adapter.namespace}.systems.\u9999`,
-    });
-
-    if (!objects?.rows) {
+    const existingNames = await this.getExistingSystemNames();
+    if (existingNames.length === 0) {
       return;
     }
 
@@ -410,19 +360,12 @@ export class StateManager {
 
     let migrated = 0;
 
-    for (const row of objects.rows) {
-      const relId = row.id.startsWith(`${this.adapter.namespace}.`)
-        ? row.id.slice(this.adapter.namespace.length + 1)
-        : row.id;
-
-      const parts = relId.split(".");
-      if (parts.length !== 2 || parts[0] !== "systems") {
-        continue;
-      }
+    for (const name of existingNames) {
+      const sysId = `systems.${name}`;
 
       // Delete flat states (only if they are actual states, not new channels)
       for (const stateId of legacyStates) {
-        const fullId = `${relId}.${stateId}`;
+        const fullId = `${sysId}.${stateId}`;
         const obj = await this.adapter.getObjectAsync(fullId);
         if (obj && obj.type === "state") {
           await this.adapter.delObjectAsync(fullId);
@@ -431,7 +374,7 @@ export class StateManager {
       }
 
       // Old "temperatures" channel → now "temperature.sensors"
-      await this.deleteChannelIfExists(`${relId}.temperatures`);
+      await this.deleteChannelIfExists(`${sysId}.temperatures`);
     }
 
     if (migrated > 0) {
@@ -483,16 +426,7 @@ export class StateManager {
     if (config.metrics_cpu) {
       await this.createAndSetState(
         `${sysId}.cpu.usage`,
-        {
-          name: "CPU Usage",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU Usage"),
         stats.cpu ?? null,
       );
     }
@@ -507,72 +441,27 @@ export class StateManager {
       const [user, sys, iowait, steal, idle] = stats.cpub;
       await this.createAndSetState(
         `${sysId}.cpu.user`,
-        {
-          name: "CPU User %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU User %"),
         user,
       );
       await this.createAndSetState(
         `${sysId}.cpu.system`,
-        {
-          name: "CPU System %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU System %"),
         sys,
       );
       await this.createAndSetState(
         `${sysId}.cpu.iowait`,
-        {
-          name: "CPU IOWait %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU IOWait %"),
         iowait,
       );
       await this.createAndSetState(
         `${sysId}.cpu.steal`,
-        {
-          name: "CPU Steal %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU Steal %"),
         steal,
       );
       await this.createAndSetState(
         `${sysId}.cpu.idle`,
-        {
-          name: "CPU Idle %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU Idle %"),
         idle,
       );
     }
@@ -581,40 +470,17 @@ export class StateManager {
     if (config.metrics_memory) {
       await this.createAndSetState(
         `${sysId}.memory.percent`,
-        {
-          name: "Memory %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("Memory %"),
         stats.mp ?? null,
       );
       await this.createAndSetState(
         `${sysId}.memory.used`,
-        {
-          name: "Memory Used",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Memory Used", "GB"),
         stats.mu ?? null,
       );
       await this.createAndSetState(
         `${sysId}.memory.total`,
-        {
-          name: "Memory Total",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Memory Total", "GB"),
         stats.m ?? null,
       );
     }
@@ -623,26 +489,12 @@ export class StateManager {
     if (config.metrics_memoryDetails) {
       await this.createAndSetState(
         `${sysId}.memory.buffers`,
-        {
-          name: "Memory Buffers+Cache",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Memory Buffers+Cache", "GB"),
         stats.mb ?? null,
       );
       await this.createAndSetState(
         `${sysId}.memory.zfs_arc`,
-        {
-          name: "Memory ZFS ARC",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Memory ZFS ARC", "GB"),
         stats.mz ?? null,
       );
     }
@@ -651,26 +503,12 @@ export class StateManager {
     if (config.metrics_swap) {
       await this.createAndSetState(
         `${sysId}.memory.swap_used`,
-        {
-          name: "Swap Used",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Swap Used", "GB"),
         stats.su ?? null,
       );
       await this.createAndSetState(
         `${sysId}.memory.swap_total`,
-        {
-          name: "Swap Total",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Swap Total", "GB"),
         stats.s ?? null,
       );
     }
@@ -679,40 +517,17 @@ export class StateManager {
     if (config.metrics_disk) {
       await this.createAndSetState(
         `${sysId}.disk.percent`,
-        {
-          name: "Disk %",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("Disk %"),
         stats.dp ?? null,
       );
       await this.createAndSetState(
         `${sysId}.disk.used`,
-        {
-          name: "Disk Used",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Disk Used", "GB"),
         stats.du ?? null,
       );
       await this.createAndSetState(
         `${sysId}.disk.total`,
-        {
-          name: "Disk Total",
-          type: "number",
-          role: "value",
-          unit: "GB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Disk Total", "GB"),
         stats.d ?? null,
       );
     }
@@ -721,26 +536,12 @@ export class StateManager {
     if (config.metrics_diskSpeed) {
       await this.createAndSetState(
         `${sysId}.disk.read`,
-        {
-          name: "Disk Read",
-          type: "number",
-          role: "value",
-          unit: "MB/s",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Disk Read", "MB/s"),
         stats.dr ?? null,
       );
       await this.createAndSetState(
         `${sysId}.disk.write`,
-        {
-          name: "Disk Write",
-          type: "number",
-          role: "value",
-          unit: "MB/s",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Disk Write", "MB/s"),
         stats.dw ?? null,
       );
     }
@@ -749,44 +550,22 @@ export class StateManager {
     if (config.metrics_network) {
       await this.createAndSetState(
         `${sysId}.network.sent`,
-        {
-          name: "Network Sent",
-          type: "number",
-          role: "value",
-          unit: "MB/s",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Network Sent", "MB/s"),
         stats.ns ?? null,
       );
       await this.createAndSetState(
         `${sysId}.network.recv`,
-        {
-          name: "Network Received",
-          type: "number",
-          role: "value",
-          unit: "MB/s",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Network Received", "MB/s"),
         stats.nr ?? null,
       );
     }
 
     // Temperature (average of top 3)
     if (config.metrics_temperature) {
-      const avgTemp = this.computeTopAvgTemp(stats.t);
       await this.createAndSetState(
         `${sysId}.temperature.average`,
-        {
-          name: "Temperature (avg top 3)",
-          type: "number",
-          role: "value.temperature",
-          unit: "°C",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
-        avgTemp,
+        this.numCommon("Temperature (avg top 3)", "°C", "value.temperature"),
+        this.computeTopAvgTemp(stats.t),
       );
     }
 
@@ -794,22 +573,12 @@ export class StateManager {
     if (config.metrics_temperatureDetails && stats.t) {
       await this.ensureChannel(`${sysId}.temperature.sensors`, "Sensors");
       for (const [sensor, temp] of Object.entries(stats.t)) {
-        const sensorId = this.sanitize(sensor);
         await this.createAndSetState(
-          `${sysId}.temperature.sensors.${sensorId}`,
-          {
-            name: sensor,
-            type: "number",
-            role: "value.temperature",
-            unit: "°C",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          `${sysId}.temperature.sensors.${this.sanitize(sensor)}`,
+          this.numCommon(sensor, "°C", "value.temperature"),
           temp,
         );
       }
-    } else if (!config.metrics_temperatureDetails) {
-      await this.deleteChannelIfExists(`${sysId}.temperature.sensors`);
     }
 
     // Battery
@@ -817,27 +586,12 @@ export class StateManager {
       const bat = stats.bat ?? system.info.bat;
       await this.createAndSetState(
         `${sysId}.battery.percent`,
-        {
-          name: "Battery %",
-          type: "number",
-          role: "value",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("Battery %"),
         bat?.[0] ?? null,
       );
       await this.createAndSetState(
         `${sysId}.battery.charging`,
-        {
-          name: "Battery Charging",
-          type: "boolean",
-          role: "indicator",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.boolCommon("Battery Charging"),
         bat ? bat[1] > 0 : null,
       );
     }
@@ -847,61 +601,28 @@ export class StateManager {
       await this.ensureChannel(`${sysId}.gpu`, "GPU");
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
         const safeId = this.sanitize(gpuId);
-        const gpuLabel = gpuData.n ?? gpuId;
-        await this.ensureChannel(`${sysId}.gpu.${safeId}`, gpuLabel);
+        await this.ensureChannel(`${sysId}.gpu.${safeId}`, gpuData.n ?? gpuId);
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
-          {
-            name: "GPU Usage",
-            type: "number",
-            role: "level",
-            unit: "%",
-            min: 0,
-            max: 100,
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.percentCommon("GPU Usage"),
           gpuData.u ?? null,
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_used`,
-          {
-            name: "GPU Memory Used",
-            type: "number",
-            role: "value",
-            unit: "GB",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("GPU Memory Used", "GB"),
           gpuData.mu ?? null,
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_total`,
-          {
-            name: "GPU Memory Total",
-            type: "number",
-            role: "value",
-            unit: "GB",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("GPU Memory Total", "GB"),
           gpuData.mt ?? null,
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.power`,
-          {
-            name: "GPU Power",
-            type: "number",
-            role: "value",
-            unit: "W",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("GPU Power", "W"),
           gpuData.p ?? null,
         );
       }
-    } else if (!config.metrics_gpu) {
-      await this.deleteChannelIfExists(`${sysId}.gpu`);
     }
 
     // Extra filesystems
@@ -924,69 +645,30 @@ export class StateManager {
 
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_percent`,
-          {
-            name: "Disk %",
-            type: "number",
-            role: "level",
-            unit: "%",
-            min: 0,
-            max: 100,
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.percentCommon("Disk %"),
           percent,
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_used`,
-          {
-            name: "Disk Used",
-            type: "number",
-            role: "value",
-            unit: "GB",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("Disk Used", "GB"),
           used,
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_total`,
-          {
-            name: "Disk Total",
-            type: "number",
-            role: "value",
-            unit: "GB",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("Disk Total", "GB"),
           total,
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.read_speed`,
-          {
-            name: "Read Speed",
-            type: "number",
-            role: "value",
-            unit: "MB/s",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("Read Speed", "MB/s"),
           fsData.r ?? null,
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.write_speed`,
-          {
-            name: "Write Speed",
-            type: "number",
-            role: "value",
-            unit: "MB/s",
-            read: true,
-            write: false,
-          } as ioBroker.StateCommon,
+          this.numCommon("Write Speed", "MB/s"),
           fsData.w ?? null,
         );
       }
-    } else if (!config.metrics_extraFs) {
-      await this.deleteChannelIfExists(`${sysId}.filesystems`);
     }
   }
 
@@ -1007,68 +689,29 @@ export class StateManager {
     for (const container of sysContainers) {
       const cId = this.sanitize(container.name);
       await this.ensureChannel(`${sysId}.containers.${cId}`, container.name);
-
       await this.createAndSetState(
         `${sysId}.containers.${cId}.status`,
-        {
-          name: "Status",
-          type: "string",
-          role: "text",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.textCommon("Status"),
         container.status,
       );
-
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
-        {
-          name: "Health",
-          type: "string",
-          role: "text",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.textCommon("Health"),
         healthLabels[container.health] ?? "unknown",
       );
-
       await this.createAndSetState(
         `${sysId}.containers.${cId}.cpu`,
-        {
-          name: "CPU Usage",
-          type: "number",
-          role: "level",
-          unit: "%",
-          min: 0,
-          max: 100,
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.percentCommon("CPU Usage"),
         container.cpu,
       );
-
       await this.createAndSetState(
         `${sysId}.containers.${cId}.memory`,
-        {
-          name: "Memory",
-          type: "number",
-          role: "value",
-          unit: "MB",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.numCommon("Memory", "MB"),
         container.memory,
       );
-
       await this.createAndSetState(
         `${sysId}.containers.${cId}.image`,
-        {
-          name: "Image",
-          type: "string",
-          role: "text",
-          read: true,
-          write: false,
-        } as ioBroker.StateCommon,
+        this.textCommon("Image"),
         container.image,
       );
     }
@@ -1096,8 +739,8 @@ export class StateManager {
   /**
    * Create or update the three load average states.
    *
-   * @param sysId - State ID prefix (e.g. "systems.my_server")
-   * @param la - Load average tuple [1m, 5m, 15m], or undefined
+   * @param sysId State ID prefix (e.g. "systems.my_server")
+   * @param la Load average tuple [1m, 5m, 15m], or undefined
    */
   private async createLoadAvgStates(
     sysId: string,
@@ -1105,35 +748,17 @@ export class StateManager {
   ): Promise<void> {
     await this.createAndSetState(
       `${sysId}.cpu.load_1m`,
-      {
-        name: "Load Average 1m",
-        type: "number",
-        role: "value",
-        read: true,
-        write: false,
-      } as ioBroker.StateCommon,
+      this.numCommon("Load Average 1m"),
       la?.[0] ?? null,
     );
     await this.createAndSetState(
       `${sysId}.cpu.load_5m`,
-      {
-        name: "Load Average 5m",
-        type: "number",
-        role: "value",
-        read: true,
-        write: false,
-      } as ioBroker.StateCommon,
+      this.numCommon("Load Average 5m"),
       la?.[1] ?? null,
     );
     await this.createAndSetState(
       `${sysId}.cpu.load_15m`,
-      {
-        name: "Load Average 15m",
-        type: "number",
-        role: "value",
-        read: true,
-        write: false,
-      } as ioBroker.StateCommon,
+      this.numCommon("Load Average 15m"),
       la?.[2] ?? null,
     );
   }
@@ -1150,6 +775,62 @@ export class StateManager {
     });
     await this.adapter.setStateAsync(id, { val: value, ack: true });
   }
+
+  // -------------------------------------------------------------------------
+  // State common factories
+  // -------------------------------------------------------------------------
+
+  private percentCommon(name: string): ioBroker.StateCommon {
+    return {
+      name,
+      type: "number",
+      role: "value",
+      unit: "%",
+      min: 0,
+      max: 100,
+      read: true,
+      write: false,
+    } as ioBroker.StateCommon;
+  }
+
+  private numCommon(
+    name: string,
+    unit?: string,
+    role = "value",
+  ): ioBroker.StateCommon {
+    return {
+      name,
+      type: "number",
+      role,
+      unit,
+      read: true,
+      write: false,
+    } as ioBroker.StateCommon;
+  }
+
+  private textCommon(name: string): ioBroker.StateCommon {
+    return {
+      name,
+      type: "string",
+      role: "text",
+      read: true,
+      write: false,
+    } as ioBroker.StateCommon;
+  }
+
+  private boolCommon(name: string, role = "indicator"): ioBroker.StateCommon {
+    return {
+      name,
+      type: "boolean",
+      role,
+      read: true,
+      write: false,
+    } as ioBroker.StateCommon;
+  }
+
+  // -------------------------------------------------------------------------
+  // Computation helpers
+  // -------------------------------------------------------------------------
 
   private computeTopAvgTemp(
     temps: Record<string, number> | undefined,

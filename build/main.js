@@ -75,18 +75,8 @@ class BeszelAdapter extends utils.Adapter {
     );
     this.stateManager = new import_state_manager.StateManager(this);
     await this.stateManager.migrateLegacyStates();
-    const existingObjects = await this.getObjectViewAsync("system", "device", {
-      startkey: `${this.namespace}.systems.`,
-      endkey: `${this.namespace}.systems.\u9999`
-    });
-    if (existingObjects == null ? void 0 : existingObjects.rows) {
-      for (const row of existingObjects.rows) {
-        const relId = row.id.startsWith(`${this.namespace}.`) ? row.id.slice(this.namespace.length + 1) : row.id;
-        const parts = relId.split(".");
-        if (parts.length === 2 && parts[0] === "systems") {
-          await this.stateManager.cleanupMetrics(parts[1], config);
-        }
-      }
+    for (const name of await this.stateManager.getExistingSystemNames()) {
+      await this.stateManager.cleanupMetrics(name, config);
     }
     await this.poll();
     const intervalMs = Math.max(10, (_a = config.pollInterval) != null ? _a : 60) * 1e3;
