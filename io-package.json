@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "news": {
+      "0.3.3": {
+        "en": "Latest-repo review compliance: set common.messagebox=true because the onMessage handler is used for the admin-UI Check Connection button.",
+        "de": "Latest-Repo-Review-Compliance: common.messagebox=true gesetzt, weil der onMessage-Handler für den Check-Connection-Button im Admin-UI genutzt wird.",
+        "ru": "Соответствие ioBroker Latest: messagebox=true для кнопки Check Connection.",
+        "pt": "Conformidade ioBroker Latest: messagebox=true para o botão Check Connection.",
+        "nl": "Compliance ioBroker Latest: messagebox=true voor Check Connection-knop.",
+        "fr": "Conformité ioBroker Latest : messagebox=true pour le bouton Check Connection.",
+        "it": "Conformità ioBroker Latest: messagebox=true per il pulsante Check Connection.",
+        "es": "Cumplimiento ioBroker Latest: messagebox=true para el botón Check Connection.",
+        "pl": "Zgodność ioBroker Latest: messagebox=true dla przycisku Check Connection.",
+        "uk": "Відповідність ioBroker Latest: messagebox=true для кнопки Check Connection.",
+        "zh-cn": "符合 ioBroker Latest 仓库规范: messagebox=true, 供 Check Connection 按钮使用。"
+      },
       "0.3.2": {
         "en": "API boundary hardening: every field from the Beszel Hub goes through a type-coercion layer so API drift (NaN, Infinity, missing fields, wrong types) cannot corrupt states",
         "de": "API-Boundary-Härtung: jedes Feld vom Beszel Hub wird durch eine Typ-Coercion-Schicht geführt, damit API-Drift (NaN, Infinity, fehlende Felder, falsche Typen) keine States verderben kann",
@@ -80,19 +93,6 @@
         "pl": "Przywrócono standardowe testy GitHub, usunięto CHANGELOG.md, referencja FORBIDDEN_CHARS, cooldown Dependabot",
         "uk": "Відновлено стандартні тести GitHub, видалено CHANGELOG.md, посилання FORBIDDEN_CHARS, cooldown Dependabot",
         "zh-cn": "恢复标准GitHub测试，删除CHANGELOG.md，添加FORBIDDEN_CHARS引用，修复Dependabot冷却"
-      },
-      "0.2.4": {
-        "en": "Cleaner log messages, remove redundant adapter name prefix",
-        "de": "Sauberere Log-Meldungen, redundanten Adapter-Namen-Präfix entfernt",
-        "ru": "Чистые сообщения журнала, удалён избыточный префикс имени адаптера",
-        "pt": "Mensagens de log mais limpas, prefixo redundante do nome do adaptador removido",
-        "nl": "Schonere logberichten, overbodige adapternaamprefix verwijderd",
-        "fr": "Messages de log plus propres, préfixe de nom d'adaptateur redondant supprimé",
-        "it": "Messaggi di log più puliti, prefisso ridondante del nome adattatore rimosso",
-        "es": "Mensajes de registro más limpios, prefijo redundante del nombre del adaptador eliminado",
-        "pl": "Czystsze komunikaty dziennika, usunięto zbędny prefiks nazwy adaptera",
-        "uk": "Чистіші повідомлення журналу, видалено зайвий префікс назви адаптера",
-        "zh-cn": "更清洁的日志消息，删除冗余的适配器名称前缀"
       }
     },
     "titleLang": {
@@ -143,6 +143,7 @@
     "tier": 3,
     "loglevel": "info",
     "mode": "daemon",
+    "messagebox": true,
     "type": "hardware",
     "compact": true,
     "connectionType": "local",

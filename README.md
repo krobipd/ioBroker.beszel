@@ -172,6 +172,9 @@ beszel.0.
 
 ## Changelog
 
+### 0.3.3 (2026-04-19)
+- Latest-repo review compliance: `common.messagebox=true` added because the `Check Connection` button in the admin UI routes through `onMessage`. Runtime behaviour unchanged.
+
 ### 0.3.2 (2026-04-18)
 - API boundary hardening: every field from the Beszel Hub passes through a type-coercion layer (NaN, Infinity, missing fields, wrong types can no longer reach states)
 - Records missing required identifiers (`id`, `name`) are skipped rather than written as malformed objects
