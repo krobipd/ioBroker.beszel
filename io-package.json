@@ -186,6 +186,26 @@
         "def": false
       },
       "native": {}
+    },
+    {
+      "_id": "systems",
+      "type": "folder",
+      "common": {
+        "name": {
+          "en": "Monitored Systems",
+          "de": "Überwachte Systeme",
+          "ru": "Отслеживаемые системы",
+          "pt": "Sistemas monitorizados",
+          "nl": "Gecontroleerde systemen",
+          "fr": "Systèmes surveillés",
+          "it": "Sistemi monitorati",
+          "es": "Sistemas monitorizados",
+          "pl": "Monitorowane systemy",
+          "uk": "Відстежувані системи",
+          "zh-cn": "受监控的系统"
+        }
+      },
+      "native": {}
     }
   ],
   "encryptedNative": [

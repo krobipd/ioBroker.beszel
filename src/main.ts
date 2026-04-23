@@ -3,6 +3,15 @@ import { BeszelClient } from "./lib/beszel-client.js";
 import { StateManager } from "./lib/state-manager.js";
 import type { AdapterConfig } from "./lib/types.js";
 
+/**
+ * Extract a log-friendly message from an unknown error value.
+ *
+ * @param err Value caught in a promise rejection (may or may not be an Error)
+ */
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 class BeszelAdapter extends utils.Adapter {
   private client: BeszelClient | null = null;
   private stateManager: StateManager | null = null;
@@ -18,32 +27,26 @@ class BeszelAdapter extends utils.Adapter {
       ...options,
       name: "beszel",
     });
-    this.on("ready", this.onReady.bind(this));
+    // Wrap async handlers with .catch() so a rejection can never become an
+    // unhandled promise rejection (→ SIGKILL → js-controller restart loop).
+    this.on("ready", () => {
+      this.onReady().catch((err: unknown) =>
+        this.log.error(`onReady failed: ${errText(err)}`),
+      );
+    });
     this.on("unload", this.onUnload.bind(this));
-    this.on("message", this.onMessage.bind(this));
+    this.on("message", (obj) => {
+      this.onMessage(obj).catch((err: unknown) =>
+        this.log.error(`onMessage failed: ${errText(err)}`),
+      );
+    });
   }
 
   private async onReady(): Promise<void> {
     const config = this.config as unknown as AdapterConfig;
 
-    // Ensure info objects exist before any setState calls
-    await this.setObjectNotExistsAsync("info", {
-      type: "channel",
-      common: { name: "Information" },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.connection", {
-      type: "state",
-      common: {
-        name: "Connection status",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false,
-      },
-      native: {},
-    });
+    // `info` + `info.connection` are declared in io-package.json instanceObjects,
+    // so the adapter framework creates them on install. Just set the initial state.
     await this.setStateAsync("info.connection", { val: false, ack: true });
 
     // Validate required config

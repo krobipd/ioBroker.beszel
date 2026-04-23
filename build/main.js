@@ -24,6 +24,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var utils = __toESM(require("@iobroker/adapter-core"));
 var import_beszel_client = require("./lib/beszel-client.js");
 var import_state_manager = require("./lib/state-manager.js");
+function errText(err) {
+  return err instanceof Error ? err.message : String(err);
+}
 class BeszelAdapter extends utils.Adapter {
   client = null;
   stateManager = null;
@@ -38,30 +41,21 @@ class BeszelAdapter extends utils.Adapter {
       ...options,
       name: "beszel"
     });
-    this.on("ready", this.onReady.bind(this));
+    this.on("ready", () => {
+      this.onReady().catch(
+        (err) => this.log.error(`onReady failed: ${errText(err)}`)
+      );
+    });
     this.on("unload", this.onUnload.bind(this));
-    this.on("message", this.onMessage.bind(this));
+    this.on("message", (obj) => {
+      this.onMessage(obj).catch(
+        (err) => this.log.error(`onMessage failed: ${errText(err)}`)
+      );
+    });
   }
   async onReady() {
     var _a, _b;
     const config = this.config;
-    await this.setObjectNotExistsAsync("info", {
-      type: "channel",
-      common: { name: "Information" },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.connection", {
-      type: "state",
-      common: {
-        name: "Connection status",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
     await this.setStateAsync("info.connection", { val: false, ack: true });
     if (!config.url || !config.username || !config.password) {
       this.log.error(

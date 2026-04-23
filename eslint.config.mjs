@@ -23,6 +23,7 @@ export default [
       "test/**",
       "*.config.mjs",
       "build",
+      "build-test",
       "admin",
       "node_modules",
       "**/adapter-config.d.ts",

@@ -172,6 +172,12 @@ beszel.0.
 
 ## Changelog
 
+### **WORK IN PROGRESS**
+- Separate test-build output (`build-test/`) from production `build/`, so `npm test` no longer risks leaving duplicated `build/src` + `build/test` trees in the published package.
+- Declare `systems` folder as instance object so the parent exists before per-system devices appear.
+- Wrap async `onReady` and `onMessage` with `.catch()` to prevent unhandled promise rejections from SIGKILLing the adapter.
+- Drop now-redundant dynamic creation of `info` and `info.connection` in `onReady` — both are declared via `instanceObjects` and created by the adapter framework at install time.
+
 ### 0.3.3 (2026-04-19)
 - Latest-repo review compliance: `common.messagebox=true` added because the `Check Connection` button in the admin UI routes through `onMessage`. Runtime behaviour unchanged.
 
