@@ -36,6 +36,8 @@ class BeszelAdapter extends utils.Adapter {
   lastErrorCode = "";
   authFailCount = 0;
   failedSystems = /* @__PURE__ */ new Set();
+  unhandledRejectionHandler = null;
+  uncaughtExceptionHandler = null;
   constructor(options = {}) {
     super({
       ...options,
@@ -52,6 +54,14 @@ class BeszelAdapter extends utils.Adapter {
         (err) => this.log.error(`onMessage failed: ${errText(err)}`)
       );
     });
+    this.unhandledRejectionHandler = (reason) => {
+      this.log.error(`Unhandled rejection: ${errText(reason)}`);
+    };
+    this.uncaughtExceptionHandler = (err) => {
+      this.log.error(`Uncaught exception: ${errText(err)}`);
+    };
+    process.on("unhandledRejection", this.unhandledRejectionHandler);
+    process.on("uncaughtException", this.uncaughtExceptionHandler);
   }
   async onReady() {
     var _a, _b;
@@ -87,6 +97,14 @@ class BeszelAdapter extends utils.Adapter {
       if (this.pollTimer) {
         this.clearInterval(this.pollTimer);
         this.pollTimer = void 0;
+      }
+      if (this.unhandledRejectionHandler) {
+        process.off("unhandledRejection", this.unhandledRejectionHandler);
+        this.unhandledRejectionHandler = null;
+      }
+      if (this.uncaughtExceptionHandler) {
+        process.off("uncaughtException", this.uncaughtExceptionHandler);
+        this.uncaughtExceptionHandler = null;
       }
       void this.setState("info.connection", { val: false, ack: true });
     } catch {

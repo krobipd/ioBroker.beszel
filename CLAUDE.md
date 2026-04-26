@@ -6,7 +6,7 @@
 
 **ioBroker Beszel Monitor** — Verbindet sich mit Beszel Hub (PocketBase) für Server-Monitoring.
 
-- **Version:** 0.3.4 (WIP — parcelapp learnings: build-test, systems instanceObject, async-handler hardening)
+- **Version:** 0.3.4 (2026-04-23, proaktive Review-Härtung nach parcelapp-Learnings)
 - **GitHub:** https://github.com/krobipd/ioBroker.beszel
 - **npm:** https://www.npmjs.com/package/iobroker.beszel
 - **Repository PR:** ioBroker/ioBroker.repositories#5787
@@ -57,7 +57,7 @@ Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Call
 
 | Version | Highlights |
 |---------|------------|
-| 0.3.4 (WIP) | tsconfig.test.json → outDir `./build-test`, `systems` (folder, 11-sprachig) als instanceObject, async-handler `.catch()`-Wrapper für onReady + onMessage, redundantes dynamisches `info`/`info.connection`-Setup in main.ts entfernt (ist in instanceObjects) |
+| 0.3.4 | tsconfig.test.json → outDir `./build-test`, `systems` (folder, 11-sprachig) als instanceObject, async-handler `.catch()`-Wrapper für onReady + onMessage, redundantes dynamisches `info`/`info.connection`-Setup in main.ts entfernt (ist in instanceObjects) |
 | 0.3.3 | Latest-repo review compliance: `common.messagebox=true` weil `Check Connection` durch `onMessage` läuft |
 | 0.3.2 | API-Boundary-Härtung: coerce.ts mit coerceFiniteNumber/String/Boolean/Object + typed coercers (System/Stats/Container/Auth). +105 Drift-Tests |
 | 0.3.1 | Error-Handling: res.on("error"), per-system Poll-Isolation, onMessage try/catch+callback, EHOSTUNREACH |

@@ -171,6 +171,14 @@ beszel.0.
 ---
 
 ## Changelog
+
+### **WORK IN PROGRESS**
+- Process-level `unhandledRejection` / `uncaughtException` handlers added as last-line-of-defence against fire-and-forget rejections.
+- Stop shipping the `manual-review` release-script plugin — adapter-only consequence.
+- Bump min js-controller to `>=7.0.23` (matches latest-repo recommendation).
+- Audit-driven boilerplate sync with the other krobi adapters (`.vscode` json5 schemas, `tsconfig.test` looser test rules).
+- README footer-link to `CHANGELOG_OLD.md` restored, `CHANGELOG_OLD.md` cleaned up to consistent compact style.
+
 ### 0.3.4 (2026-04-23)
 - Separate test-build output (`build-test/`) from production `build/`, so `npm test` no longer risks leaving duplicated `build/src` + `build/test` trees in the published package.
 - Declare `systems` folder as instance object so the parent exists before per-system devices appear.
@@ -196,6 +204,14 @@ beszel.0.
 - Automatic migration removes legacy flat state paths on first start
 - Fix: read-only percentage states use correct `value` role instead of `level`
 - Complete state tree documentation in README
+
+### 0.2.7 (2026-04-12)
+- README state tree fixed (8 missing default-on states added), `no-floating-promises` lint rule added, redundant CI checkout removed.
+
+### 0.2.6 (2026-04-08)
+- `node:` prefix used for built-in modules (http, https, url).
+
+Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
 ## Support
 
