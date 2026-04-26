@@ -6,7 +6,7 @@
 
 **ioBroker Beszel Monitor** — Verbindet sich mit Beszel Hub (PocketBase) für Server-Monitoring.
 
-- **Version:** 0.3.4 (2026-04-23, proaktive Review-Härtung nach parcelapp-Learnings)
+- **Version:** 0.3.6 (2026-04-26 — Hotfix: js-controller >=7.0.23 → >=6.0.11)
 - **GitHub:** https://github.com/krobipd/ioBroker.beszel
 - **npm:** https://www.npmjs.com/package/iobroker.beszel
 - **Repository PR:** ioBroker/ioBroker.repositories#5787
@@ -53,17 +53,18 @@ test/integration.js       → @iobroker/testing Integration-Tests (plain JS)
 
 Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Callback-API).
 
-## Versionshistorie
+## Versionshistorie (letzte 7)
 
 | Version | Highlights |
 |---------|------------|
+| 0.3.6 | Hotfix für versehentlich falsch gesetzte js-controller-Min in 0.3.5 (`>=7.0.23` war eine Recherche-Synthese, nicht Repochecker-Source). Korrektur auf `>=6.0.11` (Quelle: `ioBroker.repochecker/lib/M1000_IOPackageJson.js` — `recommendedJsControllerVersion`) |
+| 0.3.5 | Process-level `unhandledRejection`/`uncaughtException`-Handler als last-line-of-defence. `manual-review`-release-script-Plugin raus. Audit-driven Konsistenz-Cleanup (`.vscode` json5-Schemas, `tsconfig.test`). README-Footer-Link wieder rein, CHANGELOG_OLD aufgeräumt |
 | 0.3.4 | tsconfig.test.json → outDir `./build-test`, `systems` (folder, 11-sprachig) als instanceObject, async-handler `.catch()`-Wrapper für onReady + onMessage, redundantes dynamisches `info`/`info.connection`-Setup in main.ts entfernt (ist in instanceObjects) |
 | 0.3.3 | Latest-repo review compliance: `common.messagebox=true` weil `Check Connection` durch `onMessage` läuft |
 | 0.3.2 | API-Boundary-Härtung: coerce.ts mit coerceFiniteNumber/String/Boolean/Object + typed coercers (System/Stats/Container/Auth). +105 Drift-Tests |
 | 0.3.1 | Error-Handling: res.on("error"), per-system Poll-Isolation, onMessage try/catch+callback, EHOSTUNREACH |
 | 0.3.0 | **Breaking:** Channel-basierter State-Tree, Legacy-Migration, DRY-Refactor (state-common factories), role-Fix |
 | 0.2.7 | README State-Tree Fix, no-floating-promises, CI checkout entfernt |
-| 0.2.6 | node: Prefix für built-in Module (S5043) |
 | 0.2.5 | Review-Fixes: Standard-Tests (plain JS), CHANGELOG.md entfernt, FORBIDDEN_CHARS-Ref |
 | 0.2.4 | Cleaner Log-Messages, redundanter Adapter-Name-Prefix entfernt |
 | 0.2.3 | Redundante Scripts/DevDeps entfernt, Doku komprimiert |

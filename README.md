@@ -30,7 +30,7 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 ## Requirements
 
 - **Node.js >= 20**
-- **ioBroker js-controller >= 7.0.0**
+- **ioBroker js-controller >= 6.0.11**
 - **ioBroker Admin >= 7.6.20**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
 
@@ -171,6 +171,10 @@ beszel.0.
 ---
 
 ## Changelog
+
+### **WORK IN PROGRESS**
+- Min js-controller correction: was incorrectly bumped to `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended value is `>=6.0.11` — restored.
+
 ### 0.3.5 (2026-04-26)
 - Process-level `unhandledRejection` / `uncaughtException` handlers added as last-line-of-defence against fire-and-forget rejections.
 - Stop shipping the `manual-review` release-script plugin — adapter-only consequence.
