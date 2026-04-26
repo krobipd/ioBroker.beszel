@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.5",
+    "version": "0.3.6",
     "news": {
+      "0.3.6": {
+        "en": "Min js-controller correction: was incorrectly bumped to `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended value is `>=6.0.11` — restored.",
+        "de": "Min js-Controller-Korrektur: wurde falsch auf `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended Wert ist `>=6.0.11` — restauriert.",
+        "ru": "Коррекция Min js-контроллера: в 0,3.5 она была неправильно увеличена до '>=7.0.23' (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Рекомендуемое значение репочекера ->=6.0.11 - восстановлено.",
+        "pt": "Min js-controller correção: foi incorretamente batido para `>=7.0.23` em 0.3.5 (Wert kam aus Recherche-Syntheses, nicht aus Repochecker-Source). O valor recomendado pelo repochecker é `>=6.0.11` — restaurado.",
+        "nl": "Min js-controller correctie: werd foutief gestoten naar 0.3.5 (Wert kam aus recure-Synthes, nicht aus Repochecker-Source). Repochecker aanbevolen waarde is .",
+        "fr": "La correction de min js-controller: a été incorrectement cognée à `>=7.0.23` dans 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). La valeur recommandée par Repochecker est `>=6.0.11` — restaurée.",
+        "it": "Min js-controller correzione: è stato erroneamente urtato a `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Il valore ricondizionato da repochecker è `>=6.0.11` — restaurato.",
+        "es": "Min js-controller correction: was incorrectly toped to `=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recomendado valor es `=6.0.11` — restaurado.",
+        "pl": "Min js- controller korection: was intruly bone to '> = 7.0.23' in 0.3.5 (Wert kam aus Recherche- Synthes, nicht aus Repochecker- Source). Repochecker- zalecana wartość jest '> = 6.0.11' - przywrócona.",
+        "uk": "Нормативно прибрано до `>=7.0.23` у 0.3.5 (Верт kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended значення `>=6.0.11` — відновлено.",
+        "zh-cn": "Min js-controller校正:在0.3.5中错误地撞到QQ7.0.23 ' (Wert kam aus ReResearch-Synthes, nicht aus Repochecker-Source)。 复检员推荐值为 6.0.11 ' ——恢复."
+      },
       "0.3.5": {
         "en": "Process-level unhandledRejection/uncaughtException handlers added as last-line-of-defence. Stop shipping the manual-review release-script plugin. Min js-controller bumped to >=7.0.23. Audit-driven boilerplate sync with the other krobi adapters (.vscode json5 schemas, tsconfig.test looser test rules). CHANGELOG_OLD cleaned up.",
         "de": "Process-level unhandledRejection/uncaughtException-Handler als Last-Line-of-Defence hinzugefügt. Das manual-review-Release-Script-Plugin entfällt. js-controller-Mindestversion auf >=7.0.23 angehoben. Audit-getriebener Boilerplate-Sync gegenüber den anderen krobi-Adaptern (.vscode json5-Schemas, tsconfig.test loosere Test-Regeln). CHANGELOG_OLD aufgeräumt.",
@@ -80,19 +93,6 @@
         "pl": "Breaking — state tree przereorganizowane w channels (info, cpu, memory, disk, network, temperature, battery). Automatyczna migracja usuwa starsze płaskie ścieżki state przy pierwszym starcie. Read-only percent-states używają poprawnej roli value zamiast level.",
         "uk": "Breaking — state tree реорганізовано в channels (info, cpu, memory, disk, network, temperature, battery). Автоматична міграція видаляє legacy flat state-шляхи при першому старті. Read-only percent-states використовують правильну роль value замість level.",
         "zh-cn": "Breaking — state tree 重新组织为 channels（info、cpu、memory、disk、network、temperature、battery）。自动迁移在首次启动时移除遗留的扁平 state 路径。只读 percent-state 使用正确的 value 角色而非 level。"
-      },
-      "0.2.7": {
-        "en": "README state tree fixed (8 missing default-on states added), no-floating-promises lint rule added, redundant CI checkout removed.",
-        "de": "README State-Tree korrigiert (8 fehlende default-on States ergänzt), no-floating-promises Lint-Regel hinzugefügt, redundantes CI-Checkout entfernt.",
-        "ru": "README state tree виправлено (8 відсутніх default-on states додано), no-floating-promises lint-правило, redundant CI checkout видалено.",
-        "pt": "State tree do README corrigido (8 default-on states ausentes adicionados), regra no-floating-promises adicionada, actions/checkout redundante removido do CI.",
-        "nl": "README state tree gecorrigeerd (8 ontbrekende default-on states toegevoegd), no-floating-promises lint-regel toegevoegd, redundant actions/checkout uit CI verwijderd.",
-        "fr": "State tree du README corrigé (8 default-on states manquants ajoutés), règle no-floating-promises ajoutée, actions/checkout redondant retiré du CI.",
-        "it": "State tree del README corretto (8 default-on state mancanti aggiunti), regola no-floating-promises aggiunta, actions/checkout ridondante rimosso dal CI.",
-        "es": "State tree del README corregido (8 default-on states faltantes añadidos), regla no-floating-promises añadida, actions/checkout redundante eliminado del CI.",
-        "pl": "State tree README poprawione (dodano 8 brakujących default-on states), dodana reguła no-floating-promises, usunięte zbędne actions/checkout z CI.",
-        "uk": "State tree README виправлено (8 відсутніх default-on states додано), додано правило no-floating-promises, redundant actions/checkout видалено з CI.",
-        "zh-cn": "修复 README 中的 state tree（添加 8 个缺失的 default-on states），添加 no-floating-promises lint 规则，从 CI 中移除冗余的 actions/checkout。"
       }
     },
     "titleLang": {

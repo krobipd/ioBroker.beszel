@@ -1,4 +1,20 @@
 # Older Changes
+## 0.3.1 (2026-04-12)
+- Fix: handle response stream errors (prevents unhandled exceptions on connection drop)
+- Fix: isolate per-system poll failures (one broken system no longer blocks all others)
+- Fix: harden onMessage with try/catch and callback guard
+- Fix: classify EHOSTUNREACH as network error for proper log deduplication
+
+## 0.3.0 (2026-04-12)
+- **Breaking:** Reorganize state tree into channels (info, cpu, memory, disk, network, temperature, battery).
+- Automatic migration removes legacy flat state paths on first start.
+- Fix: read-only percentage states use correct `value` role instead of `level`.
+- Complete state tree documentation in README.
+
+## 0.2.7 (2026-04-12)
+- README state tree fixed (8 missing default-on states added), `no-floating-promises` lint rule added, redundant CI checkout removed.
+
+Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
 ## 0.2.6 (2026-04-08)
 - `node:` prefix used for built-in modules (http, https, url).

@@ -171,8 +171,7 @@ beszel.0.
 ---
 
 ## Changelog
-
-### **WORK IN PROGRESS**
+### 0.3.6 (2026-04-26)
 - Min js-controller correction: was incorrectly bumped to `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended value is `>=6.0.11` — restored.
 
 ### 0.3.5 (2026-04-26)
@@ -195,23 +194,6 @@ beszel.0.
 - API boundary hardening: every field from the Beszel Hub passes through a type-coercion layer (NaN, Infinity, missing fields, wrong types can no longer reach states)
 - Records missing required identifiers (`id`, `name`) are skipped rather than written as malformed objects
 - `+105` new drift tests covering primitive coercers, API response shape changes, and state-writer edge cases
-
-### 0.3.1 (2026-04-12)
-- Fix: handle response stream errors (prevents unhandled exceptions on connection drop)
-- Fix: isolate per-system poll failures (one broken system no longer blocks all others)
-- Fix: harden onMessage with try/catch and callback guard
-- Fix: classify EHOSTUNREACH as network error for proper log deduplication
-
-### 0.3.0 (2026-04-12)
-- **Breaking:** Reorganize state tree into channels (info, cpu, memory, disk, network, temperature, battery).
-- Automatic migration removes legacy flat state paths on first start.
-- Fix: read-only percentage states use correct `value` role instead of `level`.
-- Complete state tree documentation in README.
-
-### 0.2.7 (2026-04-12)
-- README state tree fixed (8 missing default-on states added), `no-floating-promises` lint rule added, redundant CI checkout removed.
-
-Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
 ## Support
 
