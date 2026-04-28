@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import * as http from "node:http";
-import { BeszelClient } from "../src/lib/beszel-client";
+import { BeszelClient } from "./beszel-client";
 
 // ---------------------------------------------------------------------------
 // Test HTTP server — simulates Beszel PocketBase API

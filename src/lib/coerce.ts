@@ -8,7 +8,7 @@ import type {
   PocketBaseList,
   SystemInfo,
   SystemStats,
-} from "./types.js";
+} from "./types";
 
 /**
  * Boundary validators for data coming in from the Beszel PocketBase API.
@@ -92,10 +92,7 @@ export function coerceArray(value: unknown): unknown[] | null {
  * @param value Unknown value from external API
  * @param length Required tuple length
  */
-export function coerceNumberTuple(
-  value: unknown,
-  length: number,
-): number[] | null {
+export function coerceNumberTuple(value: unknown, length: number): number[] | null {
   if (!Array.isArray(value) || value.length < length) {
     return null;
   }
@@ -404,9 +401,7 @@ export function coerceSystemStats(value: unknown): SystemStats {
  *
  * @param value Unknown record from PocketBase /system_stats/records
  */
-export function coerceSystemStatsRecord(
-  value: unknown,
-): BeszelSystemStats | null {
+export function coerceSystemStatsRecord(value: unknown): BeszelSystemStats | null {
   const obj = coerceObject(value);
   if (!obj) {
     return null;
@@ -462,10 +457,7 @@ export function coerceContainer(value: unknown): BeszelContainer | null {
  * @param value Unknown JSON body from a PocketBase list endpoint
  * @param itemCoercer Per-item coercer that returns the typed object or null
  */
-export function coercePocketBaseList<T>(
-  value: unknown,
-  itemCoercer: (raw: unknown) => T | null,
-): PocketBaseList<T> {
+export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unknown) => T | null): PocketBaseList<T> {
   const obj = coerceObject(value);
   if (!obj) {
     return { page: 0, perPage: 0, totalItems: 0, totalPages: 0, items: [] };

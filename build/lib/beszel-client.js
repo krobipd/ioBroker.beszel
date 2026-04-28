@@ -34,7 +34,7 @@ module.exports = __toCommonJS(beszel_client_exports);
 var http = __toESM(require("node:http"));
 var https = __toESM(require("node:https"));
 var import_node_url = require("node:url");
-var import_coerce = require("./coerce.js");
+var import_coerce = require("./coerce");
 const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1e3;
 class BeszelClient {
   baseUrl;
@@ -76,9 +76,7 @@ class BeszelClient {
   /** Fetch all systems */
   async getSystems() {
     await this.ensureToken();
-    const raw = await this.fetchJson(
-      "/api/collections/systems/records?perPage=200&sort=name"
-    );
+    const raw = await this.fetchJson("/api/collections/systems/records?perPage=200&sort=name");
     return (0, import_coerce.coercePocketBaseList)(raw, import_coerce.coerceSystem).items;
   }
   /**
@@ -107,9 +105,7 @@ class BeszelClient {
   /** Fetch all containers */
   async getContainers() {
     await this.ensureToken();
-    const raw = await this.fetchJson(
-      "/api/collections/containers/records?perPage=500&sort=system%2Cname"
-    );
+    const raw = await this.fetchJson("/api/collections/containers/records?perPage=500&sort=system%2Cname");
     return (0, import_coerce.coercePocketBaseList)(raw, import_coerce.coerceContainer).items;
   }
   // -------------------------------------------------------------------------
@@ -183,9 +179,7 @@ class BeszelClient {
           var _a;
           const raw = Buffer.concat(chunks).toString("utf8");
           if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-            const err = new Error(
-              `HTTP ${(_a = res.statusCode) != null ? _a : "?"}: ${raw.slice(0, 200)}`
-            );
+            const err = new Error(`HTTP ${(_a = res.statusCode) != null ? _a : "?"}: ${raw.slice(0, 200)}`);
             err.code = res.statusCode === 401 ? "UNAUTHORIZED" : "HTTP_ERROR";
             reject(err);
             return;

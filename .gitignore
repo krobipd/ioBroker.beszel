@@ -22,7 +22,6 @@ admin/i18n/flat.txt
 coverage/
 .nyc_output/
 *.tsbuildinfo
-build-test/
 
 # Environment
 .env

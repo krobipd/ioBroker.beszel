@@ -22,8 +22,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 var utils = __toESM(require("@iobroker/adapter-core"));
-var import_beszel_client = require("./lib/beszel-client.js");
-var import_state_manager = require("./lib/state-manager.js");
+var import_beszel_client = require("./lib/beszel-client");
+var import_state_manager = require("./lib/state-manager");
 function errText(err) {
   return err instanceof Error ? err.message : String(err);
 }
@@ -44,15 +44,11 @@ class BeszelAdapter extends utils.Adapter {
       name: "beszel"
     });
     this.on("ready", () => {
-      this.onReady().catch(
-        (err) => this.log.error(`onReady failed: ${errText(err)}`)
-      );
+      this.onReady().catch((err) => this.log.error(`onReady failed: ${errText(err)}`));
     });
     this.on("unload", this.onUnload.bind(this));
     this.on("message", (obj) => {
-      this.onMessage(obj).catch(
-        (err) => this.log.error(`onMessage failed: ${errText(err)}`)
-      );
+      this.onMessage(obj).catch((err) => this.log.error(`onMessage failed: ${errText(err)}`));
     });
     this.unhandledRejectionHandler = (reason) => {
       this.log.error(`Unhandled rejection: ${errText(reason)}`);
@@ -68,16 +64,10 @@ class BeszelAdapter extends utils.Adapter {
     const config = this.config;
     await this.setStateAsync("info.connection", { val: false, ack: true });
     if (!config.url || !config.username || !config.password) {
-      this.log.error(
-        "URL, username, and password are required \u2014 please configure the adapter settings"
-      );
+      this.log.error("URL, username, and password are required \u2014 please configure the adapter settings");
       return;
     }
-    this.client = new import_beszel_client.BeszelClient(
-      config.url,
-      config.username,
-      config.password
-    );
+    this.client = new import_beszel_client.BeszelClient(config.url, config.username, config.password);
     this.stateManager = new import_state_manager.StateManager(this);
     await this.stateManager.migrateLegacyStates();
     for (const name of await this.stateManager.getExistingSystemNames()) {
@@ -140,12 +130,7 @@ class BeszelAdapter extends utils.Adapter {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.sendTo(
-        obj.from,
-        obj.command,
-        { success: false, message: msg },
-        obj.callback
-      );
+      this.sendTo(obj.from, obj.command, { success: false, message: msg }, obj.callback);
     }
   }
   /**
@@ -191,12 +176,7 @@ class BeszelAdapter extends utils.Adapter {
       for (const system of systems) {
         try {
           const stats = statsMap.get(system.id);
-          await this.stateManager.updateSystem(
-            system,
-            stats,
-            containers,
-            config
-          );
+          await this.stateManager.updateSystem(system, stats, containers, config);
           this.failedSystems.delete(system.name);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -229,9 +209,7 @@ class BeszelAdapter extends utils.Adapter {
         if (this.authFailCount <= 3) {
           this.log.error("Authentication failed \u2014 check username and password");
         } else if (this.authFailCount === 4) {
-          this.log.error(
-            "Authentication keeps failing \u2014 suppressing further auth errors"
-          );
+          this.log.error("Authentication keeps failing \u2014 suppressing further auth errors");
         } else {
           this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
         }

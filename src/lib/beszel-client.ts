@@ -7,8 +7,8 @@ import {
   coercePocketBaseList,
   coerceSystem,
   coerceSystemStatsRecord,
-} from "./coerce.js";
-import type { BeszelContainer, BeszelSystem, SystemStats } from "./types.js";
+} from "./coerce";
+import type { BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
 const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1000; // 23 hours
 
@@ -65,9 +65,7 @@ export class BeszelClient {
   /** Fetch all systems */
   public async getSystems(): Promise<BeszelSystem[]> {
     await this.ensureToken();
-    const raw = await this.fetchJson<unknown>(
-      "/api/collections/systems/records?perPage=200&sort=name",
-    );
+    const raw = await this.fetchJson<unknown>("/api/collections/systems/records?perPage=200&sort=name");
     return coercePocketBaseList(raw, coerceSystem).items;
   }
 
@@ -77,9 +75,7 @@ export class BeszelClient {
    *
    * @param systemIds List of system IDs to fetch stats for
    */
-  public async getLatestStats(
-    systemIds: string[],
-  ): Promise<Map<string, SystemStats>> {
+  public async getLatestStats(systemIds: string[]): Promise<Map<string, SystemStats>> {
     if (systemIds.length === 0) {
       return new Map();
     }
@@ -102,9 +98,7 @@ export class BeszelClient {
   /** Fetch all containers */
   public async getContainers(): Promise<BeszelContainer[]> {
     await this.ensureToken();
-    const raw = await this.fetchJson<unknown>(
-      "/api/collections/containers/records?perPage=500&sort=system%2Cname",
-    );
+    const raw = await this.fetchJson<unknown>("/api/collections/containers/records?perPage=500&sort=system%2Cname");
     return coercePocketBaseList(raw, coerceContainer).items;
   }
 
@@ -147,12 +141,7 @@ export class BeszelClient {
     return this.request<T>("GET", path, null, this.token);
   }
 
-  private request<T>(
-    method: string,
-    path: string,
-    body: string | null,
-    token: string | null,
-  ): Promise<T> {
+  private request<T>(method: string, path: string, body: string | null, token: string | null): Promise<T> {
     return new Promise((resolve, reject) => {
       let parsedUrl: URL;
       try {
@@ -185,23 +174,16 @@ export class BeszelClient {
         timeout: 15000,
       };
 
-      const req = transport.request(options, (res) => {
+      const req = transport.request(options, res => {
         const chunks: Buffer[] = [];
-        res.on("error", (err) => reject(err));
+        res.on("error", err => reject(err));
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
         res.on("end", () => {
           const raw = Buffer.concat(chunks).toString("utf8");
-          if (
-            !res.statusCode ||
-            res.statusCode < 200 ||
-            res.statusCode >= 300
-          ) {
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
             // Propagate 401 specifically so caller can re-auth
-            const err = new Error(
-              `HTTP ${res.statusCode ?? "?"}: ${raw.slice(0, 200)}`,
-            );
-            (err as NodeJS.ErrnoException).code =
-              res.statusCode === 401 ? "UNAUTHORIZED" : "HTTP_ERROR";
+            const err = new Error(`HTTP ${res.statusCode ?? "?"}: ${raw.slice(0, 200)}`);
+            (err as NodeJS.ErrnoException).code = res.statusCode === 401 ? "UNAUTHORIZED" : "HTTP_ERROR";
             reject(err);
             return;
           }
@@ -218,7 +200,7 @@ export class BeszelClient {
         reject(new Error(`Request to ${path} timed out`));
       });
 
-      req.on("error", (err) => reject(err));
+      req.on("error", err => reject(err));
 
       if (body !== null) {
         req.write(body);

@@ -1,10 +1,5 @@
 import type * as utils from "@iobroker/adapter-core";
-import type {
-  AdapterConfig,
-  BeszelContainer,
-  BeszelSystem,
-  SystemStats,
-} from "./types.js";
+import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
 /**
  * Manages creation, update and cleanup of ioBroker objects and states for Beszel systems.
@@ -78,9 +73,7 @@ export class StateManager {
   ): Promise<void> {
     const safeName = this.sanitize(system.name);
     if (safeName.length === 0) {
-      this.adapter.log.warn(
-        `Skipping system with unusable name: ${JSON.stringify(system.name)}`,
-      );
+      this.adapter.log.warn(`Skipping system with unusable name: ${JSON.stringify(system.name)}`);
       return;
     }
     const sysId = `systems.${safeName}`;
@@ -106,20 +99,12 @@ export class StateManager {
       this.boolCommon("Online", "indicator.reachable"),
       system.status === "up",
     );
-    await this.createAndSetState(
-      `${sysId}.info.status`,
-      this.textCommon("Status"),
-      system.status,
-    );
+    await this.createAndSetState(`${sysId}.info.status`, this.textCommon("Status"), system.status);
 
     // Uptime
     if (config.metrics_uptime) {
       const uptime = system.info.u ?? null;
-      await this.createAndSetState(
-        `${sysId}.info.uptime`,
-        this.numCommon("Uptime", "s"),
-        uptime,
-      );
+      await this.createAndSetState(`${sysId}.info.uptime`, this.numCommon("Uptime", "s"), uptime);
       await this.createAndSetState(
         `${sysId}.info.uptime_text`,
         this.textCommon("Uptime (formatted)"),
@@ -139,16 +124,8 @@ export class StateManager {
     // Systemd services
     if (config.metrics_services) {
       const sv = system.info.sv;
-      await this.createAndSetState(
-        `${sysId}.info.services_total`,
-        this.numCommon("Services Total"),
-        sv?.[0] ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.info.services_failed`,
-        this.numCommon("Services Failed"),
-        sv?.[1] ?? null,
-      );
+      await this.createAndSetState(`${sysId}.info.services_total`, this.numCommon("Services Total"), sv?.[0] ?? null);
+      await this.createAndSetState(`${sysId}.info.services_failed`, this.numCommon("Services Failed"), sv?.[1] ?? null);
     }
 
     // Stats-based metrics (only if stats available)
@@ -174,7 +151,7 @@ export class StateManager {
    * @param activeSystemNames Sanitized names of currently active systems
    */
   public async cleanupSystems(activeSystemNames: string[]): Promise<void> {
-    const activeSet = new Set(activeSystemNames.map((n) => this.sanitize(n)));
+    const activeSet = new Set(activeSystemNames.map(n => this.sanitize(n)));
     const existing = await this.getExistingSystemNames();
 
     for (const name of existing) {
@@ -194,10 +171,7 @@ export class StateManager {
    * @param systemId Sanitized system name (the part after "systems.")
    * @param config Current adapter configuration
    */
-  public async cleanupMetrics(
-    systemId: string,
-    config: AdapterConfig,
-  ): Promise<void> {
+  public async cleanupMetrics(systemId: string, config: AdapterConfig): Promise<void> {
     const sysId = `systems.${systemId}`;
     const toDelete: string[] = [];
 
@@ -208,20 +182,13 @@ export class StateManager {
       toDelete.push(`${sysId}.info.agent_version`);
     }
     if (!config.metrics_services) {
-      toDelete.push(
-        `${sysId}.info.services_total`,
-        `${sysId}.info.services_failed`,
-      );
+      toDelete.push(`${sysId}.info.services_total`, `${sysId}.info.services_failed`);
     }
     if (!config.metrics_cpu) {
       toDelete.push(`${sysId}.cpu.usage`);
     }
     if (!config.metrics_loadAvg) {
-      toDelete.push(
-        `${sysId}.cpu.load_1m`,
-        `${sysId}.cpu.load_5m`,
-        `${sysId}.cpu.load_15m`,
-      );
+      toDelete.push(`${sysId}.cpu.load_1m`, `${sysId}.cpu.load_5m`, `${sysId}.cpu.load_15m`);
     }
     if (!config.metrics_cpuBreakdown) {
       toDelete.push(
@@ -233,11 +200,7 @@ export class StateManager {
       );
     }
     if (!config.metrics_memory) {
-      toDelete.push(
-        `${sysId}.memory.percent`,
-        `${sysId}.memory.used`,
-        `${sysId}.memory.total`,
-      );
+      toDelete.push(`${sysId}.memory.percent`, `${sysId}.memory.used`, `${sysId}.memory.total`);
     }
     if (!config.metrics_memoryDetails) {
       toDelete.push(`${sysId}.memory.buffers`, `${sysId}.memory.zfs_arc`);
@@ -246,11 +209,7 @@ export class StateManager {
       toDelete.push(`${sysId}.memory.swap_used`, `${sysId}.memory.swap_total`);
     }
     if (!config.metrics_disk) {
-      toDelete.push(
-        `${sysId}.disk.percent`,
-        `${sysId}.disk.used`,
-        `${sysId}.disk.total`,
-      );
+      toDelete.push(`${sysId}.disk.percent`, `${sysId}.disk.used`, `${sysId}.disk.total`);
     }
     if (!config.metrics_diskSpeed) {
       toDelete.push(`${sysId}.disk.read`, `${sysId}.disk.write`);
@@ -273,18 +232,12 @@ export class StateManager {
     }
 
     // Delete empty channels when all metrics in a group are disabled
-    const noCpu =
-      !config.metrics_cpu &&
-      !config.metrics_loadAvg &&
-      !config.metrics_cpuBreakdown;
+    const noCpu = !config.metrics_cpu && !config.metrics_loadAvg && !config.metrics_cpuBreakdown;
     if (noCpu) {
       await this.deleteChannelIfExists(`${sysId}.cpu`);
     }
 
-    const noMemory =
-      !config.metrics_memory &&
-      !config.metrics_memoryDetails &&
-      !config.metrics_swap;
+    const noMemory = !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap;
     if (noMemory) {
       await this.deleteChannelIfExists(`${sysId}.memory`);
     }
@@ -298,8 +251,7 @@ export class StateManager {
       await this.deleteChannelIfExists(`${sysId}.network`);
     }
 
-    const noTemp =
-      !config.metrics_temperature && !config.metrics_temperatureDetails;
+    const noTemp = !config.metrics_temperature && !config.metrics_temperatureDetails;
     if (noTemp) {
       await this.deleteChannelIfExists(`${sysId}.temperature`);
     }
@@ -390,9 +342,7 @@ export class StateManager {
     }
 
     if (migrated > 0) {
-      this.adapter.log.info(
-        `Migration: removed ${migrated} legacy state(s) from flat structure`,
-      );
+      this.adapter.log.info(`Migration: removed ${migrated} legacy state(s) from flat structure`);
     }
   }
 
@@ -407,18 +357,10 @@ export class StateManager {
     config: AdapterConfig,
   ): Promise<void> {
     // Ensure channels for enabled metric groups
-    if (
-      config.metrics_cpu ||
-      config.metrics_loadAvg ||
-      config.metrics_cpuBreakdown
-    ) {
+    if (config.metrics_cpu || config.metrics_loadAvg || config.metrics_cpuBreakdown) {
       await this.ensureChannel(`${sysId}.cpu`, "CPU");
     }
-    if (
-      config.metrics_memory ||
-      config.metrics_memoryDetails ||
-      config.metrics_swap
-    ) {
+    if (config.metrics_memory || config.metrics_memoryDetails || config.metrics_swap) {
       await this.ensureChannel(`${sysId}.memory`, "Memory");
     }
     if (config.metrics_disk || config.metrics_diskSpeed) {
@@ -436,11 +378,7 @@ export class StateManager {
 
     // CPU
     if (config.metrics_cpu) {
-      await this.createAndSetState(
-        `${sysId}.cpu.usage`,
-        this.percentCommon("CPU Usage"),
-        stats.cpu ?? null,
-      );
+      await this.createAndSetState(`${sysId}.cpu.usage`, this.percentCommon("CPU Usage"), stats.cpu ?? null);
     }
 
     // Load avg — prefer stats.la, fallback to system.info.la
@@ -451,50 +389,18 @@ export class StateManager {
     // CPU breakdown
     if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
       const [user, sys, iowait, steal, idle] = stats.cpub;
-      await this.createAndSetState(
-        `${sysId}.cpu.user`,
-        this.percentCommon("CPU User %"),
-        user,
-      );
-      await this.createAndSetState(
-        `${sysId}.cpu.system`,
-        this.percentCommon("CPU System %"),
-        sys,
-      );
-      await this.createAndSetState(
-        `${sysId}.cpu.iowait`,
-        this.percentCommon("CPU IOWait %"),
-        iowait,
-      );
-      await this.createAndSetState(
-        `${sysId}.cpu.steal`,
-        this.percentCommon("CPU Steal %"),
-        steal,
-      );
-      await this.createAndSetState(
-        `${sysId}.cpu.idle`,
-        this.percentCommon("CPU Idle %"),
-        idle,
-      );
+      await this.createAndSetState(`${sysId}.cpu.user`, this.percentCommon("CPU User %"), user);
+      await this.createAndSetState(`${sysId}.cpu.system`, this.percentCommon("CPU System %"), sys);
+      await this.createAndSetState(`${sysId}.cpu.iowait`, this.percentCommon("CPU IOWait %"), iowait);
+      await this.createAndSetState(`${sysId}.cpu.steal`, this.percentCommon("CPU Steal %"), steal);
+      await this.createAndSetState(`${sysId}.cpu.idle`, this.percentCommon("CPU Idle %"), idle);
     }
 
     // Memory
     if (config.metrics_memory) {
-      await this.createAndSetState(
-        `${sysId}.memory.percent`,
-        this.percentCommon("Memory %"),
-        stats.mp ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.used`,
-        this.numCommon("Memory Used", "GB"),
-        stats.mu ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.total`,
-        this.numCommon("Memory Total", "GB"),
-        stats.m ?? null,
-      );
+      await this.createAndSetState(`${sysId}.memory.percent`, this.percentCommon("Memory %"), stats.mp ?? null);
+      await this.createAndSetState(`${sysId}.memory.used`, this.numCommon("Memory Used", "GB"), stats.mu ?? null);
+      await this.createAndSetState(`${sysId}.memory.total`, this.numCommon("Memory Total", "GB"), stats.m ?? null);
     }
 
     // Memory details
@@ -504,67 +410,31 @@ export class StateManager {
         this.numCommon("Memory Buffers+Cache", "GB"),
         stats.mb ?? null,
       );
-      await this.createAndSetState(
-        `${sysId}.memory.zfs_arc`,
-        this.numCommon("Memory ZFS ARC", "GB"),
-        stats.mz ?? null,
-      );
+      await this.createAndSetState(`${sysId}.memory.zfs_arc`, this.numCommon("Memory ZFS ARC", "GB"), stats.mz ?? null);
     }
 
     // Swap
     if (config.metrics_swap) {
-      await this.createAndSetState(
-        `${sysId}.memory.swap_used`,
-        this.numCommon("Swap Used", "GB"),
-        stats.su ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.swap_total`,
-        this.numCommon("Swap Total", "GB"),
-        stats.s ?? null,
-      );
+      await this.createAndSetState(`${sysId}.memory.swap_used`, this.numCommon("Swap Used", "GB"), stats.su ?? null);
+      await this.createAndSetState(`${sysId}.memory.swap_total`, this.numCommon("Swap Total", "GB"), stats.s ?? null);
     }
 
     // Disk
     if (config.metrics_disk) {
-      await this.createAndSetState(
-        `${sysId}.disk.percent`,
-        this.percentCommon("Disk %"),
-        stats.dp ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.disk.used`,
-        this.numCommon("Disk Used", "GB"),
-        stats.du ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.disk.total`,
-        this.numCommon("Disk Total", "GB"),
-        stats.d ?? null,
-      );
+      await this.createAndSetState(`${sysId}.disk.percent`, this.percentCommon("Disk %"), stats.dp ?? null);
+      await this.createAndSetState(`${sysId}.disk.used`, this.numCommon("Disk Used", "GB"), stats.du ?? null);
+      await this.createAndSetState(`${sysId}.disk.total`, this.numCommon("Disk Total", "GB"), stats.d ?? null);
     }
 
     // Disk speed
     if (config.metrics_diskSpeed) {
-      await this.createAndSetState(
-        `${sysId}.disk.read`,
-        this.numCommon("Disk Read", "MB/s"),
-        stats.dr ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.disk.write`,
-        this.numCommon("Disk Write", "MB/s"),
-        stats.dw ?? null,
-      );
+      await this.createAndSetState(`${sysId}.disk.read`, this.numCommon("Disk Read", "MB/s"), stats.dr ?? null);
+      await this.createAndSetState(`${sysId}.disk.write`, this.numCommon("Disk Write", "MB/s"), stats.dw ?? null);
     }
 
     // Network
     if (config.metrics_network) {
-      await this.createAndSetState(
-        `${sysId}.network.sent`,
-        this.numCommon("Network Sent", "MB/s"),
-        stats.ns ?? null,
-      );
+      await this.createAndSetState(`${sysId}.network.sent`, this.numCommon("Network Sent", "MB/s"), stats.ns ?? null);
       await this.createAndSetState(
         `${sysId}.network.recv`,
         this.numCommon("Network Received", "MB/s"),
@@ -596,11 +466,7 @@ export class StateManager {
     // Battery
     if (config.metrics_battery) {
       const bat = stats.bat ?? system.info.bat;
-      await this.createAndSetState(
-        `${sysId}.battery.percent`,
-        this.percentCommon("Battery %"),
-        bat?.[0] ?? null,
-      );
+      await this.createAndSetState(`${sysId}.battery.percent`, this.percentCommon("Battery %"), bat?.[0] ?? null);
       await this.createAndSetState(
         `${sysId}.battery.charging`,
         this.boolCommon("Battery Charging"),
@@ -638,11 +504,7 @@ export class StateManager {
     }
 
     // Extra filesystems
-    if (
-      config.metrics_extraFs &&
-      stats.efs &&
-      Object.keys(stats.efs).length > 0
-    ) {
+    if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
       await this.ensureChannel(`${sysId}.filesystems`, "Filesystems");
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
         const safeId = this.sanitize(fsName);
@@ -650,10 +512,7 @@ export class StateManager {
 
         const total = fsData.d ?? null;
         const used = fsData.du ?? null;
-        const percent =
-          total !== null && used !== null && total > 0
-            ? Math.round((used / total) * 100)
-            : null;
+        const percent = total !== null && used !== null && total > 0 ? Math.round((used / total) * 100) : null;
 
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_percent`,
@@ -684,12 +543,8 @@ export class StateManager {
     }
   }
 
-  private async updateContainers(
-    sysId: string,
-    systemId: string,
-    allContainers: BeszelContainer[],
-  ): Promise<void> {
-    const sysContainers = allContainers.filter((c) => c.system === systemId);
+  private async updateContainers(sysId: string, systemId: string, allContainers: BeszelContainer[]): Promise<void> {
+    const sysContainers = allContainers.filter(c => c.system === systemId);
     if (sysContainers.length === 0) {
       return;
     }
@@ -704,31 +559,19 @@ export class StateManager {
         continue;
       }
       await this.ensureChannel(`${sysId}.containers.${cId}`, container.name);
-      await this.createAndSetState(
-        `${sysId}.containers.${cId}.status`,
-        this.textCommon("Status"),
-        container.status,
-      );
+      await this.createAndSetState(`${sysId}.containers.${cId}.status`, this.textCommon("Status"), container.status);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
         this.textCommon("Health"),
         healthLabels[container.health] ?? "unknown",
       );
-      await this.createAndSetState(
-        `${sysId}.containers.${cId}.cpu`,
-        this.percentCommon("CPU Usage"),
-        container.cpu,
-      );
+      await this.createAndSetState(`${sysId}.containers.${cId}.cpu`, this.percentCommon("CPU Usage"), container.cpu);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.memory`,
         this.numCommon("Memory", "MB"),
         container.memory,
       );
-      await this.createAndSetState(
-        `${sysId}.containers.${cId}.image`,
-        this.textCommon("Image"),
-        container.image,
-      );
+      await this.createAndSetState(`${sysId}.containers.${cId}.image`, this.textCommon("Image"), container.image);
     }
   }
 
@@ -757,32 +600,13 @@ export class StateManager {
    * @param sysId State ID prefix (e.g. "systems.my_server")
    * @param la Load average tuple [1m, 5m, 15m], or undefined
    */
-  private async createLoadAvgStates(
-    sysId: string,
-    la: [number, number, number] | undefined,
-  ): Promise<void> {
-    await this.createAndSetState(
-      `${sysId}.cpu.load_1m`,
-      this.numCommon("Load Average 1m"),
-      la?.[0] ?? null,
-    );
-    await this.createAndSetState(
-      `${sysId}.cpu.load_5m`,
-      this.numCommon("Load Average 5m"),
-      la?.[1] ?? null,
-    );
-    await this.createAndSetState(
-      `${sysId}.cpu.load_15m`,
-      this.numCommon("Load Average 15m"),
-      la?.[2] ?? null,
-    );
+  private async createLoadAvgStates(sysId: string, la: [number, number, number] | undefined): Promise<void> {
+    await this.createAndSetState(`${sysId}.cpu.load_1m`, this.numCommon("Load Average 1m"), la?.[0] ?? null);
+    await this.createAndSetState(`${sysId}.cpu.load_5m`, this.numCommon("Load Average 5m"), la?.[1] ?? null);
+    await this.createAndSetState(`${sysId}.cpu.load_15m`, this.numCommon("Load Average 15m"), la?.[2] ?? null);
   }
 
-  private async createAndSetState(
-    id: string,
-    common: ioBroker.StateCommon,
-    value: ioBroker.StateValue,
-  ): Promise<void> {
+  private async createAndSetState(id: string, common: ioBroker.StateCommon, value: ioBroker.StateValue): Promise<void> {
     await this.adapter.setObjectNotExistsAsync(id, {
       type: "state",
       common,
@@ -808,11 +632,7 @@ export class StateManager {
     } as ioBroker.StateCommon;
   }
 
-  private numCommon(
-    name: string,
-    unit?: string,
-    role = "value",
-  ): ioBroker.StateCommon {
+  private numCommon(name: string, unit?: string, role = "value"): ioBroker.StateCommon {
     return {
       name,
       type: "number",
@@ -847,15 +667,11 @@ export class StateManager {
   // Computation helpers
   // -------------------------------------------------------------------------
 
-  private computeTopAvgTemp(
-    temps: Record<string, number> | undefined,
-  ): number | null {
+  private computeTopAvgTemp(temps: Record<string, number> | undefined): number | null {
     if (!temps) {
       return null;
     }
-    const values = Object.values(temps).filter(
-      (v) => typeof v === "number" && isFinite(v),
-    );
+    const values = Object.values(temps).filter(v => typeof v === "number" && isFinite(v));
     if (values.length === 0) {
       return null;
     }

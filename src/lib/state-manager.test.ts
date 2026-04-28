@@ -1,11 +1,11 @@
 import { expect } from "chai";
-import { StateManager } from "../src/lib/state-manager";
+import { StateManager } from "./state-manager";
 import type {
     AdapterConfig,
     BeszelSystem,
     BeszelContainer,
     SystemStats,
-} from "../src/lib/types";
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Mock adapter

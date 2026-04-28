@@ -171,6 +171,16 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+- Audit cleanup against the upstream `ioBroker.example/TypeScript` full standard:
+  - Test setup migrated: tests now live next to source as `src/lib/*.test.ts` and run directly via `ts-node/register`. Removed `tsconfig.test.json` + `build-test/`, added `test/mocharc.custom.json` + `test/mocha.setup.js` + `test/tsconfig.json` + `test/.eslintrc.json`
+  - `@types/node` rolled back from `^25.6.0` to `^20.19.24` so type defs match `engines.node: ">=20"` (avoids type-checking Node 21+-only APIs that crash on Node 20)
+  - Dependabot now ignores major bumps for `@types/node`, `typescript`, `eslint`, `actions/checkout`, `actions/setup-node` — runtime/toolchain pinning cannot drift via auto-merge
+  - `nyc` config + `coverage` script added (matches upstream template)
+  - `prettier.config.mjs` made explicit with project-style overrides (Spaces 2-wide, double quotes)
+  - Source `.js`-style imports replaced with bare names (consistent with upstream default, ts-node-compatible)
+  - Orphan `.github/auto-merge.yml` removed (active workflow is `automerge-dependabot.yml` using `gh pr merge`)
+
 ### 0.3.6 (2026-04-26)
 - Min js-controller correction: was incorrectly bumped to `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended value is `>=6.0.11` — restored.
 

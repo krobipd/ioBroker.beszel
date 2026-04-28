@@ -1,7 +1,7 @@
 import * as utils from "@iobroker/adapter-core";
-import { BeszelClient } from "./lib/beszel-client.js";
-import { StateManager } from "./lib/state-manager.js";
-import type { AdapterConfig } from "./lib/types.js";
+import { BeszelClient } from "./lib/beszel-client";
+import { StateManager } from "./lib/state-manager";
+import type { AdapterConfig } from "./lib/types";
 
 /**
  * Extract a log-friendly message from an unknown error value.
@@ -32,15 +32,11 @@ class BeszelAdapter extends utils.Adapter {
     // Wrap async handlers with .catch() so a rejection can never become an
     // unhandled promise rejection (→ SIGKILL → js-controller restart loop).
     this.on("ready", () => {
-      this.onReady().catch((err: unknown) =>
-        this.log.error(`onReady failed: ${errText(err)}`),
-      );
+      this.onReady().catch((err: unknown) => this.log.error(`onReady failed: ${errText(err)}`));
     });
     this.on("unload", this.onUnload.bind(this));
-    this.on("message", (obj) => {
-      this.onMessage(obj).catch((err: unknown) =>
-        this.log.error(`onMessage failed: ${errText(err)}`),
-      );
+    this.on("message", obj => {
+      this.onMessage(obj).catch((err: unknown) => this.log.error(`onMessage failed: ${errText(err)}`));
     });
     // Last-line-of-defence against unhandled rejections / sync throws from
     // fire-and-forget paths (e.g. `void this.poll()`). The per-handler
@@ -65,17 +61,11 @@ class BeszelAdapter extends utils.Adapter {
 
     // Validate required config
     if (!config.url || !config.username || !config.password) {
-      this.log.error(
-        "URL, username, and password are required — please configure the adapter settings",
-      );
+      this.log.error("URL, username, and password are required — please configure the adapter settings");
       return;
     }
 
-    this.client = new BeszelClient(
-      config.url,
-      config.username,
-      config.password,
-    );
+    this.client = new BeszelClient(config.url, config.username, config.password);
     this.stateManager = new StateManager(this);
 
     // Migrate legacy flat state paths from pre-0.3.0
@@ -151,12 +141,7 @@ class BeszelAdapter extends utils.Adapter {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.sendTo(
-        obj.from,
-        obj.command,
-        { success: false, message: msg },
-        obj.callback,
-      );
+      this.sendTo(obj.from, obj.command, { success: false, message: msg }, obj.callback);
     }
   }
 
@@ -205,12 +190,10 @@ class BeszelAdapter extends utils.Adapter {
       // Fetch all data
       const [systems, containers] = await Promise.all([
         this.client.getSystems(),
-        config.metrics_containers
-          ? this.client.getContainers()
-          : Promise.resolve([]),
+        config.metrics_containers ? this.client.getContainers() : Promise.resolve([]),
       ]);
 
-      const systemIds = systems.map((s) => s.id);
+      const systemIds = systems.map(s => s.id);
       const statsMap = await this.client.getLatestStats(systemIds);
 
       // Update connection state
@@ -220,12 +203,7 @@ class BeszelAdapter extends utils.Adapter {
       for (const system of systems) {
         try {
           const stats = statsMap.get(system.id);
-          await this.stateManager.updateSystem(
-            system,
-            stats,
-            containers,
-            config,
-          );
+          await this.stateManager.updateSystem(system, stats, containers, config);
           this.failedSystems.delete(system.name);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -241,7 +219,7 @@ class BeszelAdapter extends utils.Adapter {
       // Cleanup stale systems — but only if we actually got results.
       // An empty list during a transient API issue must NOT wipe all devices.
       if (systems.length > 0 || this.lastSystemCount === 0) {
-        await this.stateManager.cleanupSystems(systems.map((s) => s.name));
+        await this.stateManager.cleanupSystems(systems.map(s => s.name));
       }
 
       this.lastSystemCount = systems.length;
@@ -265,9 +243,7 @@ class BeszelAdapter extends utils.Adapter {
         if (this.authFailCount <= 3) {
           this.log.error("Authentication failed — check username and password");
         } else if (this.authFailCount === 4) {
-          this.log.error(
-            "Authentication keeps failing — suppressing further auth errors",
-          );
+          this.log.error("Authentication keeps failing — suppressing further auth errors");
         } else {
           this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
         }
@@ -288,8 +264,7 @@ class BeszelAdapter extends utils.Adapter {
 
 if (require.main !== module) {
   // Export the constructor in compact mode
-  module.exports = (options: Partial<utils.AdapterOptions> | undefined) =>
-    new BeszelAdapter(options);
+  module.exports = (options: Partial<utils.AdapterOptions> | undefined) => new BeszelAdapter(options);
 } else {
   (() => new BeszelAdapter())();
 }

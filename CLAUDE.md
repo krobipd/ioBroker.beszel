@@ -6,11 +6,13 @@
 
 **ioBroker Beszel Monitor** — Verbindet sich mit Beszel Hub (PocketBase) für Server-Monitoring.
 
-- **Version:** 0.3.6 (2026-04-26 — Hotfix: js-controller >=7.0.23 → >=6.0.11)
+- **Version:** 0.3.7 (2026-04-28 — Audit-Cleanup gegen ioBroker.example/TypeScript-Vollstandard)
 - **GitHub:** https://github.com/krobipd/ioBroker.beszel
 - **npm:** https://www.npmjs.com/package/iobroker.beszel
 - **Repository PR:** ioBroker/ioBroker.repositories#5787
 - **Runtime-Deps:** nur `@iobroker/adapter-core` (HTTP via Node.js built-in)
+- **Test-Setup:** offizieller ioBroker.example/TypeScript-Standard — Tests unter `src/lib/*.test.ts` direkt mit `ts-node/register`, kein separater Build (siehe globales `reference_iobroker_test_setup_standard`)
+- **`@types/node` an `engines.node`-Min gekoppelt:** `^20.x` weil `engines.node: ">=20"`. Dependabot ignoriert Major-Bumps
 
 ## Architektur
 
@@ -57,22 +59,13 @@ Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Call
 
 | Version | Highlights |
 |---------|------------|
-| 0.3.6 | Hotfix für versehentlich falsch gesetzte js-controller-Min in 0.3.5 (`>=7.0.23` war eine Recherche-Synthese, nicht Repochecker-Source). Korrektur auf `>=6.0.11` (Quelle: `ioBroker.repochecker/lib/M1000_IOPackageJson.js` — `recommendedJsControllerVersion`) |
-| 0.3.5 | Process-level `unhandledRejection`/`uncaughtException`-Handler als last-line-of-defence. `manual-review`-release-script-Plugin raus. Audit-driven Konsistenz-Cleanup (`.vscode` json5-Schemas, `tsconfig.test`). README-Footer-Link wieder rein, CHANGELOG_OLD aufgeräumt |
-| 0.3.4 | tsconfig.test.json → outDir `./build-test`, `systems` (folder, 11-sprachig) als instanceObject, async-handler `.catch()`-Wrapper für onReady + onMessage, redundantes dynamisches `info`/`info.connection`-Setup in main.ts entfernt (ist in instanceObjects) |
-| 0.3.3 | Latest-repo review compliance: `common.messagebox=true` weil `Check Connection` durch `onMessage` läuft |
-| 0.3.2 | API-Boundary-Härtung: coerce.ts mit coerceFiniteNumber/String/Boolean/Object + typed coercers (System/Stats/Container/Auth). +105 Drift-Tests |
-| 0.3.1 | Error-Handling: res.on("error"), per-system Poll-Isolation, onMessage try/catch+callback, EHOSTUNREACH |
-| 0.3.0 | **Breaking:** Channel-basierter State-Tree, Legacy-Migration, DRY-Refactor (state-common factories), role-Fix |
-| 0.2.7 | README State-Tree Fix, no-floating-promises, CI checkout entfernt |
-| 0.2.5 | Review-Fixes: Standard-Tests (plain JS), CHANGELOG.md entfernt, FORBIDDEN_CHARS-Ref |
-| 0.2.4 | Cleaner Log-Messages, redundanter Adapter-Name-Prefix entfernt |
-| 0.2.3 | Redundante Scripts/DevDeps entfernt, Doku komprimiert |
-| 0.2.2 | Dev-Tooling modernisiert (esbuild, TS 5.9 Pin) |
-| 0.2.1 | Error-Dedup, Auth-Backoff, Empty-Systems-Guard |
-| 0.2.0 | Adapter-Timer, sync onUnload, About→Connection merged, CI cross-platform |
-| 0.1.4 | Alle Repochecker-Fehler gefixt |
-| 0.1.0 | Initial Release |
+| 0.3.7 | Audit-Cleanup gegen ioBroker.example/TypeScript-Vollstandard: Test-Setup auf `src/lib/*.test.ts` + ts-node, `tsconfig.test.json` + `build-test/` raus, `@types/node` von `^25.6.0` auf `^20.19.24` (engines.node >=20), dependabot ignore-Block für Major-Bumps von `@types/node`+`typescript`+`eslint`+`actions/checkout`+`actions/setup-node`, `nyc`-Config + `coverage`-Script, `prettier.config.mjs` mit Project-Style-Override, `auto-merge.yml` raus (verwaist), `.js`-Imports in src/ entfernt (bare-Names konsistent) |
+| 0.3.6 | Hotfix js-controller-Min auf `>=6.0.11` (Repochecker-recommended), war versehentlich `>=7.0.23` |
+| 0.3.5 | Process-level `unhandledRejection`/`uncaughtException`-Handler. `manual-review`-Plugin raus. Konsistenz-Cleanup |
+| 0.3.4 | tsconfig.test.json → outDir `./build-test` (später durch v0.3.7 vollständig ersetzt), `systems` als instanceObject, async-handler `.catch()` für onReady + onMessage |
+| 0.3.3 | Latest-repo review compliance: `common.messagebox=true` |
+| 0.3.2 | API-Boundary-Härtung: coerce.ts mit typed coercers + 105 Drift-Tests |
+| 0.3.1 | Error-Handling: res.on("error"), per-system Poll-Isolation, onMessage try/catch |
 
 ## Befehle
 

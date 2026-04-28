@@ -14,7 +14,7 @@ import {
     coerceSystem,
     coerceSystemStats,
     coerceSystemStatsRecord,
-} from "../src/lib/coerce";
+} from "./coerce";
 
 describe("coerce", () => {
     // -----------------------------------------------------------------------
