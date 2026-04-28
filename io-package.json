@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.6",
+    "version": "0.3.7",
     "news": {
+      "0.3.7": {
+        "en": "Audit cleanup against the upstream ioBroker.example/TypeScript standard: tests now under src/lib/*.test.ts, @types/node aligned with engines (>=20), dependabot ignores major bumps for runtime/toolchain pins, nyc + prettier config added.",
+        "de": "Audit-Cleanup gegen den ioBroker.example/TypeScript-Standard: Tests unter src/lib/*.test.ts, @types/node an engines (>=20) gekoppelt, dependabot ignoriert Major-Bumps für Runtime/Toolchain, nyc + prettier-Config ergänzt.",
+        "ru": "Аудит-очистка по стандарту ioBroker.example/TypeScript: тесты в src/lib/*.test.ts, @types/node привязан к engines (>=20), dependabot игнорирует мажорные обновления, добавлены nyc и prettier-конфиг.",
+        "pt": "Limpeza de auditoria conforme padrão ioBroker.example/TypeScript: testes em src/lib/*.test.ts, @types/node alinhado a engines (>=20), dependabot ignora bumps maiores, configs nyc e prettier adicionadas.",
+        "nl": "Audit-opschoning volgens ioBroker.example/TypeScript-standaard: tests onder src/lib/*.test.ts, @types/node gekoppeld aan engines (>=20), dependabot negeert major bumps, nyc + prettier-config toegevoegd.",
+        "fr": "Nettoyage d'audit selon la norme ioBroker.example/TypeScript : tests dans src/lib/*.test.ts, @types/node aligné avec engines (>=20), dependabot ignore les bumps majeurs, configs nyc et prettier ajoutées.",
+        "it": "Pulizia audit secondo standard ioBroker.example/TypeScript: test in src/lib/*.test.ts, @types/node allineato a engines (>=20), dependabot ignora i bump major, aggiunte config nyc e prettier.",
+        "es": "Limpieza de auditoría conforme al estándar ioBroker.example/TypeScript: tests en src/lib/*.test.ts, @types/node alineado con engines (>=20), dependabot ignora bumps mayores, configs nyc y prettier añadidas.",
+        "pl": "Porządkowanie audytowe zgodnie ze standardem ioBroker.example/TypeScript: testy w src/lib/*.test.ts, @types/node powiązany z engines (>=20), dependabot ignoruje główne bumpy, dodano konfigi nyc i prettier.",
+        "uk": "Аудит-очищення за стандартом ioBroker.example/TypeScript: тести в src/lib/*.test.ts, @types/node прив'язаний до engines (>=20), dependabot ігнорує мажорні бампи, додано nyc та prettier-конфіги.",
+        "zh-cn": "依照 ioBroker.example/TypeScript 标准的审计清理：测试现在位于 src/lib/*.test.ts，@types/node 与 engines (>=20) 对齐，dependabot 忽略主要版本升级，已添加 nyc 和 prettier 配置。"
+      },
       "0.3.6": {
         "en": "Min js-controller correction: was incorrectly bumped to `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended value is `>=6.0.11` — restored.",
         "de": "Min js-Controller-Korrektur: wurde falsch auf `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended Wert ist `>=6.0.11` — restauriert.",
@@ -80,19 +93,6 @@
         "pl": "Błędy response-stream obsłużone. Per-system poll-failures odizolowane (jeden zepsuty system nie blokuje już pozostałych). onMessage wzmocnione przez try/catch + callback-guard. EHOSTUNREACH klasyfikowany jako błąd sieci.",
         "uk": "Помилки response-stream оброблено. Per-system poll-failures ізольовано (одна зламана система більше не блокує інші). onMessage посилено через try/catch + callback-guard. EHOSTUNREACH класифіковано як network error.",
         "zh-cn": "处理 response-stream 错误。隔离 per-system poll-failures（一个坏掉的系统不再阻塞其他）。通过 try/catch + callback-guard 强化 onMessage。EHOSTUNREACH 归类为网络错误。"
-      },
-      "0.3.0": {
-        "en": "Breaking — state tree reorganised into channels (info, cpu, memory, disk, network, temperature, battery). Automatic migration removes legacy flat state paths on first start. Read-only percent states use correct value role instead of level.",
-        "de": "Breaking — State-Tree in Channels reorganisiert (info, cpu, memory, disk, network, temperature, battery). Automatische Migration entfernt Legacy-Flat-State-Pfade beim ersten Start. Read-only-Prozent-States nutzen die korrekte value-Rolle statt level.",
-        "ru": "Breaking — state tree реорганізовано в channels (info, cpu, memory, disk, network, temperature, battery). Автоматична міграція видаляє legacy flat state-шляхи при першому старті. Read-only percent-states використовують правильну value-роль замість level.",
-        "pt": "Breaking — state tree reorganizado em channels (info, cpu, memory, disk, network, temperature, battery). Migração automática remove caminhos legados de state plano no primeiro start. States percent read-only usam a role correta value em vez de level.",
-        "nl": "Breaking — state tree gereorganiseerd naar channels (info, cpu, memory, disk, network, temperature, battery). Automatische migratie verwijdert legacy flat state-paden bij eerste start. Read-only percent-states gebruiken de juiste value-rol in plaats van level.",
-        "fr": "Breaking — state tree réorganisé en channels (info, cpu, memory, disk, network, temperature, battery). Migration automatique supprime les chemins de state plats hérités au premier démarrage. États percent read-only utilisent le rôle value correct au lieu de level.",
-        "it": "Breaking — state tree riorganizzato in channels (info, cpu, memory, disk, network, temperature, battery). Migrazione automatica rimuove i percorsi state piatti legacy al primo avvio. State percent read-only usano il ruolo value corretto invece di level.",
-        "es": "Breaking — state tree reorganizado en channels (info, cpu, memory, disk, network, temperature, battery). Migración automática elimina rutas state planas heredadas en el primer arranque. States percent de solo lectura usan el rol value correcto en lugar de level.",
-        "pl": "Breaking — state tree przereorganizowane w channels (info, cpu, memory, disk, network, temperature, battery). Automatyczna migracja usuwa starsze płaskie ścieżki state przy pierwszym starcie. Read-only percent-states używają poprawnej roli value zamiast level.",
-        "uk": "Breaking — state tree реорганізовано в channels (info, cpu, memory, disk, network, temperature, battery). Автоматична міграція видаляє legacy flat state-шляхи при першому старті. Read-only percent-states використовують правильну роль value замість level.",
-        "zh-cn": "Breaking — state tree 重新组织为 channels（info、cpu、memory、disk、network、temperature、battery）。自动迁移在首次启动时移除遗留的扁平 state 路径。只读 percent-state 使用正确的 value 角色而非 level。"
       }
     },
     "titleLang": {

@@ -1,6 +1,6 @@
 {
   "name": "iobroker.beszel",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "ioBroker adapter for Beszel server monitoring",
   "author": {
     "name": "krobi",
@@ -71,11 +71,22 @@
     "release": "release-script"
   },
   "nyc": {
-    "include": ["src/**/*.ts"],
-    "exclude": ["src/**/*.test.ts"],
-    "extension": [".ts"],
-    "require": ["ts-node/register"],
-    "reporter": ["text-summary", "html"],
+    "include": [
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "src/**/*.test.ts"
+    ],
+    "extension": [
+      ".ts"
+    ],
+    "require": [
+      "ts-node/register"
+    ],
+    "reporter": [
+      "text-summary",
+      "html"
+    ],
     "sourceMap": true,
     "instrument": true
   },

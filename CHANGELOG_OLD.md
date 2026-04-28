@@ -1,4 +1,9 @@
 # Older Changes
+## 0.3.2 (2026-04-18)
+- API boundary hardening: every field from the Beszel Hub passes through a type-coercion layer (NaN, Infinity, missing fields, wrong types can no longer reach states)
+- Records missing required identifiers (`id`, `name`) are skipped rather than written as malformed objects
+- `+105` new drift tests covering primitive coercers, API response shape changes, and state-writer edge cases
+
 ## 0.3.1 (2026-04-12)
 - Fix: handle response stream errors (prevents unhandled exceptions on connection drop)
 - Fix: isolate per-system poll failures (one broken system no longer blocks all others)

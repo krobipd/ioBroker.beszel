@@ -171,7 +171,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.3.7 (2026-04-28)
 - Audit cleanup against the upstream `ioBroker.example/TypeScript` full standard:
   - Test setup migrated: tests now live next to source as `src/lib/*.test.ts` and run directly via `ts-node/register`. Removed `tsconfig.test.json` + `build-test/`, added `test/mocharc.custom.json` + `test/mocha.setup.js` + `test/tsconfig.json` + `test/.eslintrc.json`
   - `@types/node` rolled back from `^25.6.0` to `^20.19.24` so type defs match `engines.node: ">=20"` (avoids type-checking Node 21+-only APIs that crash on Node 20)
@@ -199,11 +199,6 @@ beszel.0.
 
 ### 0.3.3 (2026-04-19)
 - Latest-repo review compliance: `common.messagebox=true` added because the `Check Connection` button in the admin UI routes through `onMessage`. Runtime behaviour unchanged.
-
-### 0.3.2 (2026-04-18)
-- API boundary hardening: every field from the Beszel Hub passes through a type-coercion layer (NaN, Infinity, missing fields, wrong types can no longer reach states)
-- Records missing required identifiers (`id`, `name`) are skipped rather than written as malformed objects
-- `+105` new drift tests covering primitive coercers, API response shape changes, and state-writer edge cases
 
 ## Support
 
