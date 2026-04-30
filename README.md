@@ -171,6 +171,12 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- New `format` + `format:check` npm-scripts (run prettier — matches the other krobi adapters).
+- Master-sync: `repochecker-version-gate` workflow job moved from the legacy M1000 check to the sources-dist-stable check (now identical to hassemu and parcelapp).
+- `CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).
+
 ### 0.3.7 (2026-04-28)
 - Audit cleanup against the upstream `ioBroker.example/TypeScript` full standard:
   - Test setup migrated: tests now live next to source as `src/lib/*.test.ts` and run directly via `ts-node/register`. Removed `tsconfig.test.json` + `build-test/`, added `test/mocharc.custom.json` + `test/mocha.setup.js` + `test/tsconfig.json` + `test/.eslintrc.json`

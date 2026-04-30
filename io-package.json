@@ -67,32 +67,6 @@
         "pl": "Latest-repo review compliance: common.messagebox=true dodane, ponieważ przycisk Check Connection admin-UI przechodzi przez onMessage. Zachowanie runtime bez zmian.",
         "uk": "Latest-repo review compliance: common.messagebox=true додано, оскільки кнопка Check Connection в admin-UI проходить через onMessage. Runtime поведінка незмінна.",
         "zh-cn": "Latest-repo review compliance：因 admin-UI 的 Check Connection 按钮经由 onMessage 路由，故添加 common.messagebox=true。运行时行为不变。"
-      },
-      "0.3.2": {
-        "en": "API boundary hardening: every field from the Beszel Hub passes through a type-coercion layer (NaN, Infinity, missing fields, wrong types can no longer reach states). Records missing required identifiers (id, name) are skipped. 105 new drift tests.",
-        "de": "API-Boundary-Härtung: jedes Feld vom Beszel Hub läuft durch eine Type-Coercion-Schicht (NaN, Infinity, fehlende Felder, falsche Typen können keine States mehr erreichen). Records ohne id/name werden übersprungen. 105 neue Drift-Tests.",
-        "ru": "API-boundary посилено: кожне поле від Beszel Hub проходить через type-coercion шар (NaN, Infinity, відсутні поля, неправильні типи більше не можуть потрапити в states). Записи без id/name пропускаються. 105 нових drift-тестів.",
-        "pt": "API-boundary reforçado: cada campo do Beszel Hub passa por uma camada de type-coercion (NaN, Infinity, campos ausentes, tipos errados não podem mais chegar aos states). Registros sem id/name são ignorados. 105 novos drift tests.",
-        "nl": "API-boundary versterkt: elk veld van de Beszel Hub gaat door een type-coercion laag (NaN, Infinity, missende velden, verkeerde types kunnen geen states meer bereiken). Records zonder id/name worden overgeslagen. 105 nieuwe drift-tests.",
-        "fr": "API-boundary renforcé: chaque champ du Beszel Hub passe par une couche de type-coercion (NaN, Infinity, champs manquants, types erronés ne peuvent plus atteindre les states). Enregistrements sans id/name sont ignorés. 105 nouveaux drift-tests.",
-        "it": "API-boundary rafforzato: ogni campo dal Beszel Hub passa da uno strato di type-coercion (NaN, Infinity, campi mancanti, tipi errati non possono più raggiungere gli state). Record senza id/name vengono saltati. 105 nuovi drift-test.",
-        "es": "API-boundary reforzado: cada campo del Beszel Hub pasa por una capa de type-coercion (NaN, Infinity, campos faltantes, tipos incorrectos ya no pueden llegar a los states). Registros sin id/name se saltan. 105 nuevos drift-tests.",
-        "pl": "API-boundary wzmocnione: każde pole z Beszel Hub przechodzi przez warstwę type-coercion (NaN, Infinity, brakujące pola, błędne typy nie mogą już docierać do states). Rekordy bez id/name są pomijane. 105 nowych drift-testów.",
-        "uk": "API-boundary посилено: кожне поле з Beszel Hub проходить через type-coercion шар (NaN, Infinity, відсутні поля, неправильні типи більше не можуть потрапити у states). Записи без id/name пропускаються. 105 нових drift-тестів.",
-        "zh-cn": "强化 API-boundary：来自 Beszel Hub 的每个字段都经过 type-coercion 层（NaN、Infinity、缺失字段、错误类型无法再到达 state）。缺少 id/name 的记录被跳过。新增 105 个 drift 测试。"
-      },
-      "0.3.1": {
-        "en": "Handle response stream errors. Isolate per-system poll failures (one broken system no longer blocks all others). Harden onMessage with try/catch + callback guard. Classify EHOSTUNREACH as network error.",
-        "de": "Response-Stream-Errors abgefangen. Per-System Poll-Failures isoliert (ein kaputtes System blockiert nicht mehr alle anderen). onMessage mit try/catch + Callback-Guard gehärtet. EHOSTUNREACH als Netzwerk-Fehler klassifiziert.",
-        "ru": "Помилки response-stream обробляються. Per-system poll-failures ізольовано (одне зламане система не блокує інших). onMessage посилено через try/catch + callback-guard. EHOSTUNREACH класифіковано як network error.",
-        "pt": "Erros de response-stream tratados. Falhas per-system isoladas (um sistema quebrado não bloqueia mais os outros). onMessage reforçado com try/catch + callback-guard. EHOSTUNREACH classificado como erro de rede.",
-        "nl": "Response-stream fouten afgevangen. Per-system poll-failures geïsoleerd (één defect systeem blokkeert niet meer de anderen). onMessage versterkt met try/catch + callback-guard. EHOSTUNREACH geclassificeerd als netwerkfout.",
-        "fr": "Erreurs de response-stream traitées. Échecs per-system isolés (un système cassé ne bloque plus les autres). onMessage renforcé avec try/catch + callback-guard. EHOSTUNREACH classifié comme erreur réseau.",
-        "it": "Errori di response-stream gestiti. Fallimenti per-system isolati (un sistema rotto non blocca più gli altri). onMessage rafforzato con try/catch + callback-guard. EHOSTUNREACH classificato come errore di rete.",
-        "es": "Errores de response-stream manejados. Fallos per-system aislados (un sistema roto ya no bloquea los demás). onMessage reforzado con try/catch + callback-guard. EHOSTUNREACH clasificado como error de red.",
-        "pl": "Błędy response-stream obsłużone. Per-system poll-failures odizolowane (jeden zepsuty system nie blokuje już pozostałych). onMessage wzmocnione przez try/catch + callback-guard. EHOSTUNREACH klasyfikowany jako błąd sieci.",
-        "uk": "Помилки response-stream оброблено. Per-system poll-failures ізольовано (одна зламана система більше не блокує інші). onMessage посилено через try/catch + callback-guard. EHOSTUNREACH класифіковано як network error.",
-        "zh-cn": "处理 response-stream 错误。隔离 per-system poll-failures（一个坏掉的系统不再阻塞其他）。通过 try/catch + callback-guard 强化 onMessage。EHOSTUNREACH 归类为网络错误。"
       }
     },
     "titleLang": {

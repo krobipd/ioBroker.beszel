@@ -6,7 +6,7 @@
 
 **ioBroker Beszel Monitor** — Verbindet sich mit Beszel Hub (PocketBase) für Server-Monitoring.
 
-- **Version:** 0.3.7 (2026-04-28 — Audit-Cleanup gegen ioBroker.example/TypeScript-Vollstandard)
+- **Version:** 0.3.8 (in progress — Cleanup-Welle analog parcelapp v0.3.0: format/format:check npm-scripts ergänzt, .github/dependabot.yml aus Master mit ignore-Block für `actions/checkout`+`actions/setup-node` Major-Bumps, `repochecker-version-gate` Job-Block von M1000-Logik auf sources-dist-stable Master-Snippet umgestellt, CLAUDE.md-Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert)
 - **GitHub:** https://github.com/krobipd/ioBroker.beszel
 - **npm:** https://www.npmjs.com/package/iobroker.beszel
 - **Repository PR:** ioBroker/ioBroker.repositories#5787
@@ -43,14 +43,16 @@ src/lib/types.ts         → TypeScript Interfaces (API + Config)
 
 20+ konfigurierbare Metriken (global für alle Systeme). Standard-on: uptime, cpu, loadAvg, memory, disk, diskSpeed, network, temperature. Alle anderen default off.
 
-## Tests (292)
+## Tests (235 unit + 57 package + 1 integration)
+
+Tests leben seit v0.3.7 neben dem Source als `src/lib/*.test.ts` und laufen direkt via `ts-node/register` (offizieller `ioBroker.example/TypeScript`-Standard).
 
 ```
-test/testCoerce.ts        → Boundary-Validator (Primitive + Beszel-Shapes) (74 Tests)
-test/testBeszelClient.ts  → API Client (Auth, Token, Errors, Responses, API-Drift) (39 Tests)
-test/testStateManager.ts  → StateManager (Sanitize, System, Stats, GPU, FS, Containers, Cleanup, Migration, Defensive Boundaries) (122 Tests)
-test/package.js           → @iobroker/testing Package-Tests (57 Tests)
-test/integration.js       → @iobroker/testing Integration-Tests (plain JS)
+src/lib/coerce.test.ts         → Boundary-Validator (Primitive + Beszel-Shapes)
+src/lib/beszel-client.test.ts  → API Client (Auth, Token, Errors, Responses, API-Drift)
+src/lib/state-manager.test.ts  → StateManager (Sanitize, System, Stats, GPU, FS, Containers, Cleanup, Migration, Defensive Boundaries)
+test/package.js                → @iobroker/testing Package-Tests
+test/integration.js            → @iobroker/testing Integration-Tests
 ```
 
 Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Callback-API).
@@ -59,6 +61,7 @@ Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Call
 
 | Version | Highlights |
 |---------|------------|
+| 0.3.8 | Cleanup-Welle analog parcelapp v0.3.0: `format` + `format:check` npm-scripts ergänzt, `.github/dependabot.yml` aus Master mit ignore-Block für `actions/checkout` + `actions/setup-node` Major-Bumps, `repochecker-version-gate` Job-Block von M1000-Logik auf sources-dist-stable Master-Snippet umgestellt, CLAUDE.md Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert. |
 | 0.3.7 | Audit-Cleanup gegen ioBroker.example/TypeScript-Vollstandard: Test-Setup auf `src/lib/*.test.ts` + ts-node, `tsconfig.test.json` + `build-test/` raus, `@types/node` von `^25.6.0` auf `^20.19.24` (engines.node >=20), dependabot ignore-Block für Major-Bumps von `@types/node`+`typescript`+`eslint`+`actions/checkout`+`actions/setup-node`, `nyc`-Config + `coverage`-Script, `prettier.config.mjs` mit Project-Style-Override, `auto-merge.yml` raus (verwaist), `.js`-Imports in src/ entfernt (bare-Names konsistent) |
 | 0.3.6 | Hotfix js-controller-Min auf `>=6.0.11` (Repochecker-recommended), war versehentlich `>=7.0.23` |
 | 0.3.5 | Process-level `unhandledRejection`/`uncaughtException`-Handler. `manual-review`-Plugin raus. Konsistenz-Cleanup |
@@ -70,8 +73,9 @@ Nicht getestet (bewusst): main.ts poll-Loop (Adapter-Lifecycle), onMessage (Call
 ## Befehle
 
 ```bash
-npm run build        # Production (esbuild)
-npm run build:test   # Test build (tsc)
-npm test             # Build + mocha
-npm run lint         # ESLint + Prettier
+npm run build         # Production (esbuild)
+npm test              # mocha src/**/*.test.ts (via ts-node) + @iobroker/testing packageFiles
+npm run lint          # ESLint
+npm run format:check  # Prettier --check
+npm run check         # tsc --noEmit (Type-Check)
 ```
