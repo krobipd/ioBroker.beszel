@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "news": {
+      "0.3.8": {
+        "en": "New `format` + `format:check` npm-scripts (run prettier — matches the other krobi adapters).\nMaster-sync: `repochecker-version-gate` workflow job moved from the legacy M1000 check to the sources-dist-stable check (now identical to hassemu and parcelapp).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "de": "Neue `format` + `format:check` npm-scripts (run prettier — entspricht den anderen krobi adapters).\nMaster-sync: `repochecker-version-gate` Workflow-Job aus dem Vermächtnis M1000-Check in die quellen-dist-stable-Check (jetzt identisch mit hassemu und parapp).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "ru": "Новый «формат» + «формат: проверьте» npm-скрипты (run prettier — совпадает с другими адаптерами krobi).\nМастер-синхронизация: работа по рабочему процессу «repochecker-version-gate» перешла от унаследованной проверки M1000 к проверке «источник-дистанция» (теперь идентична гасему и посылке).\n'CLAUDE.md' Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in 'src/lib/*.test.ts', kein 'npm run build:test' mehr).",
+        "pt": "Novo `format` + `format:check` npm-scripts (corrida mais bonita — corresponde aos outros adaptadores krobi).\nMaster-sync: `repochecker-version-gate` trabalho de fluxo de trabalho movido da verificação M1000 legado para o sources-dist-stable check (agora idêntico ao hassemu e parcelapp).\n«CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Teste em `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "nl": "Nieuw formaat.\nMaster-sync: Repochecker-version-gate workflow job verplaatst van de nalatenschap M1000 check naar de bronnen-dist-stable check (nu identiek aan hassemu en pakketapp).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "fr": "Nouveau `format` + `format:check` npm-scripts (run brettier — correspond aux autres adaptateurs krobi).\nMaster-sync: `repochecker-version-gate` travail de flux de travail déplacé de l'héritage M1000 check à la source-dist-stable check (maintenant identique à hassemu et paquetapp).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "it": "Nuovo `format` + `format:check` npm-scripts (run prettier — corrisponde agli altri adattatori krobi).\nMaster-sync: `repochecker-version-gate` workflow job spostato dal controllo M1000 legacy al controllo sorgenti-dist-stable (ora identico a hassemu e paccoapp).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Test in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "es": "New `format` + `format:check` npm-scripts (run prettier - coincide con los otros adaptadores de krobi).\nMaster-sync: `repochecker-version-gate` trabajoflow moved from the legacy M1000 check to the sources-dist-stable check (now identical to hassemu and parcelapp).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "pl": "Nowy format 'format' + ': sprawdź' npm- skrypty (uruchom ładniejsze - pasuje do innych adapterów krobi).\nMaster- sync: zadanie \"repochecker- version- gate\" przeniosło się z dotychczasowego sprawdzenia M1000 do sprawdzenia źródeł - dist- stable (obecnie identyczne z hassemu i parcelapp).\n'CLAUDE.md' Tests- Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in 'src / lib / * .test.ts', kein 'npm run build: test' mehr).",
+        "uk": "Новий `формат` + `format:check` npm-scripts (run prettier — відповідає іншим адаптерам krobi).\nМайстер-sync: `repochecker-version-gate` робоча робота, яка переміщається з спадщини M1000, перевірте джерела-dist-stable check (нині ідентично осему та посилки).\n`CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).",
+        "zh-cn": "新的`格式 ' +`格式:检查' npm 标记(运行更美——与其他krobi适配器匹配).\nMaster-sync:`repocheer-version-gate ' 工作从遗留的M1000检查转移到源-dist-stable检查(现在与hassemu和包裹程序完全相同).\n`CLAUDE.md' Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert(src/lib/ *.test.ts中的试验,kein`npm run building: test' mehr)."
+      },
       "0.3.7": {
         "en": "Audit cleanup against the upstream ioBroker.example/TypeScript standard: tests now under src/lib/*.test.ts, @types/node aligned with engines (>=20), dependabot ignores major bumps for runtime/toolchain pins, nyc + prettier config added.",
         "de": "Audit-Cleanup gegen den ioBroker.example/TypeScript-Standard: Tests unter src/lib/*.test.ts, @types/node an engines (>=20) gekoppelt, dependabot ignoriert Major-Bumps für Runtime/Toolchain, nyc + prettier-Config ergänzt.",
@@ -130,12 +143,12 @@
     },
     "dependencies": [
       {
-        "js-controller": ">=6.0.11"
+        "js-controller": ">=7.0.7"
       }
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.6.20"
+        "admin": ">=7.7.22"
       }
     ]
   },

@@ -30,8 +30,8 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 ## Requirements
 
 - **Node.js >= 20**
-- **ioBroker js-controller >= 6.0.11**
-- **ioBroker Admin >= 7.6.20**
+- **ioBroker js-controller >= 7.0.7**
+- **ioBroker Admin >= 7.7.22**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
 
 ---
@@ -171,7 +171,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.3.8 (2026-04-30)
 
 - New `format` + `format:check` npm-scripts (run prettier — matches the other krobi adapters).
 - Master-sync: `repochecker-version-gate` workflow job moved from the legacy M1000 check to the sources-dist-stable check (now identical to hassemu and parcelapp).
@@ -202,9 +202,6 @@ beszel.0.
 - Declare `systems` folder as instance object so the parent exists before per-system devices appear.
 - Wrap async `onReady` and `onMessage` with `.catch()` to prevent unhandled promise rejections from SIGKILLing the adapter.
 - Drop now-redundant dynamic creation of `info` and `info.connection` in `onReady` — both are declared via `instanceObjects` and created by the adapter framework at install time.
-
-### 0.3.3 (2026-04-19)
-- Latest-repo review compliance: `common.messagebox=true` added because the `Check Connection` button in the admin UI routes through `onMessage`. Runtime behaviour unchanged.
 
 ## Support
 
