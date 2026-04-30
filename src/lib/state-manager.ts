@@ -578,7 +578,7 @@ export class StateManager {
   private async ensureChannel(id: string, name: string): Promise<void> {
     await this.adapter.setObjectNotExistsAsync(id, {
       type: "channel",
-      common: { name } as ioBroker.ObjectCommon,
+      common: { name },
       native: {},
     });
   }
@@ -629,7 +629,7 @@ export class StateManager {
       max: 100,
       read: true,
       write: false,
-    } as ioBroker.StateCommon;
+    };
   }
 
   private numCommon(name: string, unit?: string, role = "value"): ioBroker.StateCommon {
@@ -640,7 +640,7 @@ export class StateManager {
       unit,
       read: true,
       write: false,
-    } as ioBroker.StateCommon;
+    };
   }
 
   private textCommon(name: string): ioBroker.StateCommon {
@@ -650,7 +650,7 @@ export class StateManager {
       role: "text",
       read: true,
       write: false,
-    } as ioBroker.StateCommon;
+    };
   }
 
   private boolCommon(name: string, role = "indicator"): ioBroker.StateCommon {
@@ -660,7 +660,7 @@ export class StateManager {
       role,
       read: true,
       write: false,
-    } as ioBroker.StateCommon;
+    };
   }
 
   // -------------------------------------------------------------------------
