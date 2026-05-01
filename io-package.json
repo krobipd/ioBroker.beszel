@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.8",
+    "version": "0.3.9",
     "news": {
-      "NEXT": {
+      "0.3.9": {
         "en": "Documentation cleanup: shortened older changelog entries.",
         "de": "Dokumentation: ältere Changelog-Einträge gekürzt.",
         "ru": "Документация: сокращены старые записи changelog.",

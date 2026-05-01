@@ -171,7 +171,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.3.9 (2026-05-01)
 - Documentation cleanup: shortened older changelog entries.
 
 ### 0.3.8 (2026-04-30)
@@ -185,9 +185,6 @@ beszel.0.
 
 ### 0.3.5 (2026-04-26)
 - Crash defense: process-level `unhandledRejection`/`uncaughtException` handlers.
-
-### 0.3.4 (2026-04-23)
-- Defense-in-depth: `systems` folder as instance object, `.catch()` wrap on async `onReady`/`onMessage`.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

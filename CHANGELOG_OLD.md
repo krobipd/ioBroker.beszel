@@ -1,4 +1,7 @@
 # Older Changes
+## 0.3.4 (2026-04-23)
+- Defense-in-depth: `systems` folder as instance object, `.catch()` wrap on async `onReady`/`onMessage`.
+
 ## 0.3.3 (2026-04-19)
 - Internal: `common.messagebox=true` (admin-UI button routing).
 
