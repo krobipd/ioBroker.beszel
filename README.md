@@ -171,20 +171,23 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+- Documentation: rewrote release notes for v0.3.3–v0.3.9 in user-friendly style across all languages.
+
 ### 0.3.9 (2026-05-01)
-- Documentation cleanup: shortened older changelog entries.
+- Documentation cleanup. No code changes.
 
 ### 0.3.8 (2026-04-30)
-- Internal cleanup: `format`/`format:check` scripts, master-sync.
+- Internal cleanup. No user-facing changes.
 
 ### 0.3.7 (2026-04-28)
-- Internal cleanup against ioBroker.example/TypeScript standard.
+- Internal cleanup. No user-facing changes.
 
 ### 0.3.6 (2026-04-26)
-- Min js-controller corrected back to `>=6.0.11` (was incorrectly bumped to `>=7.0.23` in 0.3.5).
+- Min `js-controller` restored to `>=6.0.11` (was incorrectly bumped to `>=7.0.23` in 0.3.5).
 
 ### 0.3.5 (2026-04-26)
-- Crash defense: process-level `unhandledRejection`/`uncaughtException` handlers.
+- Crash defense: process-level error handlers.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
