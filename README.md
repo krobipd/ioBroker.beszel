@@ -171,7 +171,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.3.10 (2026-05-01)
 - Documentation: rewrote release notes for v0.3.3–v0.3.9 in user-friendly style across all languages.
 
 ### 0.3.9 (2026-05-01)
@@ -185,9 +185,6 @@ beszel.0.
 
 ### 0.3.6 (2026-04-26)
 - Min `js-controller` restored to `>=6.0.11` (was incorrectly bumped to `>=7.0.23` in 0.3.5).
-
-### 0.3.5 (2026-04-26)
-- Crash defense: process-level error handlers.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

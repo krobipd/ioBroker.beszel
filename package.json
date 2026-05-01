@@ -1,6 +1,6 @@
 {
   "name": "iobroker.beszel",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "ioBroker adapter for Beszel server monitoring",
   "author": {
     "name": "krobi",

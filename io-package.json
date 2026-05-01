@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.3.9",
+    "version": "0.3.10",
     "news": {
-      "NEXT": {
+      "0.3.10": {
         "en": "Documentation: rewrote release notes in user-friendly style across all languages.",
         "de": "Dokumentation: Release-Notes in alle Sprachen User-orientiert neu geschrieben.",
         "ru": "Документация: примечания к релизу переписаны в дружественном к пользователю стиле на всех языках.",
@@ -93,19 +93,6 @@
         "pl": "Wewnętrzne wzmocnienie. Brak zmian widocznych dla użytkownika.",
         "uk": "Внутрішнє зміцнення. Без помітних для користувача змін.",
         "zh-cn": "内部加固。对用户无可见变化。"
-      },
-      "0.3.3": {
-        "en": "Connection-test button in admin UI now works (added messagebox routing).",
-        "de": "Verbindungstest-Knopf in Admin UI funktioniert jetzt (Messagebox-Routing ergänzt).",
-        "ru": "Кнопка проверки соединения в admin UI теперь работает (добавлена маршрутизация messagebox).",
-        "pt": "Botão de teste de conexão no admin UI agora funciona (roteamento messagebox adicionado).",
-        "nl": "Verbindingstest-knop in admin UI werkt nu (messagebox-routing toegevoegd).",
-        "fr": "Le bouton de test de connexion dans l'admin UI fonctionne maintenant (routage messagebox ajouté).",
-        "it": "Il pulsante test connessione nell'admin UI ora funziona (aggiunto routing messagebox).",
-        "es": "El botón de prueba de conexión en la admin UI ahora funciona (enrutamiento messagebox añadido).",
-        "pl": "Przycisk testu połączenia w admin UI teraz działa (dodano routing messagebox).",
-        "uk": "Кнопка тесту з'єднання в admin UI тепер працює (додано маршрутизацію messagebox).",
-        "zh-cn": "管理 UI 中的连接测试按钮现在可用（添加了 messagebox 路由）。"
       }
     },
     "titleLang": {

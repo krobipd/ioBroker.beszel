@@ -1,4 +1,7 @@
 # Older Changes
+## 0.3.5 (2026-04-26)
+- Crash defense: process-level error handlers.
+
 ## 0.3.4 (2026-04-23)
 - Defense-in-depth: `systems` folder as instance object, `.catch()` wrap on async `onReady`/`onMessage`.
 
