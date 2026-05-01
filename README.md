@@ -171,37 +171,25 @@ beszel.0.
 ---
 
 ## Changelog
-### 0.3.8 (2026-04-30)
+### **WORK IN PROGRESS**
+- Documentation cleanup: shortened older changelog entries.
 
-- New `format` + `format:check` npm-scripts (run prettier — matches the other krobi adapters).
-- Master-sync: `repochecker-version-gate` workflow job moved from the legacy M1000 check to the sources-dist-stable check (now identical to hassemu and parcelapp).
-- `CLAUDE.md` Tests-Sektion + Befehle auf v0.3.7-Stand aktualisiert (Tests in `src/lib/*.test.ts`, kein `npm run build:test` mehr).
+### 0.3.8 (2026-04-30)
+- Internal cleanup: `format`/`format:check` scripts, master-sync.
 
 ### 0.3.7 (2026-04-28)
-- Audit cleanup against the upstream `ioBroker.example/TypeScript` full standard:
-  - Test setup migrated: tests now live next to source as `src/lib/*.test.ts` and run directly via `ts-node/register`. Removed `tsconfig.test.json` + `build-test/`, added `test/mocharc.custom.json` + `test/mocha.setup.js` + `test/tsconfig.json` + `test/.eslintrc.json`
-  - `@types/node` rolled back from `^25.6.0` to `^20.19.24` so type defs match `engines.node: ">=20"` (avoids type-checking Node 21+-only APIs that crash on Node 20)
-  - Dependabot now ignores major bumps for `@types/node`, `typescript`, `eslint`, `actions/checkout`, `actions/setup-node` — runtime/toolchain pinning cannot drift via auto-merge
-  - `nyc` config + `coverage` script added (matches upstream template)
-  - `prettier.config.mjs` made explicit with project-style overrides (Spaces 2-wide, double quotes)
-  - Source `.js`-style imports replaced with bare names (consistent with upstream default, ts-node-compatible)
-  - Orphan `.github/auto-merge.yml` removed (active workflow is `automerge-dependabot.yml` using `gh pr merge`)
+- Internal cleanup against ioBroker.example/TypeScript standard.
 
 ### 0.3.6 (2026-04-26)
-- Min js-controller correction: was incorrectly bumped to `>=7.0.23` in 0.3.5 (Wert kam aus Recherche-Synthese, nicht aus Repochecker-Source). Repochecker-recommended value is `>=6.0.11` — restored.
+- Min js-controller corrected back to `>=6.0.11` (was incorrectly bumped to `>=7.0.23` in 0.3.5).
 
 ### 0.3.5 (2026-04-26)
-- Process-level `unhandledRejection` / `uncaughtException` handlers added as last-line-of-defence against fire-and-forget rejections.
-- Stop shipping the `manual-review` release-script plugin — adapter-only consequence.
-- Bump min js-controller to `>=7.0.23` (matches latest-repo recommendation).
-- Audit-driven boilerplate sync with the other krobi adapters (`.vscode` json5 schemas, `tsconfig.test` looser test rules).
-- README footer-link to `CHANGELOG_OLD.md` restored, `CHANGELOG_OLD.md` cleaned up to consistent compact style.
+- Crash defense: process-level `unhandledRejection`/`uncaughtException` handlers.
 
 ### 0.3.4 (2026-04-23)
-- Separate test-build output (`build-test/`) from production `build/`, so `npm test` no longer risks leaving duplicated `build/src` + `build/test` trees in the published package.
-- Declare `systems` folder as instance object so the parent exists before per-system devices appear.
-- Wrap async `onReady` and `onMessage` with `.catch()` to prevent unhandled promise rejections from SIGKILLing the adapter.
-- Drop now-redundant dynamic creation of `info` and `info.connection` in `onReady` — both are declared via `instanceObjects` and created by the adapter framework at install time.
+- Defense-in-depth: `systems` folder as instance object, `.catch()` wrap on async `onReady`/`onMessage`.
+
+Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
 ## Support
 
