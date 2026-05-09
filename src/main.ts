@@ -1,7 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
 import { BeszelClient } from "./lib/beszel-client";
 import { errText } from "./lib/coerce";
-import { tLog } from "./lib/i18n-logs";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig } from "./lib/types";
 
@@ -16,7 +15,6 @@ class BeszelAdapter extends utils.Adapter {
   private failedSystems = new Set<string>();
   private unhandledRejectionHandler: ((reason: unknown) => void) | null = null;
   private uncaughtExceptionHandler: ((err: Error) => void) | null = null;
-  private systemLang: string = "en";
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({
@@ -26,25 +24,21 @@ class BeszelAdapter extends utils.Adapter {
     // Wrap async handlers with .catch() so a rejection can never become an
     // unhandled promise rejection (→ SIGKILL → js-controller restart loop).
     this.on("ready", () => {
-      this.onReady().catch((err: unknown) =>
-        this.log.error(tLog(this.systemLang, "onReadyFailed", { error: errText(err) })),
-      );
+      this.onReady().catch((err: unknown) => this.log.error(`onReady failed: ${errText(err)}`));
     });
     this.on("unload", this.onUnload.bind(this));
     this.on("message", obj => {
-      this.onMessage(obj).catch((err: unknown) =>
-        this.log.error(tLog(this.systemLang, "onMessageFailed", { error: errText(err) })),
-      );
+      this.onMessage(obj).catch((err: unknown) => this.log.error(`onMessage failed: ${errText(err)}`));
     });
     // Last-line-of-defence against unhandled rejections / sync throws from
     // fire-and-forget paths (e.g. `void this.poll()`). The per-handler
     // .catch() wrappers cover the documented async paths; this catches
     // anything that slips past during refactors.
     this.unhandledRejectionHandler = (reason: unknown) => {
-      this.log.error(tLog(this.systemLang, "unhandledRejection", { error: errText(reason) }));
+      this.log.error(`Unhandled rejection: ${errText(reason)}`);
     };
     this.uncaughtExceptionHandler = (err: Error) => {
-      this.log.error(tLog(this.systemLang, "uncaughtException", { error: errText(err) }));
+      this.log.error(`Uncaught exception: ${errText(err)}`);
     };
     process.on("unhandledRejection", this.unhandledRejectionHandler);
     process.on("uncaughtException", this.uncaughtExceptionHandler);
@@ -53,30 +47,18 @@ class BeszelAdapter extends utils.Adapter {
   private async onReady(): Promise<void> {
     const config = this.config as unknown as AdapterConfig;
 
-    // Read ioBroker system language once; admin language change requires a
-    // restart, which is acceptable — users don't switch on the fly.
-    try {
-      const sys = await this.getForeignObjectAsync("system.config");
-      const lang = sys?.common?.language;
-      if (typeof lang === "string" && lang.length > 0) {
-        this.systemLang = lang;
-      }
-    } catch {
-      // keep default "en"
-    }
-
     // `info` + `info.connection` are declared in io-package.json instanceObjects,
     // so the adapter framework creates them on install. Just set the initial state.
     await this.setStateAsync("info.connection", { val: false, ack: true });
 
     // Validate required config
     if (!config.url || !config.username || !config.password) {
-      this.log.error(tLog(this.systemLang, "configIncomplete"));
+      this.log.error("URL, username, and password are required — please configure the adapter settings");
       return;
     }
 
     this.client = new BeszelClient(config.url, config.username, config.password);
-    this.stateManager = new StateManager(this, this.systemLang);
+    this.stateManager = new StateManager(this);
 
     // Migrate legacy flat state paths from pre-0.3.0
     await this.stateManager.migrateLegacyStates();
@@ -96,10 +78,7 @@ class BeszelAdapter extends utils.Adapter {
     }, intervalMs);
 
     this.log.info(
-      tLog(this.systemLang, "adapterStarted", {
-        count: this.lastSystemCount,
-        seconds: config.pollInterval ?? 60,
-      }),
+      `Beszel adapter started — ${this.lastSystemCount} system(s), polling every ${config.pollInterval ?? 60}s`,
     );
   }
 
@@ -218,10 +197,7 @@ class BeszelAdapter extends utils.Adapter {
           await this.stateManager.updateSystem(system, stats, containers, config);
           this.failedSystems.delete(system.name);
         } catch (err) {
-          const msg = tLog(this.systemLang, "systemUpdateFailed", {
-            name: system.name,
-            error: errText(err),
-          });
+          const msg = `Failed to update system '${system.name}': ${errText(err)}`;
           if (this.failedSystems.has(system.name)) {
             this.log.debug(msg);
           } else {
@@ -242,7 +218,7 @@ class BeszelAdapter extends utils.Adapter {
 
       // Clear error state on success
       if (this.lastErrorCode) {
-        this.log.info(tLog(this.systemLang, "connectionRestored"));
+        this.log.info("Connection restored");
         this.lastErrorCode = "";
       }
       this.log.debug(`Polled ${systems.length} systems successfully`);
@@ -256,18 +232,18 @@ class BeszelAdapter extends utils.Adapter {
         this.client?.invalidateToken();
         this.authFailCount++;
         if (this.authFailCount <= 3) {
-          this.log.error(tLog(this.systemLang, "authFailed"));
+          this.log.error("Authentication failed — check username and password");
         } else if (this.authFailCount === 4) {
-          this.log.error(tLog(this.systemLang, "authSuppressed"));
+          this.log.error("Authentication keeps failing — suppressing further auth errors");
         } else {
           this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
         }
       } else if (isRepeat) {
         this.log.debug(`Poll failed (ongoing): ${errMsg}`);
       } else if (errorCode === "NETWORK") {
-        this.log.warn(tLog(this.systemLang, "cannotReach"));
+        this.log.warn("Cannot reach Beszel Hub — will keep retrying");
       } else {
-        this.log.error(tLog(this.systemLang, "pollFailed", { error: errMsg }));
+        this.log.error(`Poll failed: ${errMsg}`);
       }
 
       await this.setStateAsync("info.connection", { val: false, ack: true });

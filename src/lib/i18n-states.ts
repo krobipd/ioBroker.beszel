@@ -6,9 +6,9 @@
  * `common.name`. Admin, vis and the Object-Browser pick the user's language
  * automatically — we just hand them the object.
  *
- * No adapter-side language lookup needed (different from `i18n-logs.ts`,
- * where we have to pick at log-emit time because `this.log.info(...)` takes
- * a single string).
+ * Adapter logs (`this.log.*`) stay English by ioBroker convention so that
+ * user bug reports remain readable for maintainers regardless of the user's
+ * system language.
  */
 
 type Lang = "en" | "de" | "ru" | "pt" | "nl" | "fr" | "it" | "es" | "pl" | "uk" | "zh-cn";

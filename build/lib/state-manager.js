@@ -21,11 +21,9 @@ __export(state_manager_exports, {
   StateManager: () => StateManager
 });
 module.exports = __toCommonJS(state_manager_exports);
-var import_i18n_logs = require("./i18n-logs");
 var import_i18n_states = require("./i18n-states");
 class StateManager {
   adapter;
-  systemLang;
   /**
    * Tracks IDs we already created via `setObjectNotExistsAsync`. Skipping the
    * call on subsequent polls avoids a redundant js-controller round-trip per
@@ -34,11 +32,9 @@ class StateManager {
   createdIds = /* @__PURE__ */ new Set();
   /**
    * @param adapter The ioBroker adapter instance
-   * @param systemLang ioBroker system language (`'en'`, `'de'`, …) for log strings
    */
-  constructor(adapter, systemLang = "en") {
+  constructor(adapter) {
     this.adapter = adapter;
-    this.systemLang = systemLang;
   }
   /**
    * Sanitize a name to a valid ioBroker state ID segment (see adapter.FORBIDDEN_CHARS).
@@ -88,9 +84,7 @@ class StateManager {
     const safeName = this.sanitize(system.name);
     if (safeName.length === 0) {
       this.adapter.log.warn(
-        (0, import_i18n_logs.tLog)(this.systemLang, "systemSkipped", {
-          name: typeof system.name === "string" ? system.name : JSON.stringify(system.name)
-        })
+        `Skipping system with unusable name: ${typeof system.name === "string" ? system.name : JSON.stringify(system.name)}`
       );
       return;
     }
@@ -344,7 +338,7 @@ class StateManager {
       await this.deleteChannelIfExists(`${sysId}.temperatures`);
     }
     if (migrated > 0) {
-      this.adapter.log.info((0, import_i18n_logs.tLog)(this.systemLang, "legacyMigrated", { count: migrated }));
+      this.adapter.log.info(`Migration: removed ${migrated} legacy state(s) from flat structure`);
     }
   }
   // -------------------------------------------------------------------------

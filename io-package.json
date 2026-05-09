@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.4.1",
     "news": {
+      "NEXT": {
+        "en": "Adapter log messages are now English only, in line with the ioBroker community standard. Localized state names (11 languages) remain unchanged.",
+        "de": "Adapter-Logs sind jetzt nur noch auf Englisch, gemäß ioBroker-Community-Standard. Lokalisierte Datenpunkt-Namen (11 Sprachen) bleiben erhalten.",
+        "ru": "Сообщения журнала теперь только на английском, согласно стандарту сообщества ioBroker. Локализованные имена состояний (11 языков) сохраняются.",
+        "pt": "As mensagens de log do adaptador agora são apenas em inglês, conforme o padrão da comunidade ioBroker. Os nomes de estados localizados (11 idiomas) permanecem inalterados.",
+        "nl": "Adapter-logberichten zijn nu alleen Engels, conform de ioBroker-communitystandaard. Gelokaliseerde statusnamen (11 talen) blijven ongewijzigd.",
+        "fr": "Les messages de log de l'adaptateur sont désormais uniquement en anglais, conformément au standard de la communauté ioBroker. Les noms d'états localisés (11 langues) restent inchangés.",
+        "it": "I messaggi di log dell'adattatore sono ora solo in inglese, secondo lo standard della community ioBroker. I nomi degli stati localizzati (11 lingue) rimangono invariati.",
+        "es": "Los mensajes de registro del adaptador ahora son solo en inglés, conforme al estándar de la comunidad ioBroker. Los nombres de estados localizados (11 idiomas) permanecen sin cambios.",
+        "pl": "Komunikaty dziennika adaptera są teraz wyłącznie po angielsku, zgodnie ze standardem społeczności ioBroker. Zlokalizowane nazwy stanów (11 języków) pozostają bez zmian.",
+        "uk": "Повідомлення журналу адаптера тепер лише англійською, відповідно до стандарту спільноти ioBroker. Локалізовані назви станів (11 мов) залишаються без змін.",
+        "zh-cn": "适配器日志消息现在仅为英文，符合 ioBroker 社区标准。本地化的数据点名称（11 种语言）保持不变。"
+      },
       "0.4.1": {
         "en": "Restored the blank line between the changelog footer and the Support section (release-script swallowed it in v0.4.0).",
         "de": "Leerzeile zwischen Changelog-Footer und Support-Abschnitt wiederhergestellt (release-script hatte sie in v0.4.0 verschluckt).",
@@ -80,19 +93,6 @@
         "pl": "Wewnętrzne porządki. Brak zmian widocznych dla użytkownika.",
         "uk": "Внутрішнє прибирання. Без помітних для користувача змін.",
         "zh-cn": "内部清理。对用户无可见变化。"
-      },
-      "0.3.6": {
-        "en": "Min js-controller restored to >=6.0.11 (was incorrectly bumped to >=7.0.23 in 0.3.5).",
-        "de": "Min js-controller zurück auf >=6.0.11 (war in 0.3.5 fälschlich auf >=7.0.23 gesetzt).",
-        "ru": "Мин. js-controller восстановлен на >=6.0.11 (в 0.3.5 ошибочно был >=7.0.23).",
-        "pt": "Mín. js-controller restaurado para >=6.0.11 (em 0.3.5 estava erroneamente em >=7.0.23).",
-        "nl": "Min. js-controller hersteld op >=6.0.11 (was in 0.3.5 ten onrechte >=7.0.23).",
-        "fr": "Min js-controller rétabli à >=6.0.11 (était par erreur à >=7.0.23 en 0.3.5).",
-        "it": "Min js-controller ripristinato a >=6.0.11 (in 0.3.5 era erroneamente >=7.0.23).",
-        "es": "Mín. js-controller restaurado a >=6.0.11 (en 0.3.5 estaba incorrectamente en >=7.0.23).",
-        "pl": "Min. js-controller przywrócony do >=6.0.11 (w 0.3.5 błędnie ustawiony na >=7.0.23).",
-        "uk": "Мін. js-controller повернено на >=6.0.11 (у 0.3.5 помилково було >=7.0.23).",
-        "zh-cn": "最低 js-controller 恢复为 >=6.0.11（0.3.5 中错误地设置为 >=7.0.23）。"
       }
     },
     "titleLang": {

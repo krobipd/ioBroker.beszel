@@ -171,11 +171,18 @@ beszel.0.
 ---
 
 ## Changelog
+<!--
+    Placeholder for the next version (at the beginning of the line):
+    ### **WORK IN PROGRESS**
+-->
+### **WORK IN PROGRESS**
+- Adapter log messages are now English only, in line with the ioBroker community standard. Localized state names (11 languages) are unchanged.
+
 ### 0.4.1 (2026-05-07)
 - Restored the blank line between the changelog footer and the Support section (release-script swallowed it in v0.4.0).
 
 ### 0.4.0 (2026-05-07)
-- State names and log messages localized in 11 ioBroker languages, following the system setting.
+- State names localized in 11 ioBroker languages, following the system setting.
 - Object cache cuts js-controller calls per poll cycle.
 - Baseline: Node 22, Admin 7.8.23 (ioBroker May-2026 stable).
 

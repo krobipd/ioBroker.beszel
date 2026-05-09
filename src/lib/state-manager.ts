@@ -1,5 +1,4 @@
 import type * as utils from "@iobroker/adapter-core";
-import { tLog } from "./i18n-logs";
 import { tName } from "./i18n-states";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
@@ -15,7 +14,6 @@ type LocalizedName = ioBroker.StringOrTranslated;
  */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
-  private readonly systemLang: string;
   /**
    * Tracks IDs we already created via `setObjectNotExistsAsync`. Skipping the
    * call on subsequent polls avoids a redundant js-controller round-trip per
@@ -25,11 +23,9 @@ export class StateManager {
 
   /**
    * @param adapter The ioBroker adapter instance
-   * @param systemLang ioBroker system language (`'en'`, `'de'`, …) for log strings
    */
-  constructor(adapter: utils.AdapterInstance, systemLang = "en") {
+  constructor(adapter: utils.AdapterInstance) {
     this.adapter = adapter;
-    this.systemLang = systemLang;
   }
 
   /**
@@ -92,9 +88,7 @@ export class StateManager {
     const safeName = this.sanitize(system.name);
     if (safeName.length === 0) {
       this.adapter.log.warn(
-        tLog(this.systemLang, "systemSkipped", {
-          name: typeof system.name === "string" ? system.name : JSON.stringify(system.name),
-        }),
+        `Skipping system with unusable name: ${typeof system.name === "string" ? system.name : JSON.stringify(system.name)}`,
       );
       return;
     }
@@ -391,7 +385,7 @@ export class StateManager {
     }
 
     if (migrated > 0) {
-      this.adapter.log.info(tLog(this.systemLang, "legacyMigrated", { count: migrated }));
+      this.adapter.log.info(`Migration: removed ${migrated} legacy state(s) from flat structure`);
     }
   }
 
