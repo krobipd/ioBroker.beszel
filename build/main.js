@@ -91,7 +91,7 @@ class BeszelAdapter extends utils.Adapter {
    * v0.4.3 (M5): URL-shape validator. Returns a short reason string when
    * the URL is unusable, or null when it's OK to hand to the client.
    *
-   * @param url
+   * @param url The raw URL value from admin config.
    */
   static validateHubUrl(url) {
     if (typeof url !== "string" || url.trim().length === 0) {
@@ -114,7 +114,7 @@ class BeszelAdapter extends utils.Adapter {
    * v0.4.3 (M6): coerce poll-interval to a finite number of seconds, default
    * 60 s, clamped >= 10 s.
    *
-   * @param raw
+   * @param raw Raw `pollInterval` from admin config (number or numeric string).
    */
   static coercePollInterval(raw) {
     const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
@@ -127,7 +127,7 @@ class BeszelAdapter extends utils.Adapter {
    * v0.4.3 (B5): coerce admin's `requestTimeout` (seconds) to ms. Default
    * 15 s when missing/unparseable. Clamped to [5 s, 120 s].
    *
-   * @param raw
+   * @param raw Raw `requestTimeout` from admin config (number or numeric string).
    */
   static coerceTimeoutMs(raw) {
     const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;

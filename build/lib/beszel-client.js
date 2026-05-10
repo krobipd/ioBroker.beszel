@@ -179,8 +179,8 @@ class BeszelClient {
    * Stops at `MAX_PAGES` defensively. Splits `path` on `?` so we can
    * always append our own `page=` and `perPage=`.
    *
-   * @param path
-   * @param itemCoercer
+   * @param path The collection-records path (with or without query string).
+   * @param itemCoercer Per-item coercer; `null` items are dropped by the caller.
    */
   async fetchAllPages(path, itemCoercer) {
     const sep = path.includes("?") ? "&" : "?";

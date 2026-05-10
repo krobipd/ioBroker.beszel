@@ -73,7 +73,7 @@ class StateManager {
   /**
    * FNV-1a 32-bit short hash → 6 hex chars.
    *
-   * @param s
+   * @param s Input string to hash.
    */
   static shortHash(s) {
     let h = 2166136261;
@@ -123,7 +123,7 @@ class StateManager {
   /**
    * Resolved safeName from `prepareForPoll`, or fresh `sanitize(name)` fallback.
    *
-   * @param system
+   * @param system The Beszel system whose ID-segment we want.
    */
   resolvedSafeName(system) {
     const cached = this.resolvedSafeNames.get(system.id);

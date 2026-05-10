@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.4.2",
+    "version": "0.4.3",
     "news": {
-      "NEXT": {
+      "0.4.3": {
         "en": "Big setups load completely (no silent truncation past 200/500 records) and start up faster (parallel updates). Plus configurable request timeout, 429 retry, 403 hint, name-collision suffix.",
         "de": "Große Setups laden vollständig (kein stilles Abschneiden über 200/500 Datensätze) und starten schneller (parallel). Plus Timeout-Option, 429-Retry, 403-Hinweis, Suffix bei Namenskollision.",
         "ru": "Большие установки грузятся полностью (без обрезания после 200/500 записей) и стартуют быстрее. Плюс настраиваемый тайм-аут, 429-повтор, 403-подсказка, суффикс при коллизиях имён.",
