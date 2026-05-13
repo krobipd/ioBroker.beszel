@@ -175,7 +175,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.4.4 (2026-05-13)
 - Debug log traces previously silent paths: HTTP request lifecycle, token authentication, pagination walks and the 429-retry. Default log unchanged.
 - Test Connection in admin no longer hangs on an unknown command — it now gets a clear error response instead.
 
@@ -197,9 +197,6 @@ beszel.0.
 - State names localized in 11 ioBroker languages, following the system setting.
 - Object cache cuts js-controller calls per poll cycle.
 - Baseline: Node 22, Admin 7.8.23 (ioBroker May-2026 stable).
-
-### 0.3.10 (2026-05-01)
-- Documentation: rewrote release notes for v0.3.3–v0.3.9 in user-friendly style across all languages.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

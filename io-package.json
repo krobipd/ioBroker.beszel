@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.4.3",
+    "version": "0.4.4",
     "news": {
-      "NEXT": {
+      "0.4.4": {
         "en": "Debug log traces previously silent paths: HTTP request lifecycle, token authentication, pagination walks and the 429-retry. Default log unchanged. Test Connection no longer hangs on unknown commands.",
         "de": "Debug-Log dokumentiert stille Pfade: HTTP-Request-Lifecycle, Token-Authentifizierung, Pagination und 429-Retry. Default-Log unverändert. Test Connection hängt bei unbekannten Befehlen nicht mehr.",
         "ru": "Журнал отладки прослеживает тихие пути: цикл HTTP-запроса, аутентификация по токену, пагинация и повтор после 429. Стандартный лог не изменился. Тест соединения больше не зависает.",

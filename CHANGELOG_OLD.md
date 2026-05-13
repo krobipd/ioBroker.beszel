@@ -1,4 +1,7 @@
 # Older Changes
+## 0.3.10 (2026-05-01)
+- Documentation: rewrote release notes for v0.3.3–v0.3.9 in user-friendly style across all languages.
+
 ## 0.3.9 (2026-05-01)
 - Documentation cleanup. No code changes.
 
