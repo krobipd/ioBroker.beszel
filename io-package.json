@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.4.4",
     "news": {
+      "NEXT": {
+        "en": "Adapter shuts down cleanly even if Test Connection was still running — the test request is now aborted at unload.",
+        "de": "Adapter fährt sauber herunter, auch wenn Test Connection noch lief — die Test-Anfrage wird jetzt beim Unload abgebrochen.",
+        "ru": "Адаптер чисто завершает работу даже если кнопка Test Connection ещё выполнялась — тестовый запрос теперь прерывается при выгрузке.",
+        "pt": "O adaptador encerra corretamente mesmo se o botão Test Connection ainda estava em execução — o pedido de teste é agora abortado no unload.",
+        "nl": "De adapter sluit netjes af, ook als Test Connection nog liep — het testverzoek wordt nu bij unload afgebroken.",
+        "fr": "L'adaptateur s'arrête proprement même si Test Connection était encore en cours — la requête de test est maintenant interrompue au déchargement.",
+        "it": "L'adattatore si arresta correttamente anche se Test Connection era ancora in esecuzione — la richiesta di test viene ora interrotta allo scarico.",
+        "es": "El adaptador se cierra correctamente incluso si Test Connection seguía ejecutándose — la solicitud de prueba se aborta ahora al descargar.",
+        "pl": "Adapter zamyka się poprawnie nawet jeśli przycisk Test Connection wciąż działał — żądanie testowe jest teraz przerywane przy zwolnieniu.",
+        "uk": "Адаптер коректно завершує роботу навіть якщо Test Connection ще виконувався — тестовий запит тепер скасовується під час вивантаження.",
+        "zh-cn": "即使测试连接按钮仍在运行，适配器也能干净地关闭——测试请求现在会在卸载时中止。"
+      },
       "0.4.4": {
         "en": "Debug log traces previously silent paths: HTTP request lifecycle, token authentication, pagination walks and the 429-retry. Default log unchanged. Test Connection no longer hangs on unknown commands.",
         "de": "Debug-Log dokumentiert stille Pfade: HTTP-Request-Lifecycle, Token-Authentifizierung, Pagination und 429-Retry. Default-Log unverändert. Test Connection hängt bei unbekannten Befehlen nicht mehr.",
@@ -80,19 +93,6 @@
         "pl": "Dokumentacja: notatki wydania przepisane w przyjaznym dla użytkownika stylu we wszystkich językach.",
         "uk": "Документація: нотатки до релізу переписано у дружньому до користувача стилі усіма мовами.",
         "zh-cn": "文档：所有语言的发布说明已重写为用户友好的风格。"
-      },
-      "0.3.9": {
-        "en": "Documentation cleanup. No code changes.",
-        "de": "Dokumentations-Bereinigung. Keine Code-Änderungen.",
-        "ru": "Очистка документации. Без изменений в коде.",
-        "pt": "Limpeza da documentação. Sem alterações de código.",
-        "nl": "Documentatie-opschoning. Geen code-wijzigingen.",
-        "fr": "Nettoyage de la documentation. Aucune modification de code.",
-        "it": "Pulizia della documentazione. Nessuna modifica al codice.",
-        "es": "Limpieza de documentación. Sin cambios de código.",
-        "pl": "Czyszczenie dokumentacji. Bez zmian w kodzie.",
-        "uk": "Очищення документації. Без змін у коді.",
-        "zh-cn": "文档清理。代码无变化。"
       }
     },
     "titleLang": {

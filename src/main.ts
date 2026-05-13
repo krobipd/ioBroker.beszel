@@ -14,6 +14,14 @@ class BeszelAdapter extends utils.Adapter {
   private lastErrorCode = "";
   private authFailCount = 0;
   private failedSystems = new Set<string>();
+  /**
+   * v0.4.5: short-lived test-clients spawned from `checkConnection` admin
+   * messages. The prod-`this.client` is what `onUnload` cancels, so these
+   * need their own registry to be reachable at shutdown. Entries are added
+   * by `message-router`'s `onTestClientCreated` hook and removed once
+   * `checkConnection` settles.
+   */
+  private testClients = new Set<BeszelClient>();
   private unhandledRejectionHandler: ((reason: unknown) => void) | null = null;
   private uncaughtExceptionHandler: ((err: Error) => void) | null = null;
 
@@ -180,6 +188,14 @@ class BeszelAdapter extends utils.Adapter {
       // v0.4.3 (X1+B8): cancel every in-flight HTTP request so a slow Hub
       // doesn't keep the adapter alive past js-controller's 4-second kill.
       this.client?.cancelAll();
+      // v0.4.5: also abort any short-lived test-client whose checkConnection
+      // is still inflight — without this an admin clicking "Test Connection"
+      // right before adapter-stop could keep the process alive past the 4s
+      // kill deadline.
+      for (const tc of this.testClients) {
+        tc.cancelAll();
+      }
+      this.testClients.clear();
       if (this.unhandledRejectionHandler) {
         process.off("unhandledRejection", this.unhandledRejectionHandler);
         this.unhandledRejectionHandler = null;
@@ -206,6 +222,7 @@ class BeszelAdapter extends utils.Adapter {
     // v0.4.4 (H1+H4): delegate to the pure `dispatchMessage` helper so the
     // switch logic — including the default-Branch contract — is testable
     // without an adapter-framework instance. See `lib/message-router.ts`.
+    // v0.4.5: track test-clients so `onUnload` can `cancelAll()` them.
     await dispatchMessage(obj, {
       log: {
         debug: (m: string) => this.log.debug(m),
@@ -216,6 +233,12 @@ class BeszelAdapter extends utils.Adapter {
         debug: (m: string) => this.log.debug(m),
         warn: (m: string) => this.log.warn(m),
       }),
+      onTestClientCreated: client => {
+        this.testClients.add(client);
+      },
+      onTestClientDone: client => {
+        this.testClients.delete(client);
+      },
     });
   }
 

@@ -36,6 +36,22 @@ export interface MessageRouterDeps {
    * Injected so the test can swap in a fake instead of a live HTTP client.
    */
   createTestClient: (url: string, username: string, password: string) => BeszelClient;
+  /**
+   * v0.4.5: optional registration hook called right after `createTestClient`
+   * returns a fresh client. Adapter holds a Set so `onUnload` can `cancelAll()`
+   * on every test-client whose HTTPS-request might still be inflight at
+   * shutdown — otherwise the testClient is local-scope only and the
+   * adapter-level `cancelAll()` misses it, possibly keeping the process
+   * alive past js-controller's 4-second kill deadline.
+   */
+  onTestClientCreated?: (client: BeszelClient) => void;
+  /**
+   * v0.4.5: optional completion hook called after the testClient's
+   * `checkConnection` promise settles (success or fail). Adapter drops
+   * the client from its Set so the next shutdown doesn't try to abort
+   * an already-completed client.
+   */
+  onTestClientDone?: (client: BeszelClient) => void;
 }
 
 /**
@@ -90,10 +106,18 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         }
 
         const testClient = deps.createTestClient(url, username, password);
-        const result = await testClient.checkConnection();
-        // v0.4.4 (H3): trace checkConnection result.
-        deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
-        deps.sendTo(obj.from, obj.command, result, obj.callback);
+        // v0.4.5: register the test-client so onUnload can abort an
+        // inflight HTTPS request — the adapter's `this.client.cancelAll()`
+        // only touches the prod-client, not these short-lived testClients.
+        deps.onTestClientCreated?.(testClient);
+        try {
+          const result = await testClient.checkConnection();
+          // v0.4.4 (H3): trace checkConnection result.
+          deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
+          deps.sendTo(obj.from, obj.command, result, obj.callback);
+        } finally {
+          deps.onTestClientDone?.(testClient);
+        }
         break;
       }
       default:

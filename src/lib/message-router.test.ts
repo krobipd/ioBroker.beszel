@@ -13,6 +13,10 @@ interface TestHarness {
     sends: SentMessage[];
     logs: { level: "debug" | "warn"; msg: string }[];
     createdClients: { url: string; username: string; password: string }[];
+    /** v0.4.5: clients registered via `onTestClientCreated`. */
+    registered: BeszelClient[];
+    /** v0.4.5: clients de-registered via `onTestClientDone`. */
+    completed: BeszelClient[];
     deps: MessageRouterDeps;
 }
 
@@ -21,6 +25,8 @@ function makeHarness(checkConnectionResult?: { success: boolean; message: string
     const sends: SentMessage[] = [];
     const logs: { level: "debug" | "warn"; msg: string }[] = [];
     const createdClients: { url: string; username: string; password: string }[] = [];
+    const registered: BeszelClient[] = [];
+    const completed: BeszelClient[] = [];
 
     const deps: MessageRouterDeps = {
         log: {
@@ -37,9 +43,11 @@ function makeHarness(checkConnectionResult?: { success: boolean; message: string
                     checkConnectionResult ?? { success: true, message: "Connected successfully" },
             } as unknown as BeszelClient;
         },
+        onTestClientCreated: client => registered.push(client),
+        onTestClientDone: client => completed.push(client),
     };
 
-    return { sends, logs, createdClients, deps };
+    return { sends, logs, createdClients, registered, completed, deps };
 }
 
 function buildMessage(overrides: Partial<ioBroker.Message>): ioBroker.Message {
@@ -127,6 +135,76 @@ describe("dispatchMessage", () => {
             expect(h.createdClients).to.deep.equal([{ url: "http://h", username: "u", password: "p" }]);
             expect(h.sends).to.have.lengthOf(1);
             expect(h.sends[0].response).to.deep.equal({ success: true, message: "Connected successfully" });
+        });
+    });
+
+    describe("test-client lifecycle hooks (v0.4.5 cancelAll-Latency)", () => {
+        it("calls onTestClientCreated then onTestClientDone — adapter can track + abort at onUnload", async () => {
+            const h = makeHarness({ success: true, message: "ok" });
+            await dispatchMessage(
+                buildMessage({
+                    command: "checkConnection",
+                    message: { url: "http://h", username: "u", password: "p" },
+                }),
+                h.deps,
+            );
+
+            expect(h.registered).to.have.lengthOf(1);
+            expect(h.completed).to.have.lengthOf(1);
+            // The same client instance must travel through both hooks so the
+            // adapter's Set add/delete matches up.
+            expect(h.registered[0]).to.equal(h.completed[0]);
+        });
+
+        it("onTestClientDone fires even when checkConnection throws — Set never leaks", async () => {
+            const sends: SentMessage[] = [];
+            const registered: BeszelClient[] = [];
+            const completed: BeszelClient[] = [];
+            const failingClient = {
+                checkConnection: async () => {
+                    throw new Error("boom");
+                },
+            } as unknown as BeszelClient;
+            const deps: MessageRouterDeps = {
+                log: { debug: () => {}, warn: () => {} },
+                sendTo: (from, command, response, callback) => {
+                    sends.push({ from, command, response, callback });
+                },
+                createTestClient: () => failingClient,
+                onTestClientCreated: c => registered.push(c),
+                onTestClientDone: c => completed.push(c),
+            };
+            await dispatchMessage(
+                buildMessage({
+                    command: "checkConnection",
+                    message: { url: "http://h", username: "u", password: "p" },
+                }),
+                deps,
+            );
+
+            // The throw is caught by the outer try/catch — but the finally
+            // around the testClient must still call onTestClientDone so the
+            // adapter's Set stays clean.
+            expect(registered).to.have.lengthOf(1);
+            expect(completed).to.have.lengthOf(1);
+            expect(registered[0]).to.equal(completed[0]);
+            // Outer catch sends the failure response.
+            expect(sends).to.have.lengthOf(1);
+            expect((sends[0].response as { success: boolean }).success).to.equal(false);
+        });
+
+        it("missing-config path does NOT register a test-client (none was created)", async () => {
+            const h = makeHarness();
+            await dispatchMessage(
+                buildMessage({
+                    command: "checkConnection",
+                    message: { url: "", username: "u", password: "p" },
+                }),
+                h.deps,
+            );
+
+            expect(h.registered).to.have.lengthOf(0);
+            expect(h.completed).to.have.lengthOf(0);
         });
     });
 });
