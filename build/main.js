@@ -35,6 +35,14 @@ class BeszelAdapter extends utils.Adapter {
   lastErrorCode = "";
   authFailCount = 0;
   failedSystems = /* @__PURE__ */ new Set();
+  /**
+   * v0.4.5: short-lived test-clients spawned from `checkConnection` admin
+   * messages. The prod-`this.client` is what `onUnload` cancels, so these
+   * need their own registry to be reachable at shutdown. Entries are added
+   * by `message-router`'s `onTestClientCreated` hook and removed once
+   * `checkConnection` settles.
+   */
+  testClients = /* @__PURE__ */ new Set();
   unhandledRejectionHandler = null;
   uncaughtExceptionHandler = null;
   constructor(options = {}) {
@@ -154,6 +162,10 @@ class BeszelAdapter extends utils.Adapter {
         this.pollTimer = void 0;
       }
       (_a = this.client) == null ? void 0 : _a.cancelAll();
+      for (const tc of this.testClients) {
+        tc.cancelAll();
+      }
+      this.testClients.clear();
       if (this.unhandledRejectionHandler) {
         process.off("unhandledRejection", this.unhandledRejectionHandler);
         this.unhandledRejectionHandler = null;
@@ -179,7 +191,13 @@ class BeszelAdapter extends utils.Adapter {
       createTestClient: (0, import_message_router.makeTestClientFactory)({
         debug: (m) => this.log.debug(m),
         warn: (m) => this.log.warn(m)
-      })
+      }),
+      onTestClientCreated: (client) => {
+        this.testClients.add(client);
+      },
+      onTestClientDone: (client) => {
+        this.testClients.delete(client);
+      }
     });
   }
   /**

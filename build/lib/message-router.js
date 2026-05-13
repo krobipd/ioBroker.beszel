@@ -28,7 +28,7 @@ function makeTestClientFactory(logger) {
   return (url, username, password) => new import_beszel_client.BeszelClient(url, username, password, void 0, logger);
 }
 async function dispatchMessage(obj, deps) {
-  var _a, _b, _c;
+  var _a, _b, _c, _d, _e;
   deps.log.debug(`onMessage: command='${obj == null ? void 0 : obj.command}' from='${obj == null ? void 0 : obj.from}' has-callback=${!!(obj == null ? void 0 : obj.callback)}`);
   if (!obj.callback) {
     return;
@@ -54,9 +54,14 @@ async function dispatchMessage(obj, deps) {
           return;
         }
         const testClient = deps.createTestClient(url, username, password);
-        const result = await testClient.checkConnection();
-        deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
-        deps.sendTo(obj.from, obj.command, result, obj.callback);
+        (_d = deps.onTestClientCreated) == null ? void 0 : _d.call(deps, testClient);
+        try {
+          const result = await testClient.checkConnection();
+          deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
+          deps.sendTo(obj.from, obj.command, result, obj.callback);
+        } finally {
+          (_e = deps.onTestClientDone) == null ? void 0 : _e.call(deps, testClient);
+        }
         break;
       }
       default:

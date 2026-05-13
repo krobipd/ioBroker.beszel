@@ -175,7 +175,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.4.5 (2026-05-13)
 - Adapter shuts down cleanly even if the "Test Connection" button was still running — the test request is now aborted at unload along with regular polling.
 
 ### 0.4.4 (2026-05-13)
@@ -195,11 +195,6 @@ beszel.0.
 
 ### 0.4.1 (2026-05-07)
 - Restored the blank line between the changelog footer and the Support section (release-script swallowed it in v0.4.0).
-
-### 0.4.0 (2026-05-07)
-- State names localized in 11 ioBroker languages, following the system setting.
-- Object cache cuts js-controller calls per poll cycle.
-- Baseline: Node 22, Admin 7.8.23 (ioBroker May-2026 stable).
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

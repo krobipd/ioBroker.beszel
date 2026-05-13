@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.4.4",
+    "version": "0.4.5",
     "news": {
-      "NEXT": {
+      "0.4.5": {
         "en": "Adapter shuts down cleanly even if Test Connection was still running — the test request is now aborted at unload.",
         "de": "Adapter fährt sauber herunter, auch wenn Test Connection noch lief — die Test-Anfrage wird jetzt beim Unload abgebrochen.",
         "ru": "Адаптер чисто завершает работу даже если кнопка Test Connection ещё выполнялась — тестовый запрос теперь прерывается при выгрузке.",

@@ -1,4 +1,9 @@
 # Older Changes
+## 0.4.0 (2026-05-07)
+- State names localized in 11 ioBroker languages, following the system setting.
+- Object cache cuts js-controller calls per poll cycle.
+- Baseline: Node 22, Admin 7.8.23 (ioBroker May-2026 stable).
+
 ## 0.3.10 (2026-05-01)
 - Documentation: rewrote release notes for v0.3.3–v0.3.9 in user-friendly style across all languages.
 
