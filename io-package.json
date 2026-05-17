@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.5.3",
     "news": {
+      "NEXT": {
+        "en": "Internal cleanup. No user-facing changes.",
+        "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
+        "ru": "Внутренняя очистка. Нет видимых изменений для пользователей.",
+        "pt": "Limpeza interna. Sem alterações visíveis para o utilizador.",
+        "nl": "Interne opruiming. Geen zichtbare wijzigingen voor gebruikers.",
+        "fr": "Nettoyage interne. Aucun changement visible pour l'utilisateur.",
+        "it": "Pulizia interna. Nessuna modifica visibile per l'utente.",
+        "es": "Limpieza interna. Sin cambios visibles para el usuario.",
+        "pl": "Wewnętrzne porządki. Brak widocznych zmian dla użytkownika.",
+        "uk": "Внутрішнє прибирання. Без видимих змін для користувача.",
+        "zh-cn": "内部清理。无用户可见的更改。"
+      },
       "0.5.3": {
         "en": "Removes the automatic credential migration. After upgrading from a pre-0.5.0 version, open the Beszel adapter settings once and save — the framework encrypts your credentials cleanly.",
         "de": "Entfernt die automatische Zugangsdaten-Migration. Nach Update von einer Version vor 0.5.0: einmal die Beszel-Einstellungen im Admin öffnen und speichern, dann passt alles.",
@@ -80,19 +93,6 @@
         "pl": "Log debugowania śledzi ciche ścieżki: przebieg HTTP, uwierzytelnianie tokenem, paginacja i ponowienie 429. Domyślny log bez zmian. Test połączenia nie zawiesza się przy nieznanych poleceniach.",
         "uk": "Журнал зневадження відстежує тихі шляхи: цикл HTTP, автентифікація токеном, пагінація і повтор після 429. Стандартний лог без змін. Перевірка з'єднання більше не зависає.",
         "zh-cn": "调试日志跟踪以前静默的路径：HTTP 请求生命周期、令牌认证、分页和 429 重试。默认日志保持不变。测试连接遇到未知命令时不再挂起。"
-      },
-      "0.4.3": {
-        "en": "Big setups load completely (no silent truncation past 200/500 records) and start up faster (parallel updates). Plus configurable request timeout, 429 retry, 403 hint, name-collision suffix.",
-        "de": "Große Setups laden vollständig (kein stilles Abschneiden über 200/500 Datensätze) und starten schneller (parallel). Plus Timeout-Option, 429-Retry, 403-Hinweis, Suffix bei Namenskollision.",
-        "ru": "Большие установки грузятся полностью (без обрезания после 200/500 записей) и стартуют быстрее. Плюс настраиваемый тайм-аут, 429-повтор, 403-подсказка, суффикс при коллизиях имён.",
-        "pt": "Configurações grandes carregam por completo (sem truncar após 200/500 registos) e iniciam mais rápido (paralelo). Mais: tempo limite ajustável, retry 429, dica em 403, sufixo em colisões de nome.",
-        "nl": "Grote setups worden volledig geladen (geen stille afkapping na 200/500 records) en starten sneller (parallel). Plus instelbare time-out, 429-retry, 403-hint, suffix bij naamcollisies.",
-        "fr": "Les grandes configurations se chargent intégralement (plus de troncature après 200/500 entrées) et démarrent plus vite. Plus: timeout réglable, retry 429, indice 403, suffixe sur collision de nom.",
-        "it": "Le installazioni grandi si caricano per intero (niente più troncamento oltre 200/500 record) e partono più rapidamente. Più: timeout configurabile, retry 429, hint 403, suffisso su collisione nomi.",
-        "es": "Las instalaciones grandes se cargan completas (sin truncado tras 200/500 registros) y arrancan más rápido. Plus: tiempo de espera configurable, reintento 429, pista 403, sufijo en colisión de nombres.",
-        "pl": "Duże instalacje ładują się w całości (brak cichego ucinania po 200/500 rekordach) i startują szybciej (równolegle). Plus konfigurowalny timeout, retry 429, podpowiedź 403, sufiks przy kolizji nazw.",
-        "uk": "Великі інсталяції завантажуються повністю (без обрізання після 200/500 записів) і стартують швидше. Плюс налаштовуваний тайм-аут, повтор 429, підказка 403, суфікс при колізії імен.",
-        "zh-cn": "大型部署现在能够完整加载（不再在 200/500 条记录后悄悄截断），启动更快（并行更新）。新增可配置请求超时、429 重试、403 权限提示，以及同名服务器的哈希后缀避免覆盖。"
       }
     },
     "titleLang": {
