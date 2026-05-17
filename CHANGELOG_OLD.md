@@ -1,4 +1,7 @@
 # Older Changes
+## 0.4.1 (2026-05-07)
+- Restored the blank line between the changelog footer and the Support section (release-script swallowed it in v0.4.0).
+
 ## 0.4.0 (2026-05-07)
 - State names localized in 11 ioBroker languages, following the system setting.
 - Object cache cuts js-controller calls per poll cycle.

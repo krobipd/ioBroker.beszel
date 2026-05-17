@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.4.5",
+    "version": "0.5.0",
     "news": {
-      "NEXT": {
+      "0.5.0": {
         "en": "Hub username is now stored encrypted alongside the password — existing plain-text values are migrated automatically on first start. The Request Timeout option is documented in the README.",
         "de": "Der Hub-Username wird jetzt verschlüsselt gespeichert (wie das Passwort) — bestehende Klartext-Werte werden beim Start automatisch migriert. Request Timeout ist im README dokumentiert.",
         "ru": "Имя пользователя Hub теперь хранится в зашифрованном виде, как и пароль — открытые значения мигрируют автоматически при первом запуске. Параметр Request Timeout описан в README.",

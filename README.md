@@ -176,7 +176,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.5.0 (2026-05-17)
 - Hub username and password are both stored encrypted now. The first start after the update migrates existing plain-text usernames automatically.
 - README now documents the Request Timeout setting.
 
@@ -197,9 +197,6 @@ beszel.0.
 
 ### 0.4.2 (2026-05-09)
 - Adapter log messages are now English only, in line with the ioBroker community standard. Localized state names (11 languages) are unchanged.
-
-### 0.4.1 (2026-05-07)
-- Restored the blank line between the changelog footer and the Support section (release-script swallowed it in v0.4.0).
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

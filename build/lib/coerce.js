@@ -28,11 +28,14 @@ __export(coerce_exports, {
   coerceNumberTuple: () => coerceNumberTuple,
   coerceObject: () => coerceObject,
   coercePocketBaseList: () => coercePocketBaseList,
+  coercePollInterval: () => coercePollInterval,
   coerceString: () => coerceString,
   coerceSystem: () => coerceSystem,
   coerceSystemStats: () => coerceSystemStats,
   coerceSystemStatsRecord: () => coerceSystemStatsRecord,
-  errText: () => errText
+  coerceTimeoutMs: () => coerceTimeoutMs,
+  errText: () => errText,
+  validateHubUrl: () => validateHubUrl
 });
 module.exports = __toCommonJS(coerce_exports);
 const VALID_SYSTEM_STATUS = ["up", "down", "paused", "pending"];
@@ -390,6 +393,37 @@ function coerceContainer(value) {
     image: (_e = coerceString(obj.image)) != null ? _e : ""
   };
 }
+function validateHubUrl(url) {
+  if (typeof url !== "string" || url.trim().length === 0) {
+    return "URL is empty";
+  }
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return `protocol '${u.protocol}' is not http(s)`;
+    }
+    if (!u.hostname) {
+      return "hostname is missing";
+    }
+    return null;
+  } catch {
+    return "URL is malformed";
+  }
+}
+function coercePollInterval(raw) {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
+  if (!Number.isFinite(n)) {
+    return 60;
+  }
+  return Math.max(10, Math.min(300, Math.floor(n)));
+}
+function coerceTimeoutMs(raw) {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
+  if (!Number.isFinite(n)) {
+    return 15e3;
+  }
+  return Math.max(5, Math.min(120, Math.floor(n))) * 1e3;
+}
 function coercePocketBaseList(value, itemCoercer) {
   var _a, _b, _c, _d, _e;
   const obj = coerceObject(value);
@@ -442,10 +476,13 @@ function coerceAuthResponse(value) {
   coerceNumberTuple,
   coerceObject,
   coercePocketBaseList,
+  coercePollInterval,
   coerceString,
   coerceSystem,
   coerceSystemStats,
   coerceSystemStatsRecord,
-  errText
+  coerceTimeoutMs,
+  errText,
+  validateHubUrl
 });
 //# sourceMappingURL=coerce.js.map

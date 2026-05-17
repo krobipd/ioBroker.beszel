@@ -21,6 +21,7 @@ __export(state_manager_exports, {
   StateManager: () => StateManager
 });
 module.exports = __toCommonJS(state_manager_exports);
+var import_coerce = require("./coerce");
 var import_i18n_states = require("./i18n-states");
 class StateManager {
   adapter;
@@ -682,7 +683,8 @@ class StateManager {
         await this.adapter.delObjectAsync(id, { recursive: true });
         this.dropCacheUnder(id);
       }
-    } catch {
+    } catch (err) {
+      this.adapter.log.debug(`deleteChannelIfExists(${id}) ignored: ${(0, import_coerce.errText)(err)}`);
     }
   }
   /**

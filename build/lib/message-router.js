@@ -28,7 +28,7 @@ function makeTestClientFactory(logger) {
   return (url, username, password) => new import_beszel_client.BeszelClient(url, username, password, void 0, logger);
 }
 async function dispatchMessage(obj, deps) {
-  var _a, _b, _c, _d, _e;
+  var _a, _b, _c;
   deps.log.debug(`onMessage: command='${obj == null ? void 0 : obj.command}' from='${obj == null ? void 0 : obj.from}' has-callback=${!!(obj == null ? void 0 : obj.callback)}`);
   if (!obj.callback) {
     return;
@@ -36,10 +36,11 @@ async function dispatchMessage(obj, deps) {
   try {
     switch (obj.command) {
       case "checkConnection": {
-        const config = obj.message;
-        const url = (_a = config.url) != null ? _a : "";
-        const username = (_b = config.username) != null ? _b : "";
-        const password = (_c = config.password) != null ? _c : "";
+        const msg = (_a = (0, import_coerce.coerceObject)(obj.message)) != null ? _a : {};
+        const config = msg;
+        const url = typeof config.url === "string" ? config.url : "";
+        const username = typeof config.username === "string" ? config.username : "";
+        const password = typeof config.password === "string" ? config.password : "";
         if (!url || !username || !password) {
           deps.log.debug("checkConnection: missing url/username/password in message");
           deps.sendTo(
@@ -54,13 +55,13 @@ async function dispatchMessage(obj, deps) {
           return;
         }
         const testClient = deps.createTestClient(url, username, password);
-        (_d = deps.onTestClientCreated) == null ? void 0 : _d.call(deps, testClient);
+        (_b = deps.onTestClientCreated) == null ? void 0 : _b.call(deps, testClient);
         try {
           const result = await testClient.checkConnection();
           deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
           deps.sendTo(obj.from, obj.command, result, obj.callback);
         } finally {
-          (_e = deps.onTestClientDone) == null ? void 0 : _e.call(deps, testClient);
+          (_c = deps.onTestClientDone) == null ? void 0 : _c.call(deps, testClient);
         }
         break;
       }

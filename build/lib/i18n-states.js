@@ -23,6 +23,35 @@ __export(i18n_states_exports, {
 });
 module.exports = __toCommonJS(i18n_states_exports);
 const STATE_NAMES = {
+  // ──────── instanceObjects names (v0.5.0 B1+B3) ────────
+  /** `info.connection` state name (was hardcoded en in io-package.json). */
+  connectionStatus: {
+    en: "Connection status",
+    de: "Verbindungsstatus",
+    ru: "\u0421\u0442\u0430\u0442\u0443\u0441 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F",
+    pt: "Estado da liga\xE7\xE3o",
+    nl: "Verbindingsstatus",
+    fr: "\xC9tat de la connexion",
+    it: "Stato connessione",
+    es: "Estado de conexi\xF3n",
+    pl: "Stan po\u0142\u0105czenia",
+    uk: "\u0421\u0442\u0430\u043D \u0437'\u0454\u0434\u043D\u0430\u043D\u043D\u044F",
+    "zh-cn": "\u8FDE\u63A5\u72B6\u6001"
+  },
+  /** `systems` folder name (was inline 11-lang object in io-package.json). */
+  channelSystems: {
+    en: "Monitored Systems",
+    de: "\xDCberwachte Systeme",
+    ru: "\u041E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u0435\u043C\u044B\u0435 \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
+    pt: "Sistemas monitorizados",
+    nl: "Gecontroleerde systemen",
+    fr: "Syst\xE8mes surveill\xE9s",
+    it: "Sistemi monitorati",
+    es: "Sistemas monitorizados",
+    pl: "Monitorowane systemy",
+    uk: "\u0412\u0456\u0434\u0441\u0442\u0435\u0436\u0443\u0432\u0430\u043D\u0456 \u0441\u0438\u0441\u0442\u0435\u043C\u0438",
+    "zh-cn": "\u53D7\u76D1\u63A7\u7684\u7CFB\u7EDF"
+  },
   // ──────── Channel names ────────
   channelInfo: {
     en: "Info",

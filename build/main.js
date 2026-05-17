@@ -24,6 +24,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var utils = __toESM(require("@iobroker/adapter-core"));
 var import_beszel_client = require("./lib/beszel-client");
 var import_coerce = require("./lib/coerce");
+var import_credential_migration = require("./lib/credential-migration");
 var import_message_router = require("./lib/message-router");
 var import_state_manager = require("./lib/state-manager");
 class BeszelAdapter extends utils.Adapter {
@@ -76,16 +77,17 @@ class BeszelAdapter extends utils.Adapter {
       `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`
     );
     await this.setStateAsync("info.connection", { val: false, ack: true });
+    await (0, import_credential_migration.migrateUsernameEncryption)(this);
     if (!config.url || !config.username || !config.password) {
       this.log.error("URL, username, and password are required \u2014 please configure the adapter settings");
       return;
     }
-    const urlError = BeszelAdapter.validateHubUrl(config.url);
+    const urlError = (0, import_coerce.validateHubUrl)(config.url);
     if (urlError) {
       this.log.error(`Beszel Hub URL is invalid \u2014 ${urlError}. Adapter will not start.`);
       return;
     }
-    const timeoutMs = BeszelAdapter.coerceTimeoutMs(config.requestTimeout);
+    const timeoutMs = (0, import_coerce.coerceTimeoutMs)(config.requestTimeout);
     this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
     this.client = new import_beszel_client.BeszelClient(config.url, config.username, config.password, timeoutMs, {
       debug: (m) => this.log.debug(m),
@@ -97,62 +99,13 @@ class BeszelAdapter extends utils.Adapter {
     await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
     this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
     await this.poll();
-    const pollSec = BeszelAdapter.coercePollInterval(config.pollInterval);
+    const pollSec = (0, import_coerce.coercePollInterval)(config.pollInterval);
     this.log.debug(`pollInterval: raw=${JSON.stringify(config.pollInterval)} resolved=${pollSec}s`);
     const intervalMs = pollSec * 1e3;
     this.pollTimer = this.setInterval(() => {
       void this.poll();
     }, intervalMs);
     this.log.info(`Beszel adapter started \u2014 ${this.lastSystemCount} system(s), polling every ${pollSec}s`);
-  }
-  /**
-   * v0.4.3 (M5): URL-shape validator. Returns a short reason string when
-   * the URL is unusable, or null when it's OK to hand to the client.
-   *
-   * @param url The raw URL value from admin config.
-   */
-  static validateHubUrl(url) {
-    if (typeof url !== "string" || url.trim().length === 0) {
-      return "URL is empty";
-    }
-    try {
-      const u = new URL(url.trim());
-      if (u.protocol !== "http:" && u.protocol !== "https:") {
-        return `protocol '${u.protocol}' is not http(s)`;
-      }
-      if (!u.hostname) {
-        return "hostname is missing";
-      }
-      return null;
-    } catch {
-      return "URL is malformed";
-    }
-  }
-  /**
-   * v0.4.3 (M6): coerce poll-interval to a finite number of seconds, default
-   * 60 s, clamped >= 10 s.
-   *
-   * @param raw Raw `pollInterval` from admin config (number or numeric string).
-   */
-  static coercePollInterval(raw) {
-    const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
-    if (!Number.isFinite(n)) {
-      return 60;
-    }
-    return Math.max(10, Math.floor(n));
-  }
-  /**
-   * v0.4.3 (B5): coerce admin's `requestTimeout` (seconds) to ms. Default
-   * 15 s when missing/unparseable. Clamped to [5 s, 120 s].
-   *
-   * @param raw Raw `requestTimeout` from admin config (number or numeric string).
-   */
-  static coerceTimeoutMs(raw) {
-    const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
-    if (!Number.isFinite(n)) {
-      return 15e3;
-    }
-    return Math.max(5, Math.min(120, Math.floor(n))) * 1e3;
   }
   onUnload(callback) {
     var _a;
