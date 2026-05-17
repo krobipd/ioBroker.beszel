@@ -9,7 +9,7 @@
         "ru": "Исправлен цикл миграции из 0.5.0/0.5.1 — многократно зашифрованные имена пользователя удаляются при обновлении. Введите данные Beszel в админке один раз заново.",
         "pt": "Corrige o ciclo de migração introduzido em 0.5.0/0.5.1 — nomes de utilizador encriptados várias vezes são limpos no update. Reintroduza as credenciais Beszel no admin uma vez.",
         "nl": "Lost de migratielus uit 0.5.0/0.5.1 op — meervoudig versleutelde gebruikersnamen worden bij de update gewist. Voer de Beszel-gegevens eenmalig opnieuw in via Admin.",
-        "fr": "Corrige la boucle de migration introduite en 0.5.0/0.5.1 — les noms d'utilisateur chiffrés plusieurs fois sont effacés au moment de la mise à jour. Saisis à nouveau tes identifiants Beszel dans l'admin.",
+        "fr": "Corrige la boucle de migration de 0.5.0/0.5.1 — les noms d'utilisateur chiffrés plusieurs fois sont effacés. Réintroduis tes identifiants Beszel dans l'admin.",
         "it": "Risolve il loop di migrazione introdotto in 0.5.0/0.5.1 — i nomi utente cifrati più volte vengono cancellati al momento dell'aggiornamento. Reinserisci le credenziali Beszel nell'admin.",
         "es": "Corrige el bucle de migración introducido en 0.5.0/0.5.1 — los nombres de usuario cifrados varias veces se borran en la actualización. Vuelve a introducir las credenciales de Beszel en admin una vez.",
         "pl": "Naprawia pętlę migracji z 0.5.0/0.5.1 — wielokrotnie zaszyfrowane nazwy użytkownika są kasowane przy aktualizacji. Wprowadź dane logowania Beszel w adminie jeszcze raz.",
