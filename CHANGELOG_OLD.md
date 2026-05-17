@@ -1,4 +1,12 @@
 # Older Changes
+## 0.4.3 (2026-05-10)
+- Big setups (200+ servers / 500+ containers) now load completely instead of being silently truncated, and they start up noticeably faster — system updates, cleanups and the startup migration run in parallel.
+- New "Request timeout" setting in admin (5–120 s, default 15 s) for slow links or very large payloads.
+- Hub rate-limit (429): one transparent retry that honours `Retry-After`; permanent rate-limits surface as a clear log so you can raise the poll interval.
+- "Forbidden" (403) responses now show a permission hint instead of looping reauth.
+- Two servers whose names sanitize to the same id no longer overwrite each other — the second gets a hash suffix and a warn so you can rename on the Hub.
+- Adapter shuts down cleanly even if the Hub is slow — pending requests are aborted.
+
 ## 0.4.2 (2026-05-09)
 - Adapter log messages are now English only, in line with the ioBroker community standard. Localized state names (11 languages) are unchanged.
 

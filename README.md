@@ -176,7 +176,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.5.2 (2026-05-17)
 - Fixes the migration loop introduced in 0.5.0/0.5.1 — usernames that got re-encrypted multiple times are cleared on update. Please re-enter your Beszel credentials in admin once.
 
 ### 0.5.1 (2026-05-17)
@@ -192,14 +192,6 @@ beszel.0.
 ### 0.4.4 (2026-05-13)
 - Debug log traces previously silent paths: HTTP request lifecycle, token authentication, pagination walks and the 429-retry. Default log unchanged.
 - Test Connection in admin no longer hangs on an unknown command — it now gets a clear error response instead.
-
-### 0.4.3 (2026-05-10)
-- Big setups (200+ servers / 500+ containers) now load completely instead of being silently truncated, and they start up noticeably faster — system updates, cleanups and the startup migration run in parallel.
-- New "Request timeout" setting in admin (5–120 s, default 15 s) for slow links or very large payloads.
-- Hub rate-limit (429): one transparent retry that honours `Retry-After`; permanent rate-limits surface as a clear log so you can raise the poll interval.
-- "Forbidden" (403) responses now show a permission hint instead of looping reauth.
-- Two servers whose names sanitize to the same id no longer overwrite each other — the second gets a hash suffix and a warn so you can rename on the Hub.
-- Adapter shuts down cleanly even if the Hub is slow — pending requests are aborted.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

@@ -18,13 +18,18 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var credential_migration_exports = {};
 __export(credential_migration_exports, {
+  looksLikeCorruptedNestedEncryption: () => looksLikeCorruptedNestedEncryption,
   looksLikePlaintextUsername: () => looksLikePlaintextUsername,
   migrateUsernameEncryption: () => migrateUsernameEncryption
 });
 module.exports = __toCommonJS(credential_migration_exports);
 var import_coerce = require("./coerce");
+const IOBROKER_ENCRYPTED_PREFIX = "$/aes-192-cbc:";
 function looksLikePlaintextUsername(value) {
   if (typeof value !== "string" || value.length === 0) {
+    return false;
+  }
+  if (value.startsWith(IOBROKER_ENCRYPTED_PREFIX)) {
     return false;
   }
   if (value.length < 8) {
@@ -44,6 +49,9 @@ function looksLikePlaintextUsername(value) {
   }
   return false;
 }
+function looksLikeCorruptedNestedEncryption(decryptedValue) {
+  return typeof decryptedValue === "string" && decryptedValue.startsWith(IOBROKER_ENCRYPTED_PREFIX);
+}
 async function migrateUsernameEncryption(adapter) {
   var _a;
   const fullId = `system.adapter.${adapter.namespace}`;
@@ -58,8 +66,22 @@ async function migrateUsernameEncryption(adapter) {
   if (typeof stored !== "string" || stored.length === 0) {
     return;
   }
+  const decryptedValue = adapter.config.username;
+  if (looksLikeCorruptedNestedEncryption(decryptedValue)) {
+    try {
+      await adapter.extendForeignObjectAsync(fullId, { native: { username: "" } });
+    } catch (err) {
+      adapter.log.warn(`migrateUsernameEncryption: extendForeignObject (clear) failed: ${(0, import_coerce.errText)(err)}`);
+      return;
+    }
+    adapter.log.error(
+      "Beszel username storage is corrupted from the v0.5.0/v0.5.1 migration loop bug. It has been cleared. Please open the Beszel adapter settings in ioBroker Admin, re-enter your username and password, and save. Sorry for the inconvenience."
+    );
+    adapter.config.username = "";
+    return;
+  }
   if (!looksLikePlaintextUsername(stored)) {
-    adapter.log.debug("migrateUsernameEncryption: username already encrypted (or unrecognised shape), skipping");
+    adapter.log.debug("migrateUsernameEncryption: username already encrypted ($/aes-192-cbc:\u2026), skipping");
     return;
   }
   let encrypted;
@@ -84,6 +106,7 @@ async function migrateUsernameEncryption(adapter) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  looksLikeCorruptedNestedEncryption,
   looksLikePlaintextUsername,
   migrateUsernameEncryption
 });
