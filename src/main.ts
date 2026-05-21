@@ -30,21 +30,10 @@ class BeszelAdapter extends utils.Adapter {
       ...options,
       name: "beszel",
     });
-    // Wrap async handlers with .catch() so a rejection can never become an
-    // unhandled promise rejection (→ SIGKILL → js-controller restart loop).
-    this.on("ready", () => {
-      this.onReady().catch((err: unknown) => this.log.error(`onReady failed: ${errText(err)}`));
-    });
+    this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
-    this.on("message", obj => {
-      this.onMessage(obj).catch((err: unknown) => this.log.error(`onMessage failed: ${errText(err)}`));
-    });
-    // Last-line-of-defence against unhandled rejections / sync throws from
-    // fire-and-forget paths (e.g. `void this.poll()`). The per-handler
-    // .catch() wrappers cover the documented async paths; this catches
-    // anything that slips past during refactors.
-    // v0.4.3 (M1): log + terminate(11) instead of leaving the process alive
-    // in an undefined state.
+    this.on("message", this.onMessage.bind(this));
+    // Safety net for fire-and-forget paths (e.g. `void this.poll()`).
     this.unhandledRejectionHandler = (reason: unknown) => {
       this.log.error(`Unhandled rejection: ${errText(reason)}`);
       this.terminate?.(11);
@@ -58,79 +47,55 @@ class BeszelAdapter extends utils.Adapter {
   }
 
   private async onReady(): Promise<void> {
-    const config = this.config as unknown as AdapterConfig;
+    try {
+      const config = this.config as unknown as AdapterConfig;
 
-    // v0.4.4 (I1): onReady start anchor — debug log shows the config the
-    // adapter is starting with. Visible breadcrumb for "what URL is the
-    // adapter actually pointing at" without raising info-noise.
-    this.log.debug(
-      `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`,
-    );
-
-    // `info` + `info.connection` are declared in io-package.json instanceObjects,
-    // so the adapter framework creates them on install. Just set the initial state.
-    await this.setStateAsync("info.connection", { val: false, ack: true });
-
-    // Validate required config
-    // (v0.5.0 introduced encryptedNative for `username` — users upgrading from
-    //  v0.4.x or older v0.5.x need to open the adapter settings once and save,
-    //  so the framework re-encrypts with the current secret. Detected as empty
-    //  username here; the error message points them at the right place.)
-    if (!config.url || !config.username || !config.password) {
-      this.log.error(
-        "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once.",
+      this.log.debug(
+        `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`,
       );
-      return;
+
+      await this.setStateAsync("info.connection", { val: false, ack: true });
+
+      if (!config.url || !config.username || !config.password) {
+        this.log.error(
+          "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once.",
+        );
+        return;
+      }
+
+      const urlError = validateHubUrl(config.url);
+      if (urlError) {
+        this.log.error(`Beszel Hub URL is invalid — ${urlError}. Adapter will not start.`);
+        return;
+      }
+
+      const timeoutMs = coerceTimeoutMs(config.requestTimeout);
+      this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
+      this.client = new BeszelClient(config.url, config.username, config.password, timeoutMs, {
+        debug: (m: string) => this.log.debug(m),
+        warn: (m: string) => this.log.warn(m),
+      });
+      this.stateManager = new StateManager(this);
+
+      await this.stateManager.migrateLegacyStates();
+
+      const existingNames = await this.stateManager.getExistingSystemNames();
+      await Promise.all(existingNames.map(name => this.stateManager!.cleanupMetrics(name, config)));
+      this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
+
+      await this.poll();
+
+      const pollSec = coercePollInterval(config.pollInterval);
+      this.log.debug(`pollInterval: raw=${JSON.stringify(config.pollInterval)} resolved=${pollSec}s`);
+      const intervalMs = pollSec * 1000;
+      this.pollTimer = this.setInterval(() => {
+        void this.poll();
+      }, intervalMs);
+
+      this.log.info(`Beszel adapter started — ${this.lastSystemCount} system(s), polling every ${pollSec}s`);
+    } catch (err: unknown) {
+      this.log.error(`onReady failed: ${errText(err)}`);
     }
-
-    // v0.4.3 (M5): URL-shape validation BEFORE constructing the client.
-    // Earlier any string passed through and only the first request rejected
-    // with a confusing "Invalid URL" late error.
-    const urlError = validateHubUrl(config.url);
-    if (urlError) {
-      this.log.error(`Beszel Hub URL is invalid — ${urlError}. Adapter will not start.`);
-      return;
-    }
-
-    // v0.4.3 (B5): per-request timeout flows through from admin (default 15s).
-    const timeoutMs = coerceTimeoutMs(config.requestTimeout);
-    // v0.4.4 (I2): always-log resolved timeout. Detecting "drift" from raw
-    // is fragile (`"15"` → `15000` is coercion not drift); always-on log
-    // line keeps the resolution visible without false-flag logic.
-    this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
-    // v0.4.4: pass adapter logger so the HTTP layer can trace request /
-    // auth / pagination lifecycle.
-    this.client = new BeszelClient(config.url, config.username, config.password, timeoutMs, {
-      debug: (m: string) => this.log.debug(m),
-      warn: (m: string) => this.log.warn(m),
-    });
-    this.stateManager = new StateManager(this);
-
-    // Migrate legacy flat state paths from pre-0.3.0
-    await this.stateManager.migrateLegacyStates();
-
-    // v0.4.3 (M2): cleanupMetrics in parallel — sequential per system was
-    // pointless serialisation of independent broker calls.
-    const existingNames = await this.stateManager.getExistingSystemNames();
-    await Promise.all(existingNames.map(name => this.stateManager!.cleanupMetrics(name, config)));
-    // v0.4.4 (G2): trace cleanupMetrics-summary after the parallel fan-out.
-    this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
-
-    // Initial poll
-    await this.poll();
-
-    // v0.4.3 (M6): coerce poll-interval explicitly. `Math.max(10, "30") *
-    // 1000` returns NaN, and `setInterval(fn, NaN)` becomes `setInterval(fn,
-    // 0)` — a tight loop that hammers the Hub.
-    const pollSec = coercePollInterval(config.pollInterval);
-    // v0.4.4 (I3): always-log resolved poll interval (same reasoning as I2).
-    this.log.debug(`pollInterval: raw=${JSON.stringify(config.pollInterval)} resolved=${pollSec}s`);
-    const intervalMs = pollSec * 1000;
-    this.pollTimer = this.setInterval(() => {
-      void this.poll();
-    }, intervalMs);
-
-    this.log.info(`Beszel adapter started — ${this.lastSystemCount} system(s), polling every ${pollSec}s`);
   }
 
   private onUnload(callback: () => void): void {
@@ -173,27 +138,27 @@ class BeszelAdapter extends utils.Adapter {
   }
 
   private async onMessage(obj: ioBroker.Message): Promise<void> {
-    // v0.4.4 (H1+H4): delegate to the pure `dispatchMessage` helper so the
-    // switch logic — including the default-Branch contract — is testable
-    // without an adapter-framework instance. See `lib/message-router.ts`.
-    // v0.4.5: track test-clients so `onUnload` can `cancelAll()` them.
-    await dispatchMessage(obj, {
-      log: {
-        debug: (m: string) => this.log.debug(m),
-        warn: (m: string) => this.log.warn(m),
-      },
-      sendTo: this.sendTo.bind(this),
-      createTestClient: makeTestClientFactory({
-        debug: (m: string) => this.log.debug(m),
-        warn: (m: string) => this.log.warn(m),
-      }),
-      onTestClientCreated: client => {
-        this.testClients.add(client);
-      },
-      onTestClientDone: client => {
-        this.testClients.delete(client);
-      },
-    });
+    try {
+      await dispatchMessage(obj, {
+        log: {
+          debug: (m: string) => this.log.debug(m),
+          warn: (m: string) => this.log.warn(m),
+        },
+        sendTo: this.sendTo.bind(this),
+        createTestClient: makeTestClientFactory({
+          debug: (m: string) => this.log.debug(m),
+          warn: (m: string) => this.log.warn(m),
+        }),
+        onTestClientCreated: client => {
+          this.testClients.add(client);
+        },
+        onTestClientDone: client => {
+          this.testClients.delete(client);
+        },
+      });
+    } catch (err: unknown) {
+      this.log.error(`onMessage failed: ${errText(err)}`);
+    }
   }
 
   /**
