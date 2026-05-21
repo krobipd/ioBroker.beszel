@@ -1,4 +1,7 @@
 # Older Changes
+## 0.5.1 (2026-05-17)
+- Restores the encrypted-credentials migration that was incomplete in 0.5.0 — usernames stored as plain text now migrate cleanly on the next start.
+
 ## 0.5.0 (2026-05-17)
 - Hub username and password are both stored encrypted now. The first start after the update migrates existing plain-text usernames automatically.
 - README now documents the Request Timeout setting.

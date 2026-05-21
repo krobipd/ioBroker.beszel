@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.5",
+    "version": "0.5.6",
     "news": {
+      "0.5.6": {
+        "en": "Use community-standard event handler pattern",
+        "de": "Community-Standard Event-Handler-Pattern verwenden",
+        "ru": "Использование стандартного паттерна обработчика событий сообщества",
+        "pt": "Usar padrão de manipulador de eventos padrão da comunidade",
+        "nl": "Community-standaard event handler patroon gebruiken",
+        "fr": "Utiliser le modèle de gestionnaire d'événements standard de la communauté",
+        "it": "Utilizzare il pattern standard della community per i gestori degli eventi",
+        "es": "Usar el patrón de manejador de eventos estándar de la comunidad",
+        "pl": "Użyj standardowego wzorca obsługi zdarzeń społeczności",
+        "uk": "Використання стандартного шаблону обробника подій спільноти",
+        "zh-cn": "使用社区标准事件处理程序模式"
+      },
       "0.5.5": {
         "en": "Code quality enforced with standard formatting.",
         "de": "Code-Qualität durch einheitliche Formatierung erzwungen.",
@@ -80,19 +93,6 @@
         "pl": "Nazwa użytkownika Hub jest teraz przechowywana w postaci zaszyfrowanej, jak hasło — istniejące wartości tekstowe są migrowane automatycznie przy pierwszym starcie. Request Timeout jest w README.",
         "uk": "Імʼя користувача Hub тепер зберігається у зашифрованому вигляді, як і пароль — відкриті значення мігрують автоматично при першому запуску. Request Timeout описаний у README.",
         "zh-cn": "Hub 用户名现在与密码一样以加密形式存储——已有的明文值在首次启动时自动迁移。README 中已说明请求超时（Request Timeout）选项。"
-      },
-      "0.4.5": {
-        "en": "Adapter shuts down cleanly even if Test Connection was still running — the test request is now aborted at unload.",
-        "de": "Adapter fährt sauber herunter, auch wenn Test Connection noch lief — die Test-Anfrage wird jetzt beim Unload abgebrochen.",
-        "ru": "Адаптер чисто завершает работу даже если кнопка Test Connection ещё выполнялась — тестовый запрос теперь прерывается при выгрузке.",
-        "pt": "O adaptador encerra corretamente mesmo se o botão Test Connection ainda estava em execução — o pedido de teste é agora abortado no unload.",
-        "nl": "De adapter sluit netjes af, ook als Test Connection nog liep — het testverzoek wordt nu bij unload afgebroken.",
-        "fr": "L'adaptateur s'arrête proprement même si Test Connection était encore en cours — la requête de test est maintenant interrompue au déchargement.",
-        "it": "L'adattatore si arresta correttamente anche se Test Connection era ancora in esecuzione — la richiesta di test viene ora interrotta allo scarico.",
-        "es": "El adaptador se cierra correctamente incluso si Test Connection seguía ejecutándose — la solicitud de prueba se aborta ahora al descargar.",
-        "pl": "Adapter zamyka się poprawnie nawet jeśli przycisk Test Connection wciąż działał — żądanie testowe jest teraz przerywane przy zwolnieniu.",
-        "uk": "Адаптер коректно завершує роботу навіть якщо Test Connection ще виконувався — тестовий запит тепер скасовується під час вивантаження.",
-        "zh-cn": "即使测试连接按钮仍在运行，适配器也能干净地关闭——测试请求现在会在卸载时中止。"
       }
     },
     "titleLang": {

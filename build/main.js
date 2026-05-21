@@ -50,13 +50,9 @@ class BeszelAdapter extends utils.Adapter {
       ...options,
       name: "beszel"
     });
-    this.on("ready", () => {
-      this.onReady().catch((err) => this.log.error(`onReady failed: ${(0, import_coerce.errText)(err)}`));
-    });
+    this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
-    this.on("message", (obj) => {
-      this.onMessage(obj).catch((err) => this.log.error(`onMessage failed: ${(0, import_coerce.errText)(err)}`));
-    });
+    this.on("message", this.onMessage.bind(this));
     this.unhandledRejectionHandler = (reason) => {
       var _a;
       this.log.error(`Unhandled rejection: ${(0, import_coerce.errText)(reason)}`);
@@ -71,41 +67,45 @@ class BeszelAdapter extends utils.Adapter {
     process.on("uncaughtException", this.uncaughtExceptionHandler);
   }
   async onReady() {
-    const config = this.config;
-    this.log.debug(
-      `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`
-    );
-    await this.setStateAsync("info.connection", { val: false, ack: true });
-    if (!config.url || !config.username || !config.password) {
-      this.log.error(
-        "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once."
+    try {
+      const config = this.config;
+      this.log.debug(
+        `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`
       );
-      return;
+      await this.setStateAsync("info.connection", { val: false, ack: true });
+      if (!config.url || !config.username || !config.password) {
+        this.log.error(
+          "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once."
+        );
+        return;
+      }
+      const urlError = (0, import_coerce.validateHubUrl)(config.url);
+      if (urlError) {
+        this.log.error(`Beszel Hub URL is invalid \u2014 ${urlError}. Adapter will not start.`);
+        return;
+      }
+      const timeoutMs = (0, import_coerce.coerceTimeoutMs)(config.requestTimeout);
+      this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
+      this.client = new import_beszel_client.BeszelClient(config.url, config.username, config.password, timeoutMs, {
+        debug: (m) => this.log.debug(m),
+        warn: (m) => this.log.warn(m)
+      });
+      this.stateManager = new import_state_manager.StateManager(this);
+      await this.stateManager.migrateLegacyStates();
+      const existingNames = await this.stateManager.getExistingSystemNames();
+      await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
+      this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
+      await this.poll();
+      const pollSec = (0, import_coerce.coercePollInterval)(config.pollInterval);
+      this.log.debug(`pollInterval: raw=${JSON.stringify(config.pollInterval)} resolved=${pollSec}s`);
+      const intervalMs = pollSec * 1e3;
+      this.pollTimer = this.setInterval(() => {
+        void this.poll();
+      }, intervalMs);
+      this.log.info(`Beszel adapter started \u2014 ${this.lastSystemCount} system(s), polling every ${pollSec}s`);
+    } catch (err) {
+      this.log.error(`onReady failed: ${(0, import_coerce.errText)(err)}`);
     }
-    const urlError = (0, import_coerce.validateHubUrl)(config.url);
-    if (urlError) {
-      this.log.error(`Beszel Hub URL is invalid \u2014 ${urlError}. Adapter will not start.`);
-      return;
-    }
-    const timeoutMs = (0, import_coerce.coerceTimeoutMs)(config.requestTimeout);
-    this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
-    this.client = new import_beszel_client.BeszelClient(config.url, config.username, config.password, timeoutMs, {
-      debug: (m) => this.log.debug(m),
-      warn: (m) => this.log.warn(m)
-    });
-    this.stateManager = new import_state_manager.StateManager(this);
-    await this.stateManager.migrateLegacyStates();
-    const existingNames = await this.stateManager.getExistingSystemNames();
-    await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
-    this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
-    await this.poll();
-    const pollSec = (0, import_coerce.coercePollInterval)(config.pollInterval);
-    this.log.debug(`pollInterval: raw=${JSON.stringify(config.pollInterval)} resolved=${pollSec}s`);
-    const intervalMs = pollSec * 1e3;
-    this.pollTimer = this.setInterval(() => {
-      void this.poll();
-    }, intervalMs);
-    this.log.info(`Beszel adapter started \u2014 ${this.lastSystemCount} system(s), polling every ${pollSec}s`);
   }
   onUnload(callback) {
     var _a;
@@ -135,23 +135,27 @@ class BeszelAdapter extends utils.Adapter {
     callback();
   }
   async onMessage(obj) {
-    await (0, import_message_router.dispatchMessage)(obj, {
-      log: {
-        debug: (m) => this.log.debug(m),
-        warn: (m) => this.log.warn(m)
-      },
-      sendTo: this.sendTo.bind(this),
-      createTestClient: (0, import_message_router.makeTestClientFactory)({
-        debug: (m) => this.log.debug(m),
-        warn: (m) => this.log.warn(m)
-      }),
-      onTestClientCreated: (client) => {
-        this.testClients.add(client);
-      },
-      onTestClientDone: (client) => {
-        this.testClients.delete(client);
-      }
-    });
+    try {
+      await (0, import_message_router.dispatchMessage)(obj, {
+        log: {
+          debug: (m) => this.log.debug(m),
+          warn: (m) => this.log.warn(m)
+        },
+        sendTo: this.sendTo.bind(this),
+        createTestClient: (0, import_message_router.makeTestClientFactory)({
+          debug: (m) => this.log.debug(m),
+          warn: (m) => this.log.warn(m)
+        }),
+        onTestClientCreated: (client) => {
+          this.testClients.add(client);
+        },
+        onTestClientDone: (client) => {
+          this.testClients.delete(client);
+        }
+      });
+    } catch (err) {
+      this.log.error(`onMessage failed: ${(0, import_coerce.errText)(err)}`);
+    }
   }
   /**
    * Classify an error for deduplication and log-level decisions.
