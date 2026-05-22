@@ -172,10 +172,10 @@ beszel.0.
 ---
 
 ## Changelog
-<!--
-    Placeholder for the next version (at the beginning of the line):
-    ### **WORK IN PROGRESS**
--->
+### **WORK IN PROGRESS**
+
+- User-modified state names are no longer overwritten on adapter restart
+
 ### 0.5.6 (2026-05-21)
 
 - Use community-standard event handler pattern

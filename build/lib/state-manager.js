@@ -170,16 +170,20 @@ class StateManager {
     }
     const sysId = `systems.${safeName}`;
     this.adapter.log.debug(`updateSystem state-tree: '${system.name}' \u2192 safeName='${safeName}'`);
-    await this.adapter.extendObjectAsync(sysId, {
-      type: "device",
-      common: {
-        name: system.name,
-        statusStates: {
-          onlineId: `${this.adapter.namespace}.${sysId}.info.online`
-        }
+    await this.adapter.extendObjectAsync(
+      sysId,
+      {
+        type: "device",
+        common: {
+          name: system.name,
+          statusStates: {
+            onlineId: `${this.adapter.namespace}.${sysId}.info.online`
+          }
+        },
+        native: { id: system.id, host: system.host }
       },
-      native: { id: system.id, host: system.host }
-    });
+      { preserve: { common: ["name"] } }
+    );
     await this.ensureChannel(`${sysId}.info`, (0, import_i18n_states.tName)("channelInfo"));
     await this.createAndSetState(
       `${sysId}.info.online`,

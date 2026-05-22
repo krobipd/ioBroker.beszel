@@ -1569,4 +1569,24 @@ describe("StateManager", () => {
       expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(80);
     });
   });
+
+  describe("preserve option", () => {
+    it("extendObjectAsync passes preserve option for devices", async () => {
+      const adapter = createMockAdapter();
+      const calls: any[][] = [];
+      const origExtend = adapter.extendObjectAsync;
+      adapter.extendObjectAsync = async (...args: any[]): Promise<void> => {
+        calls.push(args);
+        return origExtend(args[0], args[1]);
+      };
+      const manager = new StateManager(adapter as any);
+      manager.prepareForPoll([testSystem]);
+
+      await manager.updateSystem(testSystem, { cpu: 50 }, [], allMetricsConfig());
+
+      const deviceCall = calls.find(c => c[0] === "systems.my_server");
+      expect(deviceCall).to.not.be.undefined;
+      expect(deviceCall![2]).to.deep.equal({ preserve: { common: ["name"] } });
+    });
+  });
 });

@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.5.6",
     "news": {
+      "NEXT": {
+        "en": "User-modified state names are no longer overwritten on adapter restart",
+        "de": "Vom Benutzer geänderte Datenpunktnamen werden beim Adapter-Neustart nicht mehr überschrieben",
+        "ru": "Пользовательские имена состояний больше не перезаписываются при перезапуске адаптера",
+        "pt": "Nomes de estados modificados pelo utilizador já não são substituídos ao reiniciar o adaptador",
+        "nl": "Door de gebruiker gewijzigde statusnamen worden niet meer overschreven bij het herstarten van de adapter",
+        "fr": "Les noms d'états modifiés par l'utilisateur ne sont plus écrasés lors du redémarrage de l'adaptateur",
+        "it": "I nomi degli stati modificati dall'utente non vengono più sovrascritti al riavvio dell'adattatore",
+        "es": "Los nombres de estados modificados por el usuario ya no se sobrescriben al reiniciar el adaptador",
+        "pl": "Nazwy stanów zmienione przez użytkownika nie są już nadpisywane przy ponownym uruchomieniu adaptera",
+        "uk": "Змінені користувачем назви станів більше не перезаписуються при перезапуску адаптера",
+        "zh-cn": "用户修改的状态名称在适配器重启时不再被覆盖"
+      },
       "0.5.6": {
         "en": "Use community-standard event handler pattern",
         "de": "Community-Standard Event-Handler-Pattern verwenden",
@@ -80,19 +93,6 @@
         "pl": "Przywraca migrację danych logowania, która w 0.5.0 była niepełna — nazwy użytkownika w postaci tekstowej migrują przy następnym uruchomieniu poprawnie.",
         "uk": "Відновлено міграцію облікових даних, яка була неповною у 0.5.0 — відкриті імена користувача коректно мігрують при наступному запуску.",
         "zh-cn": "修复 0.5.0 中不完整的凭据迁移——明文用户名将在下次启动时被正确迁移。"
-      },
-      "0.5.0": {
-        "en": "Hub username is now stored encrypted alongside the password — existing plain-text values are migrated automatically on first start. The Request Timeout option is documented in the README.",
-        "de": "Der Hub-Username wird jetzt verschlüsselt gespeichert (wie das Passwort) — bestehende Klartext-Werte werden beim Start automatisch migriert. Request Timeout ist im README dokumentiert.",
-        "ru": "Имя пользователя Hub теперь хранится в зашифрованном виде, как и пароль — открытые значения мигрируют автоматически при первом запуске. Параметр Request Timeout описан в README.",
-        "pt": "O nome de utilizador do Hub é agora armazenado encriptado, como a palavra-passe — valores em texto simples são migrados automaticamente no primeiro arranque. Request Timeout está no README.",
-        "nl": "Hub-gebruikersnaam wordt nu net als het wachtwoord versleuteld opgeslagen — bestaande plat-tekst waarden worden bij de eerste start automatisch gemigreerd. Request Timeout staat in de README.",
-        "fr": "Le nom d'utilisateur du Hub est désormais stocké chiffré comme le mot de passe — les valeurs en clair sont migrées automatiquement au premier démarrage. Request Timeout est documenté dans le README.",
-        "it": "Il nome utente dell'Hub è ora memorizzato cifrato come la password — i valori in chiaro vengono migrati automaticamente al primo avvio. L'opzione Request Timeout è documentata nel README.",
-        "es": "El nombre de usuario del Hub ahora se almacena cifrado como la contraseña — los valores en texto plano se migran automáticamente al primer arranque. Request Timeout está en el README.",
-        "pl": "Nazwa użytkownika Hub jest teraz przechowywana w postaci zaszyfrowanej, jak hasło — istniejące wartości tekstowe są migrowane automatycznie przy pierwszym starcie. Request Timeout jest w README.",
-        "uk": "Імʼя користувача Hub тепер зберігається у зашифрованому вигляді, як і пароль — відкриті значення мігрують автоматично при першому запуску. Request Timeout описаний у README.",
-        "zh-cn": "Hub 用户名现在与密码一样以加密形式存储——已有的明文值在首次启动时自动迁移。README 中已说明请求超时（Request Timeout）选项。"
       }
     },
     "titleLang": {

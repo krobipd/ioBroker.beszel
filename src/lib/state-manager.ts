@@ -183,16 +183,20 @@ export class StateManager {
     this.adapter.log.debug(`updateSystem state-tree: '${system.name}' → safeName='${safeName}'`);
 
     // Create/update device object with online indicator
-    await this.adapter.extendObjectAsync(sysId, {
-      type: "device",
-      common: {
-        name: system.name,
-        statusStates: {
-          onlineId: `${this.adapter.namespace}.${sysId}.info.online`,
+    await this.adapter.extendObjectAsync(
+      sysId,
+      {
+        type: "device",
+        common: {
+          name: system.name,
+          statusStates: {
+            onlineId: `${this.adapter.namespace}.${sysId}.info.online`,
+          },
         },
+        native: { id: system.id, host: system.host },
       },
-      native: { id: system.id, host: system.host },
-    });
+      { preserve: { common: ["name"] } },
+    );
 
     // Info channel (always created)
     await this.ensureChannel(`${sysId}.info`, tName("channelInfo"));
