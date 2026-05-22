@@ -172,7 +172,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.5.7 (2026-05-22)
 
 - User-modified state names are no longer overwritten on adapter restart
 
@@ -188,9 +188,6 @@ beszel.0.
 
 ### 0.5.3 (2026-05-17)
 - Removes the automatic credential migration. After upgrading from a pre-0.5.0 version, open the Beszel adapter settings once and save — the framework encrypts your credentials cleanly.
-
-### 0.5.2 (2026-05-17)
-- Fixes the migration loop introduced in 0.5.0/0.5.1 — usernames that got re-encrypted multiple times are cleared on update. Please re-enter your Beszel credentials in admin once.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

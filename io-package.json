@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.6",
+    "version": "0.5.7",
     "news": {
-      "NEXT": {
+      "0.5.7": {
         "en": "User-modified state names are no longer overwritten on adapter restart",
         "de": "Vom Benutzer geänderte Datenpunktnamen werden beim Adapter-Neustart nicht mehr überschrieben",
         "ru": "Пользовательские имена состояний больше не перезаписываются при перезапуске адаптера",
