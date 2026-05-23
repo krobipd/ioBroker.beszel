@@ -74,10 +74,17 @@ class BeszelAdapter extends utils.Adapter {
 
       const timeoutMs = coerceTimeoutMs(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
-      this.client = new BeszelClient(config.url, config.username, config.password, timeoutMs, {
-        debug: (m: string) => this.log.debug(m),
-        warn: (m: string) => this.log.warn(m),
-      });
+      this.client = new BeszelClient(
+        config.url,
+        config.username,
+        config.password,
+        timeoutMs,
+        {
+          debug: (m: string) => this.log.debug(m),
+          warn: (m: string) => this.log.warn(m),
+        },
+        this.delay.bind(this),
+      );
       this.stateManager = new StateManager(this);
 
       await this.stateManager.migrateLegacyStates();

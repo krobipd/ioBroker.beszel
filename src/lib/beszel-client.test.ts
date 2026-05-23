@@ -1009,13 +1009,14 @@ describe("BeszelClient", () => {
       // Inject a Retry-After: 1 header in the mock response — the mock
       // helper above doesn't expose headers, so we rely on the default
       // 1-second backoff inside the client.
-      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const instantDelay = () => Promise.resolve();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, instantDelay);
       const systems = await client.getSystems();
       expect(systems).to.have.lengthOf(0);
       // First systems-request was 429 → retry → 200
       const sysCalls = mock.requestLog.filter(r => r.path.includes("/systems/records"));
       expect(sysCalls.length).to.be.greaterThan(1);
-    }, 10000);
+    });
 
     it("surfaces RATE_LIMITED if the retry also gets 429", async () => {
       mock = createMockServer({
@@ -1025,14 +1026,15 @@ describe("BeszelClient", () => {
         }),
       });
       const port = await mock.start();
-      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const instantDelay = () => Promise.resolve();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, instantDelay);
       try {
         await client.getSystems();
         expect.fail("Should have thrown");
       } catch (err) {
         expect((err as NodeJS.ErrnoException).code).to.equal("RATE_LIMITED");
       }
-    }, 10000);
+    });
   });
 
   describe("AbortController cancel (B8 v0.4.3)", () => {

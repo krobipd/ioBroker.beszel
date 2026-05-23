@@ -60,6 +60,8 @@ export class BeszelClient {
   private readonly inflight = new Set<AbortController>();
   /** v0.4.4: optional logger for the HTTP-layer / auth / pagination trace. */
   private readonly log?: BeszelClientLogger;
+  /** Injected delay — adapter passes `this.delay.bind(this)` so it auto-cancels on unload. */
+  private readonly delay: (ms: number) => Promise<void>;
 
   /**
    * @param url Beszel Hub base URL, e.g. http://192.168.1.100:8090
@@ -67,6 +69,7 @@ export class BeszelClient {
    * @param password Login password
    * @param timeoutMs Per-request HTTP timeout in milliseconds (default 15 000)
    * @param log Optional adapter logger for HTTP/auth/pagination trace (v0.4.4)
+   * @param delay Injected delay function — adapter passes `this.delay.bind(this)` (auto-cancels on unload)
    */
   constructor(
     url: string,
@@ -74,6 +77,7 @@ export class BeszelClient {
     password: string,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     log?: BeszelClientLogger,
+    delay?: (ms: number) => Promise<void>,
   ) {
     // Strip trailing slash
     this.baseUrl = url.replace(/\/+$/, "");
@@ -81,6 +85,7 @@ export class BeszelClient {
     this.password = password;
     this.timeoutMs = timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
     this.log = log;
+    this.delay = delay ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
   }
 
   /** Force token re-authentication on the next request */
@@ -275,12 +280,9 @@ export class BeszelClient {
         throw err;
       }
       const retrySec = e.retryAfter ?? 1;
-      const sleep = Math.min(Math.max(1, retrySec), 30) * 1000;
-      // v0.4.4 (D1): trace the 429-retry path so the Hub-rate-limit handling
-      // is visible (without this only the main.ts classifyError-warn fires
-      // when both attempts fail).
-      this.log?.debug(`request: 429 retry for ${path}, sleeping ${sleep}ms`);
-      await new Promise(resolve => setTimeout(resolve, sleep));
+      const retryMs = Math.min(Math.max(1, retrySec), 30) * 1000;
+      this.log?.debug(`request: 429 retry for ${path}, waiting ${retryMs}ms`);
+      await this.delay(retryMs);
       return this.requestOnce<T>(method, path, body, token);
     }
   }
