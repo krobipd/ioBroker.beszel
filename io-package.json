@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.10",
+    "version": "0.5.11",
     "news": {
-      "NEXT": {
+      "0.5.11": {
         "en": "Changelog rewritten in user-centric style across all versions.",
         "de": "Changelog in benutzerzentriertem Stil über alle Versionen umgeschrieben.",
         "ru": "Журнал изменений переписан в стиле, ориентированном на пользователя, для всех версий.",

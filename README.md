@@ -172,7 +172,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.5.11 (2026-05-23)
 
 - Changelog rewritten in user-centric style across all versions.
 
@@ -191,10 +191,6 @@ beszel.0.
 ### 0.5.7 (2026-05-22)
 
 - User-modified state names are no longer overwritten on adapter restart
-
-### 0.5.6 (2026-05-21)
-
-- Improved adapter stability.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

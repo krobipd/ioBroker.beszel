@@ -1,4 +1,8 @@
 # Older Changes
+## 0.5.6 (2026-05-21)
+
+- Improved adapter stability.
+
 ## 0.5.5 (2026-05-19)
 - Internal cleanup. No user-facing changes.
 
