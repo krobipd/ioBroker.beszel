@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.9",
+    "version": "0.5.10",
     "news": {
-      "NEXT": {
+      "0.5.10": {
         "en": "Use adapter-managed delay for HTTP retry, improving shutdown behavior",
         "de": "Adapter-verwaltete Verzögerung für HTTP-Wiederholung, verbessert das Herunterfahren",
         "ru": "Используется управляемая адаптером задержка для повторных HTTP-запросов, улучшено поведение при завершении",

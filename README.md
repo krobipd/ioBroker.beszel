@@ -172,7 +172,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.5.10 (2026-05-23)
 
 - Use adapter-managed delay for HTTP retry, improving shutdown behavior
 
@@ -191,9 +191,6 @@ beszel.0.
 ### 0.5.6 (2026-05-21)
 
 - Use community-standard event handler pattern
-
-### 0.5.5 (2026-05-19)
-- Code quality enforced with standard formatting.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
