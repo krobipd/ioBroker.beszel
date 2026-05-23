@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.7",
+    "version": "0.5.8",
     "news": {
-      "NEXT": {
+      "0.5.8": {
         "en": "State names use the adapter-core I18n framework",
         "de": "Datenpunktnamen nutzen das I18n-Framework von adapter-core",
         "ru": "Имена состояний используют I18n-фреймворк adapter-core",
