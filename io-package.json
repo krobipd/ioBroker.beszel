@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.5.9",
     "news": {
+      "NEXT": {
+        "en": "Use adapter-managed delay for HTTP retry, improving shutdown behavior",
+        "de": "Adapter-verwaltete Verzögerung für HTTP-Wiederholung, verbessert das Herunterfahren",
+        "ru": "Используется управляемая адаптером задержка для повторных HTTP-запросов, улучшено поведение при завершении",
+        "pt": "Usa atraso gerenciado pelo adaptador para repetição HTTP, melhorando o comportamento de desligamento",
+        "nl": "Gebruikt door adapter beheerde vertraging voor HTTP-herhaling, verbetert het afsluitgedrag",
+        "fr": "Utilise un délai géré par l'adaptateur pour les tentatives HTTP, améliore le comportement à l'arrêt",
+        "it": "Usa ritardo gestito dall'adattatore per i tentativi HTTP, migliorando il comportamento allo spegnimento",
+        "es": "Usa retardo gestionado por el adaptador para reintentos HTTP, mejorando el comportamiento de apagado",
+        "pl": "Używa opóźnienia zarządzanego przez adapter do ponawiania HTTP, poprawiając zachowanie przy zamykaniu",
+        "uk": "Використовує керовану адаптером затримку для повторних HTTP-запитів, покращено поведінку при зупинці",
+        "zh-cn": "使用适配器管理的延迟进行HTTP重试，改善关闭行为"
+      },
       "0.5.9": {
         "en": "CI check-and-lint updated to Node.js 24",
         "de": "CI check-and-lint auf Node.js 24 aktualisiert",
@@ -80,19 +93,6 @@
         "pl": "Wewnętrzne porządki. Brak widocznych zmian dla użytkownika.",
         "uk": "Внутрішнє прибирання. Без видимих змін для користувача.",
         "zh-cn": "内部清理。无用户可见的更改。"
-      },
-      "0.5.3": {
-        "en": "Removes the automatic credential migration. After upgrading from a pre-0.5.0 version, open the Beszel adapter settings once and save — the framework encrypts your credentials cleanly.",
-        "de": "Entfernt die automatische Zugangsdaten-Migration. Nach Update von einer Version vor 0.5.0: einmal die Beszel-Einstellungen im Admin öffnen und speichern, dann passt alles.",
-        "ru": "Удалена автоматическая миграция учётных данных. После обновления с версии до 0.5.0 откройте настройки Beszel в админке и сохраните — фреймворк зашифрует данные корректно.",
-        "pt": "Remove a migração automática de credenciais. Após atualização a partir de uma versão anterior à 0.5.0, abra as definições do Beszel no admin e guarde uma vez.",
-        "nl": "Verwijdert de automatische migratie van inloggegevens. Open na een update vanuit een versie vóór 0.5.0 eenmalig de Beszel-instellingen in Admin en sla op.",
-        "fr": "Supprime la migration automatique des identifiants. Après une mise à jour depuis une version antérieure à 0.5.0, ouvre les paramètres Beszel dans l'admin et enregistre une fois.",
-        "it": "Rimuove la migrazione automatica delle credenziali. Dopo l'aggiornamento da una versione precedente a 0.5.0, apri le impostazioni Beszel nell'admin e salva una volta.",
-        "es": "Elimina la migración automática de credenciales. Tras actualizar desde una versión anterior a 0.5.0, abre la configuración de Beszel en admin y guarda una vez.",
-        "pl": "Usuwa automatyczną migrację danych logowania. Po aktualizacji z wersji starszej niż 0.5.0 otwórz ustawienia Beszel w adminie i zapisz raz.",
-        "uk": "Видалено автоматичну міграцію облікових даних. Після оновлення з версії до 0.5.0 відкрийте налаштування Beszel в адмінці та збережіть один раз.",
-        "zh-cn": "移除自动凭据迁移逻辑。从 0.5.0 之前版本升级后，请在管理界面打开 Beszel 适配器设置并保存一次。"
       }
     },
     "titleLang": {

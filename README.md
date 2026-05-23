@@ -172,6 +172,10 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- Use adapter-managed delay for HTTP retry, improving shutdown behavior
+
 ### 0.5.9 (2026-05-23)
 
 - CI check-and-lint updated to Node.js 24
