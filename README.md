@@ -172,17 +172,21 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- Changelog rewritten in user-centric style across all versions.
+
 ### 0.5.10 (2026-05-23)
 
-- Use adapter-managed delay for HTTP retry, improving shutdown behavior
+- Internal cleanup. No user-facing changes.
 
 ### 0.5.9 (2026-05-23)
 
-- CI check-and-lint updated to Node.js 24
+- Internal cleanup. No user-facing changes.
 
 ### 0.5.8 (2026-05-23)
 
-- State names use the adapter-core I18n framework
+- Internal cleanup. No user-facing changes.
 
 ### 0.5.7 (2026-05-22)
 
@@ -190,7 +194,7 @@ beszel.0.
 
 ### 0.5.6 (2026-05-21)
 
-- Use community-standard event handler pattern
+- Improved adapter stability.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

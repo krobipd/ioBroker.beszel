@@ -1,6 +1,6 @@
 # Older Changes
 ## 0.5.5 (2026-05-19)
-- Code quality enforced with standard formatting.
+- Internal cleanup. No user-facing changes.
 
 ## 0.5.4 (2026-05-17)
 * Internal cleanup. No user-facing changes.
@@ -22,7 +22,7 @@
 - Adapter shuts down cleanly even if the "Test Connection" button was still running — the test request is now aborted at unload along with regular polling.
 
 ## 0.4.4 (2026-05-13)
-- Debug log traces previously silent paths: HTTP request lifecycle, token authentication, pagination walks and the 429-retry. Default log unchanged.
+- Verbose debug log now traces the full request flow when enabled. Default log unchanged.
 - Test Connection in admin no longer hangs on an unknown command — it now gets a clear error response instead.
 
 ## 0.4.3 (2026-05-10)
@@ -37,15 +37,15 @@
 - Adapter log messages are now English only, in line with the ioBroker community standard. Localized state names (11 languages) are unchanged.
 
 ## 0.4.1 (2026-05-07)
-- Restored the blank line between the changelog footer and the Support section (release-script swallowed it in v0.4.0).
+- Documentation fix.
 
 ## 0.4.0 (2026-05-07)
 - State names localized in 11 ioBroker languages, following the system setting.
-- Object cache cuts js-controller calls per poll cycle.
+- Faster polling through internal caching.
 - Baseline: Node 22, Admin 7.8.23 (ioBroker May-2026 stable).
 
 ## 0.3.10 (2026-05-01)
-- Documentation: rewrote release notes for v0.3.3–v0.3.9 in user-friendly style across all languages.
+- Documentation cleanup. No code changes.
 
 ## 0.3.9 (2026-05-01)
 - Documentation cleanup. No code changes.
@@ -60,19 +60,19 @@
 - Min `js-controller` restored to `>=6.0.11` (was incorrectly bumped to `>=7.0.23` in 0.3.5).
 
 ## 0.3.5 (2026-04-26)
-- Crash defense: process-level error handlers.
+- Internal cleanup. No user-facing changes.
 
 ## 0.3.4 (2026-04-23)
-- Defense-in-depth: `systems` folder as instance object, `.catch()` wrap on async `onReady`/`onMessage`.
+- Internal cleanup. No user-facing changes.
 
 ## 0.3.3 (2026-04-19)
-- Internal: `common.messagebox=true` (admin-UI button routing).
+- Internal cleanup. No user-facing changes.
 
 ## 0.3.2 (2026-04-18)
-- API-boundary hardening: type coercion for every Beszel Hub field. +105 drift tests.
+- Handles unexpected data from the Beszel Hub gracefully instead of crashing.
 
 ## 0.3.1 (2026-04-12)
-- Fix: response-stream errors handled, per-system poll failures isolated, safer `onMessage`.
+- Connection errors no longer affect other systems; each system polls independently.
 
 ## 0.3.0 (2026-04-12)
 - **Breaking:** state tree reorganized into channels (info, cpu, memory, disk, network, temperature, battery). Auto-migration on first start.
@@ -81,28 +81,28 @@
 - Internal cleanup.
 
 ## 0.2.6 (2026-04-08)
-- Internal: `node:` prefix for built-in modules.
+- Internal cleanup.
 
 ## 0.2.5 (2026-04-08)
-- Internal: standard tests restored.
+- Internal cleanup.
 
 ## 0.2.4 (2026-04-05)
-- Internal: cleaner log messages.
+- Improved log messages.
 
 ## 0.2.3 (2026-04-05)
 - Internal cleanup.
 
 ## 0.2.2 (2026-04-03)
-- Internal dev-tooling modernization.
+- Internal cleanup.
 
 ## 0.2.1 (2026-03-28)
-- Error deduplication, auth-backoff after 3 failures, empty-systems guard.
+- Repeated errors no longer flood the log. Authentication stops retrying after 3 failures.
 
 ## 0.2.0 (2026-03-28)
-- Adapter timers; sync `onUnload`; admin UI compacted.
+- Admin settings layout improved.
 
 ## 0.1.9 (2026-03-19)
-- Internal: stale-system removal moved to debug level.
+- Internal cleanup.
 
 ## 0.1.8 (2026-03-19)
 - Online/offline indicator on system device folders.
@@ -111,16 +111,16 @@
 - System count added to startup log.
 
 ## 0.1.6 (2026-03-18)
-- Internal: code cleanup, duplicate container filter fixed.
+- Fixed duplicate containers appearing in the state tree.
 
 ## 0.1.5 (2026-03-17)
-- Migrated to `@alcalzone/release-script`. npm Trusted Publishing enabled.
+- Internal cleanup.
 
 ## 0.1.4 (2026-03-17)
-- Repochecker issues fixed; jsonConfig responsive sizing.
+- Config dialog now works on small screens.
 
 ## 0.1.3 (2026-03-17)
-- Internal: JSDoc warnings cleared (58 → 0).
+- Internal cleanup.
 
 ## 0.1.2 (2026-03-17)
 - Fix: `cpu_steal` state added to CPU breakdown metric.
