@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.5.7",
     "news": {
+      "NEXT": {
+        "en": "State names use the adapter-core I18n framework",
+        "de": "Datenpunktnamen nutzen das I18n-Framework von adapter-core",
+        "ru": "Имена состояний используют I18n-фреймворк adapter-core",
+        "pt": "Os nomes dos estados utilizam o framework I18n do adapter-core",
+        "nl": "Statusnamen gebruiken het I18n-framework van adapter-core",
+        "fr": "Les noms d'états utilisent le framework I18n d'adapter-core",
+        "it": "I nomi degli stati utilizzano il framework I18n di adapter-core",
+        "es": "Los nombres de estados utilizan el framework I18n de adapter-core",
+        "pl": "Nazwy stanów korzystają z frameworka I18n adapter-core",
+        "uk": "Назви станів використовують I18n-фреймворк adapter-core",
+        "zh-cn": "状态名称使用 adapter-core 的 I18n 框架"
+      },
       "0.5.7": {
         "en": "User-modified state names are no longer overwritten on adapter restart",
         "de": "Vom Benutzer geänderte Datenpunktnamen werden beim Adapter-Neustart nicht mehr überschrieben",
@@ -80,19 +93,6 @@
         "pl": "Naprawia pętlę migracji z 0.5.0/0.5.1 — wielokrotnie zaszyfrowane nazwy użytkownika są kasowane przy aktualizacji. Wprowadź dane logowania Beszel w adminie jeszcze raz.",
         "uk": "Виправляє цикл міграції з 0.5.0/0.5.1 — багаторазово зашифровані імена користувача очищаються при оновленні. Введіть облікові дані Beszel в адмінці ще раз.",
         "zh-cn": "修复 0.5.0/0.5.1 中的迁移循环 — 被多次加密的用户名在更新时会被清空，请在管理界面重新填写一次 Beszel 凭据。"
-      },
-      "0.5.1": {
-        "en": "Restores the encrypted-credentials migration that was incomplete in 0.5.0 — usernames stored as plain text now migrate cleanly on the next start.",
-        "de": "Stellt die in 0.5.0 unvollständige Credentials-Migration wieder her — Klartext-Usernames migrieren beim nächsten Start jetzt sauber.",
-        "ru": "Восстановлено шифрование имени пользователя, неполное в 0.5.0 — открытые имена при следующем запуске мигрируют корректно.",
-        "pt": "Restaura a migração de credenciais que ficou incompleta em 0.5.0 — nomes de utilizador em texto simples migram corretamente no próximo arranque.",
-        "nl": "Herstelt de in 0.5.0 onvolledige migratie van inloggegevens — platte-tekst gebruikersnamen migreren bij de volgende start netjes.",
-        "fr": "Rétablit la migration des identifiants incomplète en 0.5.0 — les noms d'utilisateur en clair migrent proprement au prochain démarrage.",
-        "it": "Ripristina la migrazione delle credenziali incompleta in 0.5.0 — i nomi utente in chiaro migrano correttamente al prossimo avvio.",
-        "es": "Restaura la migración de credenciales que en 0.5.0 quedó incompleta — los nombres de usuario en texto plano migran correctamente al próximo arranque.",
-        "pl": "Przywraca migrację danych logowania, która w 0.5.0 była niepełna — nazwy użytkownika w postaci tekstowej migrują przy następnym uruchomieniu poprawnie.",
-        "uk": "Відновлено міграцію облікових даних, яка була неповною у 0.5.0 — відкриті імена користувача коректно мігрують при наступному запуску.",
-        "zh-cn": "修复 0.5.0 中不完整的凭据迁移——明文用户名将在下次启动时被正确迁移。"
       }
     },
     "titleLang": {

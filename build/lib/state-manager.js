@@ -22,7 +22,7 @@ __export(state_manager_exports, {
 });
 module.exports = __toCommonJS(state_manager_exports);
 var import_coerce = require("./coerce");
-var import_i18n_states = require("./i18n-states");
+var import_i18n = require("./i18n");
 class StateManager {
   adapter;
   /**
@@ -184,26 +184,26 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    await this.ensureChannel(`${sysId}.info`, (0, import_i18n_states.tName)("channelInfo"));
+    await this.ensureChannel(`${sysId}.info`, (0, import_i18n.tName)("channelInfo"));
     await this.createAndSetState(
       `${sysId}.info.online`,
-      this.boolCommon((0, import_i18n_states.tName)("online"), "indicator.reachable"),
+      this.boolCommon((0, import_i18n.tName)("online"), "indicator.reachable"),
       system.status === "up"
     );
-    await this.createAndSetState(`${sysId}.info.status`, this.textCommon((0, import_i18n_states.tName)("status")), system.status);
+    await this.createAndSetState(`${sysId}.info.status`, this.textCommon((0, import_i18n.tName)("status")), system.status);
     if (config.metrics_uptime) {
       const uptime = (_a = system.info.u) != null ? _a : null;
-      await this.createAndSetState(`${sysId}.info.uptime`, this.numCommon((0, import_i18n_states.tName)("uptime"), "s"), uptime);
+      await this.createAndSetState(`${sysId}.info.uptime`, this.numCommon((0, import_i18n.tName)("uptime"), "s"), uptime);
       await this.createAndSetState(
         `${sysId}.info.uptime_text`,
-        this.textCommon((0, import_i18n_states.tName)("uptimeFormatted")),
+        this.textCommon((0, import_i18n.tName)("uptimeFormatted")),
         uptime !== null ? this.formatUptime(uptime) : null
       );
     }
     if (config.metrics_agentVersion) {
       await this.createAndSetState(
         `${sysId}.info.agent_version`,
-        this.textCommon((0, import_i18n_states.tName)("agentVersion")),
+        this.textCommon((0, import_i18n.tName)("agentVersion")),
         (_b = system.info.v) != null ? _b : null
       );
     }
@@ -211,12 +211,12 @@ class StateManager {
       const sv = system.info.sv;
       await this.createAndSetState(
         `${sysId}.info.services_total`,
-        this.numCommon((0, import_i18n_states.tName)("servicesTotal")),
+        this.numCommon((0, import_i18n.tName)("servicesTotal")),
         (_c = sv == null ? void 0 : sv[0]) != null ? _c : null
       );
       await this.createAndSetState(
         `${sysId}.info.services_failed`,
-        this.numCommon((0, import_i18n_states.tName)("servicesFailed")),
+        this.numCommon((0, import_i18n.tName)("servicesFailed")),
         (_d = sv == null ? void 0 : sv[1]) != null ? _d : null
       );
     }
@@ -224,7 +224,7 @@ class StateManager {
       await this.updateStatsStates(sysId, system, stats, config);
     }
     if (config.metrics_loadAvg && !stats) {
-      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n_states.tName)("channelCpu"));
+      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n.tName)("channelCpu"));
       await this.createLoadAvgStates(sysId, system.info.la);
     }
     if (config.metrics_containers) {
@@ -445,104 +445,104 @@ class StateManager {
   async updateStatsStates(sysId, system, stats, config) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     if (config.metrics_cpu || config.metrics_loadAvg || config.metrics_cpuBreakdown) {
-      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n_states.tName)("channelCpu"));
+      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n.tName)("channelCpu"));
     }
     if (config.metrics_memory || config.metrics_memoryDetails || config.metrics_swap) {
-      await this.ensureChannel(`${sysId}.memory`, (0, import_i18n_states.tName)("channelMemory"));
+      await this.ensureChannel(`${sysId}.memory`, (0, import_i18n.tName)("channelMemory"));
     }
     if (config.metrics_disk || config.metrics_diskSpeed) {
-      await this.ensureChannel(`${sysId}.disk`, (0, import_i18n_states.tName)("channelDisk"));
+      await this.ensureChannel(`${sysId}.disk`, (0, import_i18n.tName)("channelDisk"));
     }
     if (config.metrics_network) {
-      await this.ensureChannel(`${sysId}.network`, (0, import_i18n_states.tName)("channelNetwork"));
+      await this.ensureChannel(`${sysId}.network`, (0, import_i18n.tName)("channelNetwork"));
     }
     if (config.metrics_temperature || config.metrics_temperatureDetails) {
-      await this.ensureChannel(`${sysId}.temperature`, (0, import_i18n_states.tName)("channelTemperature"));
+      await this.ensureChannel(`${sysId}.temperature`, (0, import_i18n.tName)("channelTemperature"));
     }
     if (config.metrics_battery) {
-      await this.ensureChannel(`${sysId}.battery`, (0, import_i18n_states.tName)("channelBattery"));
+      await this.ensureChannel(`${sysId}.battery`, (0, import_i18n.tName)("channelBattery"));
     }
     if (config.metrics_cpu) {
-      await this.createAndSetState(`${sysId}.cpu.usage`, this.percentCommon((0, import_i18n_states.tName)("cpuUsage")), (_a = stats.cpu) != null ? _a : null);
+      await this.createAndSetState(`${sysId}.cpu.usage`, this.percentCommon((0, import_i18n.tName)("cpuUsage")), (_a = stats.cpu) != null ? _a : null);
     }
     if (config.metrics_loadAvg) {
       await this.createLoadAvgStates(sysId, (_b = stats.la) != null ? _b : system.info.la);
     }
     if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
       const [user, sys, iowait, steal, idle] = stats.cpub;
-      await this.createAndSetState(`${sysId}.cpu.user`, this.percentCommon((0, import_i18n_states.tName)("cpuUser")), user);
-      await this.createAndSetState(`${sysId}.cpu.system`, this.percentCommon((0, import_i18n_states.tName)("cpuSystem")), sys);
-      await this.createAndSetState(`${sysId}.cpu.iowait`, this.percentCommon((0, import_i18n_states.tName)("cpuIowait")), iowait);
-      await this.createAndSetState(`${sysId}.cpu.steal`, this.percentCommon((0, import_i18n_states.tName)("cpuSteal")), steal);
-      await this.createAndSetState(`${sysId}.cpu.idle`, this.percentCommon((0, import_i18n_states.tName)("cpuIdle")), idle);
+      await this.createAndSetState(`${sysId}.cpu.user`, this.percentCommon((0, import_i18n.tName)("cpuUser")), user);
+      await this.createAndSetState(`${sysId}.cpu.system`, this.percentCommon((0, import_i18n.tName)("cpuSystem")), sys);
+      await this.createAndSetState(`${sysId}.cpu.iowait`, this.percentCommon((0, import_i18n.tName)("cpuIowait")), iowait);
+      await this.createAndSetState(`${sysId}.cpu.steal`, this.percentCommon((0, import_i18n.tName)("cpuSteal")), steal);
+      await this.createAndSetState(`${sysId}.cpu.idle`, this.percentCommon((0, import_i18n.tName)("cpuIdle")), idle);
     }
     if (config.metrics_memory) {
       await this.createAndSetState(
         `${sysId}.memory.percent`,
-        this.percentCommon((0, import_i18n_states.tName)("memoryPercent")),
+        this.percentCommon((0, import_i18n.tName)("memoryPercent")),
         (_c = stats.mp) != null ? _c : null
       );
-      await this.createAndSetState(`${sysId}.memory.used`, this.numCommon((0, import_i18n_states.tName)("memoryUsed"), "GB"), (_d = stats.mu) != null ? _d : null);
+      await this.createAndSetState(`${sysId}.memory.used`, this.numCommon((0, import_i18n.tName)("memoryUsed"), "GB"), (_d = stats.mu) != null ? _d : null);
       await this.createAndSetState(
         `${sysId}.memory.total`,
-        this.numCommon((0, import_i18n_states.tName)("memoryTotal"), "GB"),
+        this.numCommon((0, import_i18n.tName)("memoryTotal"), "GB"),
         (_e = stats.m) != null ? _e : null
       );
     }
     if (config.metrics_memoryDetails) {
       await this.createAndSetState(
         `${sysId}.memory.buffers`,
-        this.numCommon((0, import_i18n_states.tName)("memoryBuffers"), "GB"),
+        this.numCommon((0, import_i18n.tName)("memoryBuffers"), "GB"),
         (_f = stats.mb) != null ? _f : null
       );
       await this.createAndSetState(
         `${sysId}.memory.zfs_arc`,
-        this.numCommon((0, import_i18n_states.tName)("memoryZfsArc"), "GB"),
+        this.numCommon((0, import_i18n.tName)("memoryZfsArc"), "GB"),
         (_g = stats.mz) != null ? _g : null
       );
     }
     if (config.metrics_swap) {
       await this.createAndSetState(
         `${sysId}.memory.swap_used`,
-        this.numCommon((0, import_i18n_states.tName)("swapUsed"), "GB"),
+        this.numCommon((0, import_i18n.tName)("swapUsed"), "GB"),
         (_h = stats.su) != null ? _h : null
       );
       await this.createAndSetState(
         `${sysId}.memory.swap_total`,
-        this.numCommon((0, import_i18n_states.tName)("swapTotal"), "GB"),
+        this.numCommon((0, import_i18n.tName)("swapTotal"), "GB"),
         (_i = stats.s) != null ? _i : null
       );
     }
     if (config.metrics_disk) {
-      await this.createAndSetState(`${sysId}.disk.percent`, this.percentCommon((0, import_i18n_states.tName)("diskPercent")), (_j = stats.dp) != null ? _j : null);
-      await this.createAndSetState(`${sysId}.disk.used`, this.numCommon((0, import_i18n_states.tName)("diskUsed"), "GB"), (_k = stats.du) != null ? _k : null);
-      await this.createAndSetState(`${sysId}.disk.total`, this.numCommon((0, import_i18n_states.tName)("diskTotal"), "GB"), (_l = stats.d) != null ? _l : null);
+      await this.createAndSetState(`${sysId}.disk.percent`, this.percentCommon((0, import_i18n.tName)("diskPercent")), (_j = stats.dp) != null ? _j : null);
+      await this.createAndSetState(`${sysId}.disk.used`, this.numCommon((0, import_i18n.tName)("diskUsed"), "GB"), (_k = stats.du) != null ? _k : null);
+      await this.createAndSetState(`${sysId}.disk.total`, this.numCommon((0, import_i18n.tName)("diskTotal"), "GB"), (_l = stats.d) != null ? _l : null);
     }
     if (config.metrics_diskSpeed) {
-      await this.createAndSetState(`${sysId}.disk.read`, this.numCommon((0, import_i18n_states.tName)("diskRead"), "MB/s"), (_m = stats.dr) != null ? _m : null);
-      await this.createAndSetState(`${sysId}.disk.write`, this.numCommon((0, import_i18n_states.tName)("diskWrite"), "MB/s"), (_n = stats.dw) != null ? _n : null);
+      await this.createAndSetState(`${sysId}.disk.read`, this.numCommon((0, import_i18n.tName)("diskRead"), "MB/s"), (_m = stats.dr) != null ? _m : null);
+      await this.createAndSetState(`${sysId}.disk.write`, this.numCommon((0, import_i18n.tName)("diskWrite"), "MB/s"), (_n = stats.dw) != null ? _n : null);
     }
     if (config.metrics_network) {
       await this.createAndSetState(
         `${sysId}.network.sent`,
-        this.numCommon((0, import_i18n_states.tName)("networkSent"), "MB/s"),
+        this.numCommon((0, import_i18n.tName)("networkSent"), "MB/s"),
         (_o = stats.ns) != null ? _o : null
       );
       await this.createAndSetState(
         `${sysId}.network.recv`,
-        this.numCommon((0, import_i18n_states.tName)("networkReceived"), "MB/s"),
+        this.numCommon((0, import_i18n.tName)("networkReceived"), "MB/s"),
         (_p = stats.nr) != null ? _p : null
       );
     }
     if (config.metrics_temperature) {
       await this.createAndSetState(
         `${sysId}.temperature.average`,
-        this.numCommon((0, import_i18n_states.tName)("temperatureAvg"), "\xB0C", "value.temperature"),
+        this.numCommon((0, import_i18n.tName)("temperatureAvg"), "\xB0C", "value.temperature"),
         this.computeTopAvgTemp(stats.t)
       );
     }
     if (config.metrics_temperatureDetails && stats.t) {
-      await this.ensureChannel(`${sysId}.temperature.sensors`, (0, import_i18n_states.tName)("channelSensors"));
+      await this.ensureChannel(`${sysId}.temperature.sensors`, (0, import_i18n.tName)("channelSensors"));
       for (const [sensor, temp] of Object.entries(stats.t)) {
         await this.createAndSetState(
           `${sysId}.temperature.sensors.${this.sanitize(sensor)}`,
@@ -555,44 +555,44 @@ class StateManager {
       const bat = (_q = stats.bat) != null ? _q : system.info.bat;
       await this.createAndSetState(
         `${sysId}.battery.percent`,
-        this.percentCommon((0, import_i18n_states.tName)("batteryPercent")),
+        this.percentCommon((0, import_i18n.tName)("batteryPercent")),
         (_r = bat == null ? void 0 : bat[0]) != null ? _r : null
       );
       await this.createAndSetState(
         `${sysId}.battery.charging`,
-        this.boolCommon((0, import_i18n_states.tName)("batteryCharging")),
+        this.boolCommon((0, import_i18n.tName)("batteryCharging")),
         bat ? bat[1] > 0 : null
       );
     }
     if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
-      await this.ensureChannel(`${sysId}.gpu`, (0, import_i18n_states.tName)("channelGpu"));
+      await this.ensureChannel(`${sysId}.gpu`, (0, import_i18n.tName)("channelGpu"));
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
         const safeId = this.sanitize(gpuId);
         await this.ensureChannel(`${sysId}.gpu.${safeId}`, (_s = gpuData.n) != null ? _s : gpuId);
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
-          this.percentCommon((0, import_i18n_states.tName)("gpuUsage")),
+          this.percentCommon((0, import_i18n.tName)("gpuUsage")),
           (_t = gpuData.u) != null ? _t : null
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_used`,
-          this.numCommon((0, import_i18n_states.tName)("gpuMemoryUsed"), "GB"),
+          this.numCommon((0, import_i18n.tName)("gpuMemoryUsed"), "GB"),
           (_u = gpuData.mu) != null ? _u : null
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_total`,
-          this.numCommon((0, import_i18n_states.tName)("gpuMemoryTotal"), "GB"),
+          this.numCommon((0, import_i18n.tName)("gpuMemoryTotal"), "GB"),
           (_v = gpuData.mt) != null ? _v : null
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.power`,
-          this.numCommon((0, import_i18n_states.tName)("gpuPower"), "W"),
+          this.numCommon((0, import_i18n.tName)("gpuPower"), "W"),
           (_w = gpuData.p) != null ? _w : null
         );
       }
     }
     if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
-      await this.ensureChannel(`${sysId}.filesystems`, (0, import_i18n_states.tName)("channelFilesystems"));
+      await this.ensureChannel(`${sysId}.filesystems`, (0, import_i18n.tName)("channelFilesystems"));
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
         const safeId = this.sanitize(fsName);
         await this.ensureChannel(`${sysId}.filesystems.${safeId}`, fsName);
@@ -601,27 +601,27 @@ class StateManager {
         const percent = total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_percent`,
-          this.percentCommon((0, import_i18n_states.tName)("diskPercent")),
+          this.percentCommon((0, import_i18n.tName)("diskPercent")),
           percent
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_used`,
-          this.numCommon((0, import_i18n_states.tName)("diskUsed"), "GB"),
+          this.numCommon((0, import_i18n.tName)("diskUsed"), "GB"),
           used
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_total`,
-          this.numCommon((0, import_i18n_states.tName)("diskTotal"), "GB"),
+          this.numCommon((0, import_i18n.tName)("diskTotal"), "GB"),
           total
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.read_speed`,
-          this.numCommon((0, import_i18n_states.tName)("readSpeed"), "MB/s"),
+          this.numCommon((0, import_i18n.tName)("readSpeed"), "MB/s"),
           (_z = fsData.r) != null ? _z : null
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.write_speed`,
-          this.numCommon((0, import_i18n_states.tName)("writeSpeed"), "MB/s"),
+          this.numCommon((0, import_i18n.tName)("writeSpeed"), "MB/s"),
           (_A = fsData.w) != null ? _A : null
         );
       }
@@ -633,7 +633,7 @@ class StateManager {
     if (sysContainers.length === 0) {
       return;
     }
-    await this.ensureChannel(`${sysId}.containers`, (0, import_i18n_states.tName)("channelContainers"));
+    await this.ensureChannel(`${sysId}.containers`, (0, import_i18n.tName)("channelContainers"));
     const healthLabels = ["none", "starting", "healthy", "unhealthy"];
     for (const container of sysContainers) {
       const cId = this.sanitize(container.name);
@@ -643,28 +643,28 @@ class StateManager {
       await this.ensureChannel(`${sysId}.containers.${cId}`, container.name);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.status`,
-        this.textCommon((0, import_i18n_states.tName)("status")),
+        this.textCommon((0, import_i18n.tName)("status")),
         container.status
       );
       const healthIdx = Math.floor(container.health);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
-        this.textCommon((0, import_i18n_states.tName)("containerHealth")),
+        this.textCommon((0, import_i18n.tName)("containerHealth")),
         (_a = healthLabels[healthIdx]) != null ? _a : "unknown"
       );
       await this.createAndSetState(
         `${sysId}.containers.${cId}.cpu`,
-        this.percentCommon((0, import_i18n_states.tName)("cpuUsage")),
+        this.percentCommon((0, import_i18n.tName)("cpuUsage")),
         container.cpu
       );
       await this.createAndSetState(
         `${sysId}.containers.${cId}.memory`,
-        this.numCommon((0, import_i18n_states.tName)("containerMemory"), "MB"),
+        this.numCommon((0, import_i18n.tName)("containerMemory"), "MB"),
         container.memory
       );
       await this.createAndSetState(
         `${sysId}.containers.${cId}.image`,
-        this.textCommon((0, import_i18n_states.tName)("containerImage")),
+        this.textCommon((0, import_i18n.tName)("containerImage")),
         container.image
       );
     }
@@ -699,9 +699,9 @@ class StateManager {
    */
   async createLoadAvgStates(sysId, la) {
     var _a, _b, _c;
-    await this.createAndSetState(`${sysId}.cpu.load_1m`, this.numCommon((0, import_i18n_states.tName)("load1m")), (_a = la == null ? void 0 : la[0]) != null ? _a : null);
-    await this.createAndSetState(`${sysId}.cpu.load_5m`, this.numCommon((0, import_i18n_states.tName)("load5m")), (_b = la == null ? void 0 : la[1]) != null ? _b : null);
-    await this.createAndSetState(`${sysId}.cpu.load_15m`, this.numCommon((0, import_i18n_states.tName)("load15m")), (_c = la == null ? void 0 : la[2]) != null ? _c : null);
+    await this.createAndSetState(`${sysId}.cpu.load_1m`, this.numCommon((0, import_i18n.tName)("load1m")), (_a = la == null ? void 0 : la[0]) != null ? _a : null);
+    await this.createAndSetState(`${sysId}.cpu.load_5m`, this.numCommon((0, import_i18n.tName)("load5m")), (_b = la == null ? void 0 : la[1]) != null ? _b : null);
+    await this.createAndSetState(`${sysId}.cpu.load_15m`, this.numCommon((0, import_i18n.tName)("load15m")), (_c = la == null ? void 0 : la[2]) != null ? _c : null);
   }
   async createAndSetState(id, common, value) {
     if (!this.createdIds.has(id)) {

@@ -22,6 +22,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 var utils = __toESM(require("@iobroker/adapter-core"));
+var import_adapter_core = require("@iobroker/adapter-core");
+var import_node_path = require("node:path");
 var import_beszel_client = require("./lib/beszel-client");
 var import_coerce = require("./lib/coerce");
 var import_message_router = require("./lib/message-router");
@@ -68,6 +70,7 @@ class BeszelAdapter extends utils.Adapter {
   }
   async onReady() {
     try {
+      await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
       const config = this.config;
       this.log.debug(
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`

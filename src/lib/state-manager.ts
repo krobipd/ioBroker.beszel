@@ -1,6 +1,6 @@
 import type * as utils from "@iobroker/adapter-core";
 import { errText } from "./coerce";
-import { tName } from "./i18n-states";
+import { tName } from "./i18n";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
 /**

@@ -172,6 +172,10 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- State names use the adapter-core I18n framework
+
 ### 0.5.7 (2026-05-22)
 
 - User-modified state names are no longer overwritten on adapter restart

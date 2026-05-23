@@ -1,4 +1,11 @@
 import { expect } from "chai";
+
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: {
+    getTranslatedObject: vi.fn((key: string) => ({ en: key, de: `${key}_de` })),
+  },
+}));
+
 import { StateManager } from "./state-manager";
 import type { AdapterConfig, BeszelSystem, BeszelContainer, SystemStats } from "./types";
 
@@ -1451,44 +1458,40 @@ describe("StateManager", () => {
   // -----------------------------------------------------------------------
 
   describe("translation objects (Multi-Language)", () => {
-    it("info channel common.name is a translation object", async () => {
+    it("info channel common.name is a translation object from I18n", async () => {
       await manager.updateSystem(testSystem, undefined, [], allMetricsConfig());
       const obj = adapter.objects.get("systems.my_server.info");
       const name = obj?.common.name as Record<string, string>;
       expect(name).to.be.an("object");
-      expect(name.en).to.equal("Info");
-      expect(name.de).to.equal("Info");
-      expect(name.ru).to.equal("Информация");
+      expect(name.en).to.equal("channelInfo");
+      expect(name.de).to.equal("channelInfo_de");
     });
 
-    it("online state common.name is a translation object", async () => {
+    it("online state common.name is a translation object from I18n", async () => {
       await manager.updateSystem(testSystem, undefined, [], allMetricsConfig());
       const obj = adapter.objects.get("systems.my_server.info.online");
       const name = obj?.common.name as Record<string, string>;
       expect(name).to.be.an("object");
-      expect(name.en).to.equal("Online");
-      expect(name["zh-cn"]).to.equal("在线");
+      expect(name.en).to.equal("online");
     });
 
-    it("CPU channel + usage state common.name are translation objects", async () => {
+    it("CPU channel + usage state common.name are translation objects from I18n", async () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       const ch = adapter.objects.get("systems.my_server.cpu");
       const st = adapter.objects.get("systems.my_server.cpu.usage");
       const chName = ch?.common.name as Record<string, string>;
       const stName = st?.common.name as Record<string, string>;
-      expect(chName.en).to.equal("CPU");
-      expect(chName.de).to.equal("CPU");
-      expect(stName.en).to.equal("CPU Usage");
-      expect(stName.de).to.equal("CPU-Auslastung");
+      expect(chName.en).to.equal("channelCpu");
+      expect(stName.en).to.equal("cpuUsage");
     });
 
-    it("memory state common.name covers all 11 languages", async () => {
+    it("state common.name has en and de keys from I18n mock", async () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       const obj = adapter.objects.get("systems.my_server.memory.percent");
       const name = obj?.common.name as Record<string, string>;
-      for (const lang of ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"]) {
-        expect(name[lang], `missing ${lang}`).to.be.a("string").and.not.empty;
-      }
+      expect(name).to.have.property("en");
+      expect(name).to.have.property("de");
+      expect(name.en).to.be.a("string").and.not.empty;
     });
 
     it("device common.name keeps the raw system name from the API", async () => {

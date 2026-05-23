@@ -1,4 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
+import { I18n } from "@iobroker/adapter-core";
+import { join } from "node:path";
 import { BeszelClient } from "./lib/beszel-client";
 import { coercePollInterval, coerceTimeoutMs, errText, validateHubUrl } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
@@ -48,6 +50,7 @@ class BeszelAdapter extends utils.Adapter {
 
   private async onReady(): Promise<void> {
     try {
+      await I18n.init(join(this.adapterDir, "admin"), this);
       const config = this.config as unknown as AdapterConfig;
 
       this.log.debug(
