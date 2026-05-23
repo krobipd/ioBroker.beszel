@@ -175,7 +175,7 @@ beszel.0.
 ### 0.5.12 (2026-05-23)
 
 - Reduced unnecessary state-change events by skipping writes when the value has not changed.
-- Fixed potential process-handler stacking in ioBroker compact mode.
+- Fixed duplicate error messages that could appear when running in compact mode.
 
 ### 0.5.11 (2026-05-23)
 

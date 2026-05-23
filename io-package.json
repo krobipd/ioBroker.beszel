@@ -4,17 +4,17 @@
     "version": "0.5.12",
     "news": {
       "0.5.12": {
-        "en": "Reduced unnecessary state-change events. Fixed potential process-handler stacking in compact mode.",
-        "de": "Unnötige State-Change-Events reduziert. Mögliches Stapeln von Prozess-Handlern im Compact-Modus behoben.",
-        "ru": "Сокращены ненужные события изменения состояний. Исправлено возможное накопление обработчиков процесса в компактном режиме.",
-        "pt": "Eventos de mudança de estado desnecessários reduzidos. Corrigido possível empilhamento de handlers de processo no modo compacto.",
-        "nl": "Onnodige state-change-events verminderd. Mogelijke stapeling van process-handlers in compacte modus verholpen.",
-        "fr": "Réduction des événements de changement d'état inutiles. Correction d'un empilement potentiel des gestionnaires de processus en mode compact.",
-        "it": "Ridotti gli eventi di cambio stato non necessari. Corretto il possibile accumulo di gestori di processo in modalità compatta.",
-        "es": "Reducidos los eventos de cambio de estado innecesarios. Corregido el posible apilamiento de manejadores de proceso en modo compacto.",
-        "pl": "Zmniejszono niepotrzebne zdarzenia zmiany stanu. Naprawiono możliwe nakładanie się obsługi procesów w trybie kompaktowym.",
-        "uk": "Зменшено непотрібні події зміни стану. Виправлено можливе накопичення обробників процесів у компактному режимі.",
-        "zh-cn": "减少了不必要的状态变更事件。修复了紧凑模式下进程处理程序可能堆叠的问题。"
+        "en": "Reduced unnecessary state-change events. Fixed duplicate error messages in compact mode.",
+        "de": "Unnötige State-Change-Events reduziert. Doppelte Fehlermeldungen im Compact-Modus behoben.",
+        "ru": "Сокращены ненужные события изменения состояний. Исправлены дублирующиеся сообщения об ошибках в компактном режиме.",
+        "pt": "Eventos de mudança de estado desnecessários reduzidos. Corrigidas mensagens de erro duplicadas no modo compacto.",
+        "nl": "Onnodige state-change-events verminderd. Dubbele foutmeldingen in compacte modus verholpen.",
+        "fr": "Réduction des événements de changement d'état inutiles. Correction des messages d'erreur en double en mode compact.",
+        "it": "Ridotti gli eventi di cambio stato non necessari. Corretti i messaggi di errore duplicati in modalità compatta.",
+        "es": "Reducidos los eventos de cambio de estado innecesarios. Corregidos los mensajes de error duplicados en modo compacto.",
+        "pl": "Zmniejszono niepotrzebne zdarzenia zmiany stanu. Naprawiono zduplikowane komunikaty o błędach w trybie kompaktowym.",
+        "uk": "Зменшено непотрібні події зміни стану. Виправлено дублювання повідомлень про помилки у компактному режимі.",
+        "zh-cn": "减少了不必要的状态变更事件。修复了紧凑模式下重复的错误消息。"
       },
       "0.5.11": {
         "en": "Changelog rewritten in user-centric style across all versions.",
