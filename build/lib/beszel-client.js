@@ -59,19 +59,23 @@ class BeszelClient {
   inflight = /* @__PURE__ */ new Set();
   /** v0.4.4: optional logger for the HTTP-layer / auth / pagination trace. */
   log;
+  /** Injected delay — adapter passes `this.delay.bind(this)` so it auto-cancels on unload. */
+  delay;
   /**
    * @param url Beszel Hub base URL, e.g. http://192.168.1.100:8090
    * @param username Login username
    * @param password Login password
    * @param timeoutMs Per-request HTTP timeout in milliseconds (default 15 000)
    * @param log Optional adapter logger for HTTP/auth/pagination trace (v0.4.4)
+   * @param delay Injected delay function — adapter passes `this.delay.bind(this)` (auto-cancels on unload)
    */
-  constructor(url, username, password, timeoutMs = DEFAULT_TIMEOUT_MS, log) {
+  constructor(url, username, password, timeoutMs = DEFAULT_TIMEOUT_MS, log, delay) {
     this.baseUrl = url.replace(/\/+$/, "");
     this.username = username;
     this.password = password;
     this.timeoutMs = timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
     this.log = log;
+    this.delay = delay != null ? delay : ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
   /** Force token re-authentication on the next request */
   invalidateToken() {
@@ -232,9 +236,9 @@ class BeszelClient {
         throw err;
       }
       const retrySec = (_a = e.retryAfter) != null ? _a : 1;
-      const sleep = Math.min(Math.max(1, retrySec), 30) * 1e3;
-      (_b = this.log) == null ? void 0 : _b.debug(`request: 429 retry for ${path}, sleeping ${sleep}ms`);
-      await new Promise((resolve) => setTimeout(resolve, sleep));
+      const retryMs = Math.min(Math.max(1, retrySec), 30) * 1e3;
+      (_b = this.log) == null ? void 0 : _b.debug(`request: 429 retry for ${path}, waiting ${retryMs}ms`);
+      await this.delay(retryMs);
       return this.requestOnce(method, path, body, token);
     }
   }
