@@ -172,7 +172,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.5.9 (2026-05-23)
 
 - CI check-and-lint updated to Node.js 24
 
@@ -190,9 +190,6 @@ beszel.0.
 
 ### 0.5.5 (2026-05-19)
 - Code quality enforced with standard formatting.
-
-### 0.5.4 (2026-05-17)
-* Internal cleanup. No user-facing changes.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
