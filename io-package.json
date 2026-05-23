@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.11",
+    "version": "0.5.12",
     "news": {
+      "0.5.12": {
+        "en": "Reduced unnecessary state-change events. Fixed potential process-handler stacking in compact mode.",
+        "de": "Unnötige State-Change-Events reduziert. Mögliches Stapeln von Prozess-Handlern im Compact-Modus behoben.",
+        "ru": "Сокращены ненужные события изменения состояний. Исправлено возможное накопление обработчиков процесса в компактном режиме.",
+        "pt": "Eventos de mudança de estado desnecessários reduzidos. Corrigido possível empilhamento de handlers de processo no modo compacto.",
+        "nl": "Onnodige state-change-events verminderd. Mogelijke stapeling van process-handlers in compacte modus verholpen.",
+        "fr": "Réduction des événements de changement d'état inutiles. Correction d'un empilement potentiel des gestionnaires de processus en mode compact.",
+        "it": "Ridotti gli eventi di cambio stato non necessari. Corretto il possibile accumulo di gestori di processo in modalità compatta.",
+        "es": "Reducidos los eventos de cambio de estado innecesarios. Corregido el posible apilamiento de manejadores de proceso en modo compacto.",
+        "pl": "Zmniejszono niepotrzebne zdarzenia zmiany stanu. Naprawiono możliwe nakładanie się obsługi procesów w trybie kompaktowym.",
+        "uk": "Зменшено непотрібні події зміни стану. Виправлено можливе накопичення обробників процесів у компактному режимі.",
+        "zh-cn": "减少了不必要的状态变更事件。修复了紧凑模式下进程处理程序可能堆叠的问题。"
+      },
       "0.5.11": {
         "en": "Changelog rewritten in user-centric style across all versions.",
         "de": "Changelog in benutzerzentriertem Stil über alle Versionen umgeschrieben.",
@@ -80,19 +93,6 @@
         "pl": "Poprawiona stabilność adaptera.",
         "uk": "Покращено стабільність адаптера.",
         "zh-cn": "提高了适配器稳定性。"
-      },
-      "0.5.5": {
-        "en": "Internal cleanup. No user-facing changes.",
-        "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
-        "ru": "Внутренняя очистка. Нет видимых изменений для пользователей.",
-        "pt": "Limpeza interna. Sem alterações visíveis para o utilizador.",
-        "nl": "Interne opruiming. Geen zichtbare wijzigingen voor gebruikers.",
-        "fr": "Nettoyage interne. Aucun changement visible pour l'utilisateur.",
-        "it": "Pulizia interna. Nessuna modifica visibile per l'utente.",
-        "es": "Limpieza interna. Sin cambios visibles para el usuario.",
-        "pl": "Wewnętrzne porządki. Brak widocznych zmian dla użytkownika.",
-        "uk": "Внутрішнє прибирання. Без видимих змін для користувача.",
-        "zh-cn": "内部清理。无用户可见的更改。"
       }
     },
     "titleLang": {

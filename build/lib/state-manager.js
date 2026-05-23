@@ -712,7 +712,7 @@ class StateManager {
       });
       this.createdIds.add(id);
     }
-    await this.adapter.setStateAsync(id, { val: value, ack: true });
+    await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
   }
   // -------------------------------------------------------------------------
   // State common factories

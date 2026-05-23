@@ -7,6 +7,10 @@ import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig } from "./lib/types";
 
+let processHandlersInstalled = false;
+let installedUnhandledHandler: ((reason: unknown) => void) | null = null;
+let installedUncaughtHandler: ((err: Error) => void) | null = null;
+
 class BeszelAdapter extends utils.Adapter {
   private client: BeszelClient | null = null;
   private stateManager: StateManager | null = null;
@@ -24,8 +28,6 @@ class BeszelAdapter extends utils.Adapter {
    * `checkConnection` settles.
    */
   private testClients = new Set<BeszelClient>();
-  private unhandledRejectionHandler: ((reason: unknown) => void) | null = null;
-  private uncaughtExceptionHandler: ((err: Error) => void) | null = null;
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({
@@ -35,17 +37,17 @@ class BeszelAdapter extends utils.Adapter {
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
     this.on("message", this.onMessage.bind(this));
-    // Safety net for fire-and-forget paths (e.g. `void this.poll()`).
-    this.unhandledRejectionHandler = (reason: unknown) => {
-      this.log.error(`Unhandled rejection: ${errText(reason)}`);
-      this.terminate?.(11);
-    };
-    this.uncaughtExceptionHandler = (err: Error) => {
-      this.log.error(`Uncaught exception: ${errText(err)}`);
-      this.terminate?.(11);
-    };
-    process.on("unhandledRejection", this.unhandledRejectionHandler);
-    process.on("uncaughtException", this.uncaughtExceptionHandler);
+    if (!processHandlersInstalled) {
+      installedUnhandledHandler = (reason: unknown): void => {
+        console.error(`[beszel] Unhandled rejection: ${reason instanceof Error ? reason.message : String(reason)}`);
+      };
+      installedUncaughtHandler = (err: Error): void => {
+        console.error(`[beszel] Uncaught exception: ${err.message}`);
+      };
+      process.on("unhandledRejection", installedUnhandledHandler);
+      process.on("uncaughtException", installedUncaughtHandler);
+      processHandlersInstalled = true;
+    }
   }
 
   private async onReady(): Promise<void> {
@@ -125,14 +127,6 @@ class BeszelAdapter extends utils.Adapter {
         tc.cancelAll();
       }
       this.testClients.clear();
-      if (this.unhandledRejectionHandler) {
-        process.off("unhandledRejection", this.unhandledRejectionHandler);
-        this.unhandledRejectionHandler = null;
-      }
-      if (this.uncaughtExceptionHandler) {
-        process.off("uncaughtException", this.uncaughtExceptionHandler);
-        this.uncaughtExceptionHandler = null;
-      }
       // v0.4.3 (X2): explicit catch — broker-already-down should not leak
       // as an unhandled rejection.
       void this.setState("info.connection", { val: false, ack: true }).catch(() => {
