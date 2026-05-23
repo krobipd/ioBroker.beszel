@@ -172,6 +172,10 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- CI check-and-lint updated to Node.js 24
+
 ### 0.5.8 (2026-05-23)
 
 - State names use the adapter-core I18n framework

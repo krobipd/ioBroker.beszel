@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.5.8",
     "news": {
+      "NEXT": {
+        "en": "CI check-and-lint updated to Node.js 24",
+        "de": "CI check-and-lint auf Node.js 24 aktualisiert",
+        "ru": "CI check-and-lint обновлён до Node.js 24",
+        "pt": "CI check-and-lint atualizado para Node.js 24",
+        "nl": "CI check-and-lint bijgewerkt naar Node.js 24",
+        "fr": "CI check-and-lint mis à jour vers Node.js 24",
+        "it": "CI check-and-lint aggiornato a Node.js 24",
+        "es": "CI check-and-lint actualizado a Node.js 24",
+        "pl": "CI check-and-lint zaktualizowano do Node.js 24",
+        "uk": "CI check-and-lint оновлено до Node.js 24",
+        "zh-cn": "CI check-and-lint 更新至 Node.js 24"
+      },
       "0.5.8": {
         "en": "State names use the adapter-core I18n framework",
         "de": "Datenpunktnamen nutzen das I18n-Framework von adapter-core",
@@ -80,19 +93,6 @@
         "pl": "Usuwa automatyczną migrację danych logowania. Po aktualizacji z wersji starszej niż 0.5.0 otwórz ustawienia Beszel w adminie i zapisz raz.",
         "uk": "Видалено автоматичну міграцію облікових даних. Після оновлення з версії до 0.5.0 відкрийте налаштування Beszel в адмінці та збережіть один раз.",
         "zh-cn": "移除自动凭据迁移逻辑。从 0.5.0 之前版本升级后，请在管理界面打开 Beszel 适配器设置并保存一次。"
-      },
-      "0.5.2": {
-        "en": "Fixes the migration loop introduced in 0.5.0/0.5.1 — usernames that got re-encrypted multiple times are cleared on update. Please re-enter your Beszel credentials in admin once.",
-        "de": "Behebt die Migrationsschleife aus 0.5.0/0.5.1 — mehrfach verschlüsselte Usernames werden beim Update gelöscht. Bitte einmalig die Beszel-Zugangsdaten im Admin neu eingeben.",
-        "ru": "Исправлен цикл миграции из 0.5.0/0.5.1 — многократно зашифрованные имена пользователя удаляются при обновлении. Введите данные Beszel в админке один раз заново.",
-        "pt": "Corrige o ciclo de migração introduzido em 0.5.0/0.5.1 — nomes de utilizador encriptados várias vezes são limpos no update. Reintroduza as credenciais Beszel no admin uma vez.",
-        "nl": "Lost de migratielus uit 0.5.0/0.5.1 op — meervoudig versleutelde gebruikersnamen worden bij de update gewist. Voer de Beszel-gegevens eenmalig opnieuw in via Admin.",
-        "fr": "Corrige la boucle de migration de 0.5.0/0.5.1 — les noms d'utilisateur chiffrés plusieurs fois sont effacés. Réintroduis tes identifiants Beszel dans l'admin.",
-        "it": "Risolve il loop di migrazione introdotto in 0.5.0/0.5.1 — i nomi utente cifrati più volte vengono cancellati al momento dell'aggiornamento. Reinserisci le credenziali Beszel nell'admin.",
-        "es": "Corrige el bucle de migración introducido en 0.5.0/0.5.1 — los nombres de usuario cifrados varias veces se borran en la actualización. Vuelve a introducir las credenciales de Beszel en admin una vez.",
-        "pl": "Naprawia pętlę migracji z 0.5.0/0.5.1 — wielokrotnie zaszyfrowane nazwy użytkownika są kasowane przy aktualizacji. Wprowadź dane logowania Beszel w adminie jeszcze raz.",
-        "uk": "Виправляє цикл міграції з 0.5.0/0.5.1 — багаторазово зашифровані імена користувача очищаються при оновленні. Введіть облікові дані Beszel в адмінці ще раз.",
-        "zh-cn": "修复 0.5.0/0.5.1 中的迁移循环 — 被多次加密的用户名在更新时会被清空，请在管理界面重新填写一次 Beszel 凭据。"
       }
     },
     "titleLang": {
