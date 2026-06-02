@@ -6,10 +6,11 @@ import {
   coerceContainer,
   coercePocketBaseList,
   coerceSystem,
+  coerceSystemDetailsRecord,
   coerceSystemStatsRecord,
   errText,
 } from "./coerce";
-import type { BeszelContainer, BeszelSystem, SystemStats } from "./types";
+import type { BeszelContainer, BeszelSystem, SystemDetails, SystemStats } from "./types";
 
 const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1000; // 23 hours
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -60,7 +61,12 @@ export class BeszelClient {
   private readonly inflight = new Set<AbortController>();
   /** v0.4.4: optional logger for the HTTP-layer / auth / pagination trace. */
   private readonly log?: BeszelClientLogger;
-  /** Injected delay — adapter passes `this.delay.bind(this)` so it auto-cancels on unload. */
+  /**
+   * Injected delay — production passes the adapter-managed `this.delay.bind(this)`
+   * (auto-cancels on unload). When omitted (only outside the adapter, e.g. a bare
+   * unit-test client), it degrades to an immediate resolve — i.e. the 429-retry
+   * fires without back-off rather than pulling in a plain `setTimeout`.
+   */
   private readonly delay: (ms: number) => Promise<void>;
 
   /**
@@ -85,7 +91,10 @@ export class BeszelClient {
     this.password = password;
     this.timeoutMs = timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
     this.log = log;
-    this.delay = delay ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+    // Default is a no-back-off immediate resolve — NOT a plain setTimeout. In the
+    // adapter the real (cancel-on-unload) delay is always injected (main.ts +
+    // makeTestClientFactory), so this fallback is never used in production.
+    this.delay = delay ?? ((): Promise<void> => Promise.resolve());
   }
 
   /** Force token re-authentication on the next request */
@@ -156,6 +165,28 @@ export class BeszelClient {
     for (const record of items) {
       if (record && !result.has(record.system)) {
         result.set(record.system, record.stats);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Fetch static system details (Beszel v0.18.0+), keyed by system id.
+   * Returns an empty Map on an older Hub without the collection (the list
+   * endpoint 404s → caught by the caller, which treats details as absent).
+   *
+   * Access is scoped to the user's own systems (same `systemScopedReadRule`
+   * as system_stats), so the regular auth token used everywhere else works.
+   * Called rarely (start + new-system), not in every poll — the data is
+   * static (changes only on agent restart/upgrade).
+   */
+  public async getSystemDetails(): Promise<Map<string, SystemDetails>> {
+    await this.ensureToken();
+    const items = await this.fetchAllPages("/api/collections/system_details/records", coerceSystemDetailsRecord);
+    const result = new Map<string, SystemDetails>();
+    for (const rec of items) {
+      if (rec && !result.has(rec.system)) {
+        result.set(rec.system, rec.details);
       }
     }
     return result;
@@ -276,6 +307,16 @@ export class BeszelClient {
       return await this.requestOnce<T>(method, path, body, token);
     } catch (err) {
       const e = err as NodeJS.ErrnoException & { retryAfter?: number };
+      // F6: token expired mid-life (401 on an authenticated request) → reauth
+      // once and retry transparently so a single expiry doesn't burn a whole
+      // poll. The auth request itself (token === null) is never retried here,
+      // and if the retry also 401s it propagates to the poll's auth-backoff.
+      if (e.code === "UNAUTHORIZED" && token !== null) {
+        this.log?.debug(`request: 401 on ${path} — re-authenticating and retrying once`);
+        this.invalidateToken();
+        await this.ensureToken();
+        return this.requestOnce<T>(method, path, body, this.token);
+      }
       if (e.code !== "RATE_LIMITED") {
         throw err;
       }

@@ -20,7 +20,6 @@ var coerce_exports = {};
 __export(coerce_exports, {
   coerceArray: () => coerceArray,
   coerceAuthResponse: () => coerceAuthResponse,
-  coerceBoolean: () => coerceBoolean,
   coerceContainer: () => coerceContainer,
   coerceFiniteNumber: () => coerceFiniteNumber,
   coerceNumberArray: () => coerceNumberArray,
@@ -31,10 +30,12 @@ __export(coerce_exports, {
   coercePollInterval: () => coercePollInterval,
   coerceString: () => coerceString,
   coerceSystem: () => coerceSystem,
+  coerceSystemDetailsRecord: () => coerceSystemDetailsRecord,
   coerceSystemStats: () => coerceSystemStats,
   coerceSystemStatsRecord: () => coerceSystemStatsRecord,
   coerceTimeoutMs: () => coerceTimeoutMs,
   errText: () => errText,
+  shouldFetchSystemDetails: () => shouldFetchSystemDetails,
   validateHubUrl: () => validateHubUrl
 });
 module.exports = __toCommonJS(coerce_exports);
@@ -54,9 +55,6 @@ function coerceString(value, maxLength = 1024) {
     return null;
   }
   return value.length > maxLength ? value.slice(0, maxLength) : value;
-}
-function coerceBoolean(value) {
-  return typeof value === "boolean" ? value : null;
 }
 function errText(err) {
   if (err instanceof Error) {
@@ -185,6 +183,56 @@ function coerceSystem(value) {
     info: coerceSystemInfo(obj.info)
   };
 }
+function coerceSystemDetails(obj) {
+  const out = {};
+  const hostname = coerceString(obj.hostname);
+  if (hostname !== null) {
+    out.hostname = hostname;
+  }
+  const os = coerceFiniteNumber(obj.os);
+  if (os !== null) {
+    out.os = os;
+  }
+  const osName = coerceString(obj.os_name);
+  if (osName !== null) {
+    out.os_name = osName;
+  }
+  const kernel = coerceString(obj.kernel);
+  if (kernel !== null) {
+    out.kernel = kernel;
+  }
+  const cpu = coerceString(obj.cpu);
+  if (cpu !== null) {
+    out.cpu = cpu;
+  }
+  const arch = coerceString(obj.arch);
+  if (arch !== null) {
+    out.arch = arch;
+  }
+  const cores = coerceFiniteNumber(obj.cores);
+  if (cores !== null) {
+    out.cores = cores;
+  }
+  const threads = coerceFiniteNumber(obj.threads);
+  if (threads !== null) {
+    out.threads = threads;
+  }
+  if (typeof obj.podman === "boolean") {
+    out.podman = obj.podman;
+  }
+  return out;
+}
+function coerceSystemDetailsRecord(value) {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const system = coerceString(obj.system);
+  if (system === null) {
+    return null;
+  }
+  return { system, details: coerceSystemDetails(obj) };
+}
 function coerceGPUData(value) {
   const obj = coerceObject(value);
   if (!obj) {
@@ -210,6 +258,14 @@ function coerceGPUData(value) {
   const p = coerceFiniteNumber(obj.p);
   if (p !== null) {
     out.p = p;
+  }
+  const pp = coerceFiniteNumber(obj.pp);
+  if (pp !== null) {
+    out.pp = pp;
+  }
+  const e = coerceNumberMap(obj.e);
+  if (e && Object.keys(e).length > 0) {
+    out.e = e;
   }
   return out;
 }
@@ -265,65 +321,34 @@ function coerceSystemStats(value) {
     return {};
   }
   const s = {};
-  const cpu = coerceFiniteNumber(obj.cpu);
-  if (cpu !== null) {
-    s.cpu = cpu;
-  }
-  const mu = coerceFiniteNumber(obj.mu);
-  if (mu !== null) {
-    s.mu = mu;
-  }
-  const m = coerceFiniteNumber(obj.m);
-  if (m !== null) {
-    s.m = m;
-  }
-  const mp = coerceFiniteNumber(obj.mp);
-  if (mp !== null) {
-    s.mp = mp;
-  }
-  const mb = coerceFiniteNumber(obj.mb);
-  if (mb !== null) {
-    s.mb = mb;
-  }
-  const mz = coerceFiniteNumber(obj.mz);
-  if (mz !== null) {
-    s.mz = mz;
-  }
-  const su = coerceFiniteNumber(obj.su);
-  if (su !== null) {
-    s.su = su;
-  }
-  const sw = coerceFiniteNumber(obj.s);
-  if (sw !== null) {
-    s.s = sw;
-  }
-  const du = coerceFiniteNumber(obj.du);
-  if (du !== null) {
-    s.du = du;
-  }
-  const d = coerceFiniteNumber(obj.d);
-  if (d !== null) {
-    s.d = d;
-  }
-  const dp = coerceFiniteNumber(obj.dp);
-  if (dp !== null) {
-    s.dp = dp;
-  }
-  const dr = coerceFiniteNumber(obj.dr);
-  if (dr !== null) {
-    s.dr = dr;
-  }
-  const dw = coerceFiniteNumber(obj.dw);
-  if (dw !== null) {
-    s.dw = dw;
-  }
-  const ns = coerceFiniteNumber(obj.ns);
-  if (ns !== null) {
-    s.ns = ns;
-  }
-  const nr = coerceFiniteNumber(obj.nr);
-  if (nr !== null) {
-    s.nr = nr;
+  const NUMBER_FIELDS = [
+    "cpu",
+    "mu",
+    "m",
+    "mp",
+    "mb",
+    "mz",
+    "su",
+    "s",
+    "du",
+    "d",
+    "dp",
+    "dr",
+    "dw",
+    "ns",
+    "nr",
+    "cpum",
+    "mm",
+    "drm",
+    "dwm",
+    "nsm",
+    "nrm"
+  ];
+  for (const k of NUMBER_FIELDS) {
+    const n = coerceFiniteNumber(obj[k]);
+    if (n !== null) {
+      s[k] = n;
+    }
   }
   const t = coerceNumberMap(obj.t);
   if (t) {
@@ -348,6 +373,27 @@ function coerceSystemStats(value) {
   const cpub = coerceNumberArray(obj.cpub);
   if (cpub) {
     s.cpub = cpub;
+  }
+  const cpus = coerceNumberArray(obj.cpus);
+  if (cpus) {
+    s.cpus = cpus;
+  }
+  const dios = coerceNumberArray(obj.dios);
+  if (dios) {
+    s.dios = dios;
+  }
+  const niObj = coerceObject(obj.ni);
+  if (niObj) {
+    const ni = {};
+    for (const [k, v] of Object.entries(niObj)) {
+      const tup = coerceNumberTuple(v, 4);
+      if (tup) {
+        ni[k] = [tup[0], tup[1], tup[2], tup[3]];
+      }
+    }
+    if (Object.keys(ni).length > 0) {
+      s.ni = ni;
+    }
   }
   return s;
 }
@@ -382,7 +428,7 @@ function coerceContainer(value) {
   if (id === null || system === null || name === null) {
     return null;
   }
-  return {
+  const container = {
     id,
     system,
     name,
@@ -392,6 +438,11 @@ function coerceContainer(value) {
     memory: (_d = coerceFiniteNumber(obj.memory)) != null ? _d : 0,
     image: (_e = coerceString(obj.image)) != null ? _e : ""
   };
+  const net = coerceFiniteNumber(obj.net);
+  if (net !== null) {
+    container.net = net;
+  }
+  return container;
 }
 function validateHubUrl(url) {
   if (typeof url !== "string" || url.trim().length === 0) {
@@ -416,6 +467,9 @@ function coercePollInterval(raw) {
     return 60;
   }
   return Math.max(10, Math.min(300, Math.floor(n)));
+}
+function shouldFetchSystemDetails(systemIds, attempted) {
+  return systemIds.some((id) => !attempted.has(id));
 }
 function coerceTimeoutMs(raw) {
   const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
@@ -447,7 +501,6 @@ function coercePocketBaseList(value, itemCoercer) {
   };
 }
 function coerceAuthResponse(value) {
-  var _a, _b, _c;
   const obj = coerceObject(value);
   if (!obj) {
     return null;
@@ -456,19 +509,12 @@ function coerceAuthResponse(value) {
   if (token === null) {
     return null;
   }
-  const recordObj = (_a = coerceObject(obj.record)) != null ? _a : {};
-  const id = (_b = coerceString(recordObj.id)) != null ? _b : "";
-  const email = (_c = coerceString(recordObj.email)) != null ? _c : "";
-  return {
-    token,
-    record: { ...recordObj, id, email }
-  };
+  return { token };
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   coerceArray,
   coerceAuthResponse,
-  coerceBoolean,
   coerceContainer,
   coerceFiniteNumber,
   coerceNumberArray,
@@ -479,10 +525,12 @@ function coerceAuthResponse(value) {
   coercePollInterval,
   coerceString,
   coerceSystem,
+  coerceSystemDetailsRecord,
   coerceSystemStats,
   coerceSystemStatsRecord,
   coerceTimeoutMs,
   errText,
+  shouldFetchSystemDetails,
   validateHubUrl
 });
 //# sourceMappingURL=coerce.js.map

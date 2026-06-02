@@ -2,7 +2,6 @@ import { expect } from "chai";
 import {
   coerceArray,
   coerceAuthResponse,
-  coerceBoolean,
   coerceContainer,
   coerceFiniteNumber,
   coerceNumberArray,
@@ -13,10 +12,12 @@ import {
   coercePollInterval,
   coerceString,
   coerceSystem,
+  coerceSystemDetailsRecord,
   coerceSystemStats,
   coerceSystemStatsRecord,
   coerceTimeoutMs,
   errText,
+  shouldFetchSystemDetails,
   validateHubUrl,
 } from "./coerce";
 
@@ -100,30 +101,6 @@ describe("coerce", () => {
 
     it("does not cap strings shorter than maxLength", () => {
       expect(coerceString("short", 1024)).to.equal("short");
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // coerceBoolean
-  // -----------------------------------------------------------------------
-
-  describe("coerceBoolean", () => {
-    it("returns true and false unchanged", () => {
-      expect(coerceBoolean(true)).to.be.true;
-      expect(coerceBoolean(false)).to.be.false;
-    });
-
-    it("returns null for truthy non-boolean values", () => {
-      expect(coerceBoolean("true")).to.be.null;
-      expect(coerceBoolean(1)).to.be.null;
-      expect(coerceBoolean({})).to.be.null;
-    });
-
-    it("returns null for null, undefined, 0, empty string", () => {
-      expect(coerceBoolean(null)).to.be.null;
-      expect(coerceBoolean(undefined)).to.be.null;
-      expect(coerceBoolean(0)).to.be.null;
-      expect(coerceBoolean("")).to.be.null;
     });
   });
 
@@ -404,6 +381,68 @@ describe("coerce", () => {
       expect(coerceSystemStats([])).to.deep.equal({});
       expect(coerceSystemStats("x")).to.deep.equal({});
     });
+
+    // --- v0.18.7 fields (absent on older Beszel → skipped, never crash) ---
+
+    it("coerces the v0.18.7 peak scalars", () => {
+      const s = coerceSystemStats({ cpum: 92.3, mm: 15.2, drm: 120, dwm: 80, nsm: 5.5, nrm: 6.6 });
+      expect(s.cpum).to.equal(92.3);
+      expect(s.mm).to.equal(15.2);
+      expect(s.drm).to.equal(120);
+      expect(s.dwm).to.equal(80);
+      expect(s.nsm).to.equal(5.5);
+      expect(s.nrm).to.equal(6.6);
+    });
+
+    it("drops a peak scalar when not finite", () => {
+      const s = coerceSystemStats({ cpum: Infinity, mm: "bad" });
+      expect(s.cpum).to.be.undefined;
+      expect(s.mm).to.be.undefined;
+    });
+
+    it("coerces variable-length arrays cpus / dios", () => {
+      const s = coerceSystemStats({
+        cpus: [10, 20, 30, 40],
+        dios: [1, 2, 3, 4, 5, 6],
+      });
+      expect(s.cpus).to.deep.equal([10, 20, 30, 40]);
+      expect(s.dios).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    });
+
+    it("drops cpus when any element is not finite", () => {
+      expect(coerceSystemStats({ cpus: [10, NaN, 30] }).cpus).to.be.undefined;
+    });
+
+    it("ignores the redundant byte-rate fields b/bm/dio/diom (duplicates of ns/nr and dr/dw)", () => {
+      const s = coerceSystemStats({ b: [1, 2], bm: [3, 4], dio: [5, 6], diom: [7, 8] }) as Record<string, unknown>;
+      expect(s.b).to.be.undefined;
+      expect(s.bm).to.be.undefined;
+      expect(s.dio).to.be.undefined;
+      expect(s.diom).to.be.undefined;
+    });
+
+    it("coerces the per-interface map (ni) keeping only 4-number tuples", () => {
+      const s = coerceSystemStats({
+        ni: {
+          eth0: [10, 20, 1000, 2000],
+          bad: [1, 2, 3],
+        },
+      });
+      expect(s.ni).to.deep.equal({ eth0: [10, 20, 1000, 2000] });
+    });
+
+    it("omits ni entirely when no interface yields a valid tuple", () => {
+      const s = coerceSystemStats({ ni: { eth0: [1, 2] } });
+      expect(s.ni).to.be.undefined;
+    });
+
+    it("coerces the v0.18.7 GPU fields pp (package power) and e (engines)", () => {
+      const s = coerceSystemStats({
+        g: { gpu0: { n: "Intel", u: 30, pp: 18.5, e: { render: 40, video: 5, bad: NaN } } },
+      });
+      expect(s.g!.gpu0.pp).to.equal(18.5);
+      expect(s.g!.gpu0.e).to.deep.equal({ render: 40, video: 5 });
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -440,6 +479,95 @@ describe("coerce", () => {
         stats: "not an object",
       });
       expect(rec!.stats).to.deep.equal({});
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // coerceSystemDetailsRecord (F2)
+  // -----------------------------------------------------------------------
+
+  describe("coerceSystemDetailsRecord", () => {
+    it("coerces a full system_details record", () => {
+      const rec = coerceSystemDetailsRecord({
+        id: "d1",
+        system: "sys001",
+        hostname: "server1",
+        os: 0,
+        os_name: "Ubuntu 22.04",
+        kernel: "6.5.0-1",
+        cpu: "Intel i7-9700",
+        arch: "x86_64",
+        cores: 8,
+        threads: 16,
+        podman: true,
+      });
+      expect(rec).to.not.be.null;
+      expect(rec!.system).to.equal("sys001");
+      expect(rec!.details).to.deep.equal({
+        hostname: "server1",
+        os: 0,
+        os_name: "Ubuntu 22.04",
+        kernel: "6.5.0-1",
+        cpu: "Intel i7-9700",
+        arch: "x86_64",
+        cores: 8,
+        threads: 16,
+        podman: true,
+      });
+    });
+
+    it("returns null when the system reference is missing", () => {
+      expect(coerceSystemDetailsRecord({ id: "d1", hostname: "x" })).to.be.null;
+    });
+
+    it("returns null for non-object input", () => {
+      expect(coerceSystemDetailsRecord(null)).to.be.null;
+      expect(coerceSystemDetailsRecord("x")).to.be.null;
+      expect(coerceSystemDetailsRecord([])).to.be.null;
+    });
+
+    it("drops absent / wrong-typed fields rather than crashing", () => {
+      const rec = coerceSystemDetailsRecord({
+        system: "sys001",
+        hostname: "",
+        os: "not a number",
+        cores: 4,
+        podman: "yes",
+      });
+      expect(rec!.details).to.deep.equal({ cores: 4 });
+    });
+
+    it("keeps os=0 (Linux) rather than dropping a falsy enum value", () => {
+      const rec = coerceSystemDetailsRecord({ system: "sys001", os: 0 });
+      expect(rec!.details.os).to.equal(0);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // shouldFetchSystemDetails (F2 cadence)
+  // -----------------------------------------------------------------------
+
+  describe("shouldFetchSystemDetails", () => {
+    it("fetches on the first poll (nothing attempted yet)", () => {
+      expect(shouldFetchSystemDetails(["a", "b"], new Set())).to.be.true;
+    });
+
+    it("does NOT refetch in steady state (all ids already attempted)", () => {
+      expect(shouldFetchSystemDetails(["a", "b"], new Set(["a", "b"]))).to.be.false;
+    });
+
+    it("refetches once when a genuinely new system id appears", () => {
+      expect(shouldFetchSystemDetails(["a", "b", "c"], new Set(["a", "b"]))).to.be.true;
+    });
+
+    it("does NOT refetch a details-less / 404 system that was already attempted", () => {
+      // 'a' was attempted but never yielded a details row (empty result / older
+      // Hub 404). It is in `attempted`, so it must not retrigger every poll.
+      expect(shouldFetchSystemDetails(["a"], new Set(["a"]))).to.be.false;
+    });
+
+    it("returns false for an empty system list", () => {
+      expect(shouldFetchSystemDetails([], new Set())).to.be.false;
     });
   });
 
@@ -507,8 +635,6 @@ describe("coerce", () => {
       });
       expect(auth).to.not.be.null;
       expect(auth!.token).to.equal("abc123");
-      expect(auth!.record.id).to.equal("u1");
-      expect(auth!.record.email).to.equal("a@b.com");
     });
 
     it("returns null when token is missing", () => {
@@ -522,12 +648,6 @@ describe("coerce", () => {
     it("returns null when token is not a string", () => {
       expect(coerceAuthResponse({ token: 42, record: {} })).to.be.null;
       expect(coerceAuthResponse({ token: null, record: {} })).to.be.null;
-    });
-
-    it("defaults to empty record when record is missing or wrong type", () => {
-      const auth = coerceAuthResponse({ token: "t" });
-      expect(auth!.record.id).to.equal("");
-      expect(auth!.record.email).to.equal("");
     });
 
     it("returns null for non-object input", () => {

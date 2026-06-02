@@ -11,6 +11,24 @@ import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "
 type LocalizedName = ioBroker.StringOrTranslated;
 
 /**
+ * One toggled scalar metric. Shared by the create-path (`applyMetrics`) and
+ * the cleanup-path (`cleanupMetrics`) so the toggle → state-id mapping has a
+ * single source of truth (K1). `available` gates creation on data shape
+ * (default: always); `extract` returns the value or null.
+ */
+interface MetricDef {
+  toggle: keyof AdapterConfig;
+  channel: string;
+  id: string;
+  nameKey: string;
+  kind: "percent" | "num" | "text" | "bool";
+  unit?: string;
+  role?: string;
+  available?: (stats: SystemStats | undefined, system: BeszelSystem) => boolean;
+  extract: (system: BeszelSystem, stats: SystemStats | undefined) => ioBroker.StateValue;
+}
+
+/**
  * Manages creation, update and cleanup of ioBroker objects and states for Beszel systems.
  */
 export class StateManager {
@@ -155,20 +173,656 @@ export class StateManager {
     return names;
   }
 
+  // -------------------------------------------------------------------------
+  // Metric registry (K1): single source of truth for every toggled scalar
+  // state. Both the create-path (`applyMetrics`) and the cleanup-path
+  // (`cleanupMetrics`) iterate this list, so a metric's toggle → state-id
+  // mapping can never drift between "create" and "delete".
+  //
+  // Dynamic groups (per-sensor temperature, per-GPU, per-filesystem,
+  // per-container) are NOT in here — they fan out to N items and stay in
+  // their dedicated handlers (`updateDynamicStats`, `updateContainers`).
+  // -------------------------------------------------------------------------
+
+  /**
+   * Beszel battery charge-state value that means "actively charging"
+   * (agent/battery/battery.go enum: 0=unknown 1=empty 2=full 3=charging
+   * 4=discharging 5=idle). Used to map `bat[1]` to the `charging` boolean.
+   */
+  private static readonly BATTERY_STATE_CHARGING = 3;
+
+  /** i18n key for each metric channel. */
+  private static readonly CHANNEL_NAME_KEY: Record<string, string> = {
+    info: "channelInfo",
+    cpu: "channelCpu",
+    memory: "channelMemory",
+    disk: "channelDisk",
+    network: "channelNetwork",
+    temperature: "channelTemperature",
+    battery: "channelBattery",
+  };
+
+  /**
+   * v0.6.0: each detail/peak toggle depends on its category's base toggle —
+   * when the category is off, the detail is off too. This mirrors the admin
+   * grey-out (`disabled` in jsonConfig) in the DATA logic, so a sub-metric
+   * never creates states while its category is disabled (krobi: "Kategorie aus
+   * → Unterkategorie automatisch mit aus"). Must stay in sync with the
+   * `disabled` conditions in admin/jsonConfig.json. Every non-base metric in a
+   * category gates on the category's base/usage metric — including the
+   * default-on co-metrics `loadAvg` (→ CPU) and `diskSpeed` (→ Disk): krobi
+   * wants a category to switch off completely, no "logischer Ausreißer". Only
+   * the System category (uptime / system-info / services) has no single base,
+   * so its three independent metrics are not gated.
+   */
+  private static readonly METRIC_DEPENDENCIES = {
+    metrics_loadAvg: "metrics_cpu",
+    metrics_cpuBreakdown: "metrics_cpu",
+    metrics_cpuCores: "metrics_cpu",
+    metrics_cpuPeak: "metrics_cpu",
+    metrics_memoryDetails: "metrics_memory",
+    metrics_swap: "metrics_memory",
+    metrics_memoryPeak: "metrics_memory",
+    metrics_diskSpeed: "metrics_disk",
+    metrics_extraFs: "metrics_disk",
+    metrics_diskIo: "metrics_disk",
+    metrics_diskPeak: "metrics_disk",
+    metrics_networkInterfaces: "metrics_network",
+    metrics_networkPeak: "metrics_network",
+    metrics_temperatureDetails: "metrics_temperature",
+    metrics_gpuDetails: "metrics_gpu",
+  } satisfies Partial<Record<keyof AdapterConfig, keyof AdapterConfig>>;
+
+  /**
+   * Return a config copy where every detail/peak toggle whose category base is
+   * disabled is forced to `false` (see `METRIC_DEPENDENCIES`). Applied at the
+   * top of `updateSystem` and `cleanupMetrics` so both create- and cleanup-path
+   * see the same effective values — a disabled category's sub-states are never
+   * created, and existing ones are pruned.
+   *
+   * @param config Raw adapter configuration.
+   */
+  private effectiveConfig(config: AdapterConfig): AdapterConfig {
+    const out = { ...config };
+    for (const detail of Object.keys(
+      StateManager.METRIC_DEPENDENCIES,
+    ) as (keyof typeof StateManager.METRIC_DEPENDENCIES)[]) {
+      const base = StateManager.METRIC_DEPENDENCIES[detail];
+      if (!config[base]) {
+        out[detail] = false;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Shared metric definitions. `extract` returns the value (or null);
+   * `available` (default: always) gates state CREATION exactly like the old
+   * inline guards (e.g. cpuBreakdown needs `cpub.length >= 5`). Entries that
+   * need live stats set `available: hasStats`.
+   *
+   * Note: `loadAvg` is defined once here and falls back `stats.la ?? info.la`
+   * — this unifies the two old code paths (with-stats in updateStatsStates,
+   * without-stats in updateSystem) that previously duplicated it.
+   */
+  private metricDefs(): MetricDef[] {
+    const hasStats = (s: SystemStats | undefined): boolean => !!s;
+    const la = (system: BeszelSystem, stats: SystemStats | undefined): [number, number, number] | undefined =>
+      stats?.la ?? system.info.la;
+    return [
+      // info (no stats required)
+      {
+        toggle: "metrics_uptime",
+        channel: "info",
+        id: "info.uptime",
+        nameKey: "uptime",
+        kind: "num",
+        unit: "s",
+        extract: s => s.info.u ?? null,
+      },
+      {
+        toggle: "metrics_uptime",
+        channel: "info",
+        id: "info.uptime_text",
+        nameKey: "uptimeFormatted",
+        kind: "text",
+        extract: s => (s.info.u != null ? this.formatUptime(s.info.u) : null),
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.agent_version",
+        nameKey: "agentVersion",
+        kind: "text",
+        extract: s => s.info.v ?? null,
+      },
+      // F2: static hardware/OS info from the system_details collection (attached
+      // to system.details by the poll loop). Each field gated on its own presence
+      // so a partially-populated agent yields no empty states; all share the
+      // "System info" toggle (metrics_agentVersion) and the existing info channel.
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.hostname",
+        nameKey: "hostname",
+        kind: "text",
+        available: (_st, s) => s.details?.hostname != null,
+        extract: s => s.details?.hostname ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.os",
+        nameKey: "os",
+        kind: "text",
+        available: (_st, s) => s.details?.os != null,
+        extract: s => this.osLabel(s.details?.os),
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.os_name",
+        nameKey: "osName",
+        kind: "text",
+        available: (_st, s) => s.details?.os_name != null,
+        extract: s => s.details?.os_name ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.kernel",
+        nameKey: "kernel",
+        kind: "text",
+        available: (_st, s) => s.details?.kernel != null,
+        extract: s => s.details?.kernel ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.cpu_model",
+        nameKey: "cpuModel",
+        kind: "text",
+        available: (_st, s) => s.details?.cpu != null,
+        extract: s => s.details?.cpu ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.arch",
+        nameKey: "arch",
+        kind: "text",
+        available: (_st, s) => s.details?.arch != null,
+        extract: s => s.details?.arch ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.cores",
+        nameKey: "cores",
+        kind: "num",
+        available: (_st, s) => s.details?.cores != null,
+        extract: s => s.details?.cores ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.threads",
+        nameKey: "threads",
+        kind: "num",
+        available: (_st, s) => s.details?.threads != null,
+        extract: s => s.details?.threads ?? null,
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.podman",
+        nameKey: "podman",
+        kind: "bool",
+        available: (_st, s) => s.details?.podman != null,
+        extract: s => s.details?.podman ?? null,
+      },
+      {
+        toggle: "metrics_services",
+        channel: "info",
+        id: "info.services_total",
+        nameKey: "servicesTotal",
+        kind: "num",
+        extract: s => s.info.sv?.[0] ?? null,
+      },
+      {
+        toggle: "metrics_services",
+        channel: "info",
+        id: "info.services_failed",
+        nameKey: "servicesFailed",
+        kind: "num",
+        extract: s => s.info.sv?.[1] ?? null,
+      },
+      // load average — always created if toggled (stats.la or info.la fallback)
+      {
+        toggle: "metrics_loadAvg",
+        channel: "cpu",
+        id: "cpu.load_1m",
+        nameKey: "load1m",
+        kind: "num",
+        extract: (s, st) => la(s, st)?.[0] ?? null,
+      },
+      {
+        toggle: "metrics_loadAvg",
+        channel: "cpu",
+        id: "cpu.load_5m",
+        nameKey: "load5m",
+        kind: "num",
+        extract: (s, st) => la(s, st)?.[1] ?? null,
+      },
+      {
+        toggle: "metrics_loadAvg",
+        channel: "cpu",
+        id: "cpu.load_15m",
+        nameKey: "load15m",
+        kind: "num",
+        extract: (s, st) => la(s, st)?.[2] ?? null,
+      },
+      // stats-gated scalar metrics
+      {
+        toggle: "metrics_cpu",
+        channel: "cpu",
+        id: "cpu.usage",
+        nameKey: "cpuUsage",
+        kind: "percent",
+        available: hasStats,
+        extract: (_s, st) => st?.cpu ?? null,
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.user",
+        nameKey: "cpuUser",
+        kind: "percent",
+        available: st => !!st?.cpub && st.cpub.length >= 5,
+        extract: (_s, st) => st!.cpub![0],
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.system",
+        nameKey: "cpuSystem",
+        kind: "percent",
+        available: st => !!st?.cpub && st.cpub.length >= 5,
+        extract: (_s, st) => st!.cpub![1],
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.iowait",
+        nameKey: "cpuIowait",
+        kind: "percent",
+        available: st => !!st?.cpub && st.cpub.length >= 5,
+        extract: (_s, st) => st!.cpub![2],
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.steal",
+        nameKey: "cpuSteal",
+        kind: "percent",
+        available: st => !!st?.cpub && st.cpub.length >= 5,
+        extract: (_s, st) => st!.cpub![3],
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.idle",
+        nameKey: "cpuIdle",
+        kind: "percent",
+        available: st => !!st?.cpub && st.cpub.length >= 5,
+        extract: (_s, st) => st!.cpub![4],
+      },
+      {
+        toggle: "metrics_memory",
+        channel: "memory",
+        id: "memory.percent",
+        nameKey: "memoryPercent",
+        kind: "percent",
+        available: hasStats,
+        extract: (_s, st) => st?.mp ?? null,
+      },
+      {
+        toggle: "metrics_memory",
+        channel: "memory",
+        id: "memory.used",
+        nameKey: "memoryUsed",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.mu ?? null,
+      },
+      {
+        toggle: "metrics_memory",
+        channel: "memory",
+        id: "memory.total",
+        nameKey: "memoryTotal",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.m ?? null,
+      },
+      {
+        toggle: "metrics_memoryDetails",
+        channel: "memory",
+        id: "memory.buffers",
+        nameKey: "memoryBuffers",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.mb ?? null,
+      },
+      {
+        toggle: "metrics_memoryDetails",
+        channel: "memory",
+        id: "memory.zfs_arc",
+        nameKey: "memoryZfsArc",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.mz ?? null,
+      },
+      {
+        toggle: "metrics_swap",
+        channel: "memory",
+        id: "memory.swap_used",
+        nameKey: "swapUsed",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.su ?? null,
+      },
+      {
+        toggle: "metrics_swap",
+        channel: "memory",
+        id: "memory.swap_total",
+        nameKey: "swapTotal",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.s ?? null,
+      },
+      {
+        toggle: "metrics_disk",
+        channel: "disk",
+        id: "disk.percent",
+        nameKey: "diskPercent",
+        kind: "percent",
+        available: hasStats,
+        extract: (_s, st) => st?.dp ?? null,
+      },
+      {
+        toggle: "metrics_disk",
+        channel: "disk",
+        id: "disk.used",
+        nameKey: "diskUsed",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.du ?? null,
+      },
+      {
+        toggle: "metrics_disk",
+        channel: "disk",
+        id: "disk.total",
+        nameKey: "diskTotal",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => st?.d ?? null,
+      },
+      {
+        toggle: "metrics_diskSpeed",
+        channel: "disk",
+        id: "disk.read",
+        nameKey: "diskRead",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => st?.dr ?? null,
+      },
+      {
+        toggle: "metrics_diskSpeed",
+        channel: "disk",
+        id: "disk.write",
+        nameKey: "diskWrite",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => st?.dw ?? null,
+      },
+      {
+        toggle: "metrics_network",
+        channel: "network",
+        id: "network.sent",
+        nameKey: "networkSent",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => st?.ns ?? null,
+      },
+      {
+        toggle: "metrics_network",
+        channel: "network",
+        id: "network.recv",
+        nameKey: "networkReceived",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => st?.nr ?? null,
+      },
+      {
+        toggle: "metrics_temperature",
+        channel: "temperature",
+        id: "temperature.average",
+        nameKey: "temperatureAvg",
+        kind: "num",
+        unit: "°C",
+        role: "value.temperature",
+        available: hasStats,
+        extract: (_s, st) => this.computeTopAvgTemp(st?.t),
+      },
+      {
+        toggle: "metrics_temperature",
+        channel: "temperature",
+        id: "temperature.max",
+        nameKey: "temperatureMax",
+        kind: "num",
+        unit: "°C",
+        role: "value.temperature",
+        available: hasStats,
+        extract: (_s, st) => this.computeMaxTemp(st?.t),
+      },
+      {
+        toggle: "metrics_battery",
+        channel: "battery",
+        id: "battery.percent",
+        nameKey: "batteryPercent",
+        kind: "percent",
+        available: hasStats,
+        extract: (s, st) => (st?.bat ?? s.info.bat)?.[0] ?? null,
+      },
+      {
+        toggle: "metrics_battery",
+        channel: "battery",
+        id: "battery.charging",
+        nameKey: "batteryCharging",
+        kind: "bool",
+        available: hasStats,
+        extract: (s, st) => {
+          const b = st?.bat ?? s.info.bat;
+          if (!b) {
+            return null;
+          }
+          // bat[1] is a charge-STATE enum, not a boolean — verified against
+          // agent/battery/battery.go: 0=unknown, 1=empty, 2=full, 3=charging,
+          // 4=discharging, 5=idle. Only state 3 means actively charging; the
+          // old `> 0` wrongly reported charging while discharging/full/idle.
+          return b[1] === StateManager.BATTERY_STATE_CHARGING;
+        },
+      },
+      // --- v0.6.0 peaks + detail (available-gated on the field being present,
+      // so an older Beszel that doesn't send it gets no empty state) ---
+      {
+        toggle: "metrics_cpuPeak",
+        channel: "cpu",
+        id: "cpu.peak",
+        nameKey: "cpuPeak",
+        kind: "percent",
+        available: st => st?.cpum != null,
+        extract: (_s, st) => st?.cpum ?? null,
+      },
+      {
+        toggle: "metrics_memoryPeak",
+        channel: "memory",
+        id: "memory.peak",
+        nameKey: "memoryPeak",
+        kind: "num",
+        unit: "GB",
+        available: st => st?.mm != null,
+        extract: (_s, st) => st?.mm ?? null,
+      },
+      {
+        toggle: "metrics_diskPeak",
+        channel: "disk",
+        id: "disk.read_peak",
+        nameKey: "diskReadPeak",
+        kind: "num",
+        unit: "MB/s",
+        available: st => st?.drm != null,
+        extract: (_s, st) => st?.drm ?? null,
+      },
+      {
+        toggle: "metrics_diskPeak",
+        channel: "disk",
+        id: "disk.write_peak",
+        nameKey: "diskWritePeak",
+        kind: "num",
+        unit: "MB/s",
+        available: st => st?.dwm != null,
+        extract: (_s, st) => st?.dwm ?? null,
+      },
+      {
+        toggle: "metrics_networkPeak",
+        channel: "network",
+        id: "network.sent_peak",
+        nameKey: "networkSentPeak",
+        kind: "num",
+        unit: "MB/s",
+        available: st => st?.nsm != null,
+        extract: (_s, st) => st?.nsm ?? null,
+      },
+      {
+        toggle: "metrics_networkPeak",
+        channel: "network",
+        id: "network.recv_peak",
+        nameKey: "networkRecvPeak",
+        kind: "num",
+        unit: "MB/s",
+        available: st => st?.nrm != null,
+        extract: (_s, st) => st?.nrm ?? null,
+      },
+      {
+        toggle: "metrics_diskIo",
+        channel: "disk",
+        id: "disk.io_util",
+        nameKey: "diskIoUtil",
+        kind: "percent",
+        available: st => !!st?.dios && st.dios.length >= 3,
+        extract: (_s, st) => st?.dios?.[2] ?? null,
+      },
+      {
+        toggle: "metrics_diskIo",
+        channel: "disk",
+        id: "disk.io_await_read",
+        nameKey: "diskIoAwaitRead",
+        kind: "num",
+        unit: "ms",
+        available: st => !!st?.dios && st.dios.length >= 5,
+        extract: (_s, st) => st?.dios?.[3] ?? null,
+      },
+      {
+        toggle: "metrics_diskIo",
+        channel: "disk",
+        id: "disk.io_await_write",
+        nameKey: "diskIoAwaitWrite",
+        kind: "num",
+        unit: "ms",
+        available: st => !!st?.dios && st.dios.length >= 5,
+        extract: (_s, st) => st?.dios?.[4] ?? null,
+      },
+    ];
+  }
+
+  /**
+   * Build the StateCommon for a metric definition via the existing factories.
+   *
+   * @param def Metric definition (kind/unit/role/nameKey) to build the common from.
+   */
+  private commonFor(def: MetricDef): ioBroker.StateCommon {
+    const name = tName(def.nameKey as Parameters<typeof tName>[0]);
+    switch (def.kind) {
+      case "percent":
+        return this.percentCommon(name);
+      case "text":
+        return this.textCommon(name);
+      case "bool":
+        return this.boolCommon(name);
+      default:
+        return this.numCommon(name, def.unit, def.role ?? "value");
+    }
+  }
+
+  /**
+   * Create + set every enabled scalar metric for one system, driven by the
+   * registry. Ensures each needed channel once.
+   *
+   * @param sysId State prefix (`systems.<safeName>`)
+   * @param system The Beszel system record
+   * @param stats Latest stats, or undefined
+   * @param config Current adapter configuration
+   */
+  private async applyMetrics(
+    sysId: string,
+    system: BeszelSystem,
+    stats: SystemStats | undefined,
+    config: AdapterConfig,
+  ): Promise<void> {
+    const active = this.metricDefs().filter(d => config[d.toggle] && (d.available ? d.available(stats, system) : true));
+    const channels = new Set(active.map(d => d.channel));
+    for (const ch of channels) {
+      await this.ensureChannel(
+        `${sysId}.${ch}`,
+        tName(StateManager.CHANNEL_NAME_KEY[ch] as Parameters<typeof tName>[0]),
+      );
+    }
+    for (const def of active) {
+      await this.createAndSetState(`${sysId}.${def.id}`, this.commonFor(def), def.extract(system, stats));
+    }
+  }
+
   /**
    * Update all states for a single system.
    *
    * @param system Beszel system record
    * @param stats Latest stats for this system, or undefined if unavailable
    * @param containers Container records belonging to this system
-   * @param config Current adapter configuration
+   * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
    */
   public async updateSystem(
     system: BeszelSystem,
     stats: SystemStats | undefined,
     containers: BeszelContainer[],
-    config: AdapterConfig,
+    rawConfig: AdapterConfig,
   ): Promise<void> {
+    // Detail toggles inherit their category's base toggle (off category → off
+    // detail). Applied once here so applyMetrics + updateDynamicStats + the
+    // container path all see the same effective config.
+    const config = this.effectiveConfig(rawConfig);
     const safeName = this.resolvedSafeName(system);
     if (safeName.length === 0) {
       this.adapter.log.warn(
@@ -209,50 +863,16 @@ export class StateManager {
     );
     await this.createAndSetState(`${sysId}.info.status`, this.textCommon(tName("status")), system.status);
 
-    // Uptime
-    if (config.metrics_uptime) {
-      const uptime = system.info.u ?? null;
-      await this.createAndSetState(`${sysId}.info.uptime`, this.numCommon(tName("uptime"), "s"), uptime);
-      await this.createAndSetState(
-        `${sysId}.info.uptime_text`,
-        this.textCommon(tName("uptimeFormatted")),
-        uptime !== null ? this.formatUptime(uptime) : null,
-      );
-    }
+    // All toggled scalar metrics (info + cpu + memory + disk + network +
+    // temperature + battery) are driven by the registry (K1) — single source
+    // of truth shared with cleanupMetrics. loadAvg's old with-/without-stats
+    // split is unified inside the registry (stats.la ?? info.la fallback).
+    await this.applyMetrics(sysId, system, stats, config);
 
-    // Agent version
-    if (config.metrics_agentVersion) {
-      await this.createAndSetState(
-        `${sysId}.info.agent_version`,
-        this.textCommon(tName("agentVersion")),
-        system.info.v ?? null,
-      );
-    }
-
-    // Systemd services
-    if (config.metrics_services) {
-      const sv = system.info.sv;
-      await this.createAndSetState(
-        `${sysId}.info.services_total`,
-        this.numCommon(tName("servicesTotal")),
-        sv?.[0] ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.info.services_failed`,
-        this.numCommon(tName("servicesFailed")),
-        sv?.[1] ?? null,
-      );
-    }
-
-    // Stats-based metrics (only if stats available)
+    // Dynamic per-item groups (per-sensor temps, per-GPU, per-filesystem)
+    // need live stats and fan out to N children — kept in their own handler.
     if (stats) {
-      await this.updateStatsStates(sysId, system, stats, config);
-    }
-
-    // Load avg fallback to system.info.la if no stats
-    if (config.metrics_loadAvg && !stats) {
-      await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
-      await this.createLoadAvgStates(sysId, system.info.la);
+      await this.updateDynamicStats(sysId, stats, config);
     }
 
     // Containers
@@ -310,59 +930,22 @@ export class StateManager {
    * Called on startup to clean up previously-enabled states.
    *
    * @param systemId Sanitized system name (the part after "systems.")
-   * @param config Current adapter configuration
+   * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
    */
-  public async cleanupMetrics(systemId: string, config: AdapterConfig): Promise<void> {
+  public async cleanupMetrics(systemId: string, rawConfig: AdapterConfig): Promise<void> {
+    // Same dependency gating as updateSystem: a disabled category forces its
+    // detail toggles off, so their states (and empty channels) get pruned.
+    const config = this.effectiveConfig(rawConfig);
     const sysId = `systems.${systemId}`;
     const toDelete: string[] = [];
 
-    if (!config.metrics_uptime) {
-      toDelete.push(`${sysId}.info.uptime`, `${sysId}.info.uptime_text`);
-    }
-    if (!config.metrics_agentVersion) {
-      toDelete.push(`${sysId}.info.agent_version`);
-    }
-    if (!config.metrics_services) {
-      toDelete.push(`${sysId}.info.services_total`, `${sysId}.info.services_failed`);
-    }
-    if (!config.metrics_cpu) {
-      toDelete.push(`${sysId}.cpu.usage`);
-    }
-    if (!config.metrics_loadAvg) {
-      toDelete.push(`${sysId}.cpu.load_1m`, `${sysId}.cpu.load_5m`, `${sysId}.cpu.load_15m`);
-    }
-    if (!config.metrics_cpuBreakdown) {
-      toDelete.push(
-        `${sysId}.cpu.user`,
-        `${sysId}.cpu.system`,
-        `${sysId}.cpu.iowait`,
-        `${sysId}.cpu.steal`,
-        `${sysId}.cpu.idle`,
-      );
-    }
-    if (!config.metrics_memory) {
-      toDelete.push(`${sysId}.memory.percent`, `${sysId}.memory.used`, `${sysId}.memory.total`);
-    }
-    if (!config.metrics_memoryDetails) {
-      toDelete.push(`${sysId}.memory.buffers`, `${sysId}.memory.zfs_arc`);
-    }
-    if (!config.metrics_swap) {
-      toDelete.push(`${sysId}.memory.swap_used`, `${sysId}.memory.swap_total`);
-    }
-    if (!config.metrics_disk) {
-      toDelete.push(`${sysId}.disk.percent`, `${sysId}.disk.used`, `${sysId}.disk.total`);
-    }
-    if (!config.metrics_diskSpeed) {
-      toDelete.push(`${sysId}.disk.read`, `${sysId}.disk.write`);
-    }
-    if (!config.metrics_network) {
-      toDelete.push(`${sysId}.network.sent`, `${sysId}.network.recv`);
-    }
-    if (!config.metrics_temperature) {
-      toDelete.push(`${sysId}.temperature.average`);
-    }
-    if (!config.metrics_battery) {
-      toDelete.push(`${sysId}.battery.percent`, `${sysId}.battery.charging`);
+    // Scalar metrics: delete the state of every disabled toggle. Driven by the
+    // SAME registry as `applyMetrics` (K1) — create- and cleanup-path share one
+    // source of truth, so a metric's toggle → state-id mapping can never drift.
+    for (const def of this.metricDefs()) {
+      if (!config[def.toggle]) {
+        toDelete.push(`${sysId}.${def.id}`);
+      }
     }
 
     // v0.4.3 (SM2): toDelete check + delete in parallel.
@@ -377,22 +960,30 @@ export class StateManager {
     );
 
     // Delete empty channels when all metrics in a group are disabled
-    const noCpu = !config.metrics_cpu && !config.metrics_loadAvg && !config.metrics_cpuBreakdown;
+    const noCpu =
+      !config.metrics_cpu &&
+      !config.metrics_loadAvg &&
+      !config.metrics_cpuBreakdown &&
+      !config.metrics_cpuCores &&
+      !config.metrics_cpuPeak;
     if (noCpu) {
       await this.deleteChannelIfExists(`${sysId}.cpu`);
     }
 
-    const noMemory = !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap;
+    const noMemory =
+      !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap && !config.metrics_memoryPeak;
     if (noMemory) {
       await this.deleteChannelIfExists(`${sysId}.memory`);
     }
 
-    const noDisk = !config.metrics_disk && !config.metrics_diskSpeed;
+    const noDisk =
+      !config.metrics_disk && !config.metrics_diskSpeed && !config.metrics_diskIo && !config.metrics_diskPeak;
     if (noDisk) {
       await this.deleteChannelIfExists(`${sysId}.disk`);
     }
 
-    if (!config.metrics_network) {
+    const noNetwork = !config.metrics_network && !config.metrics_networkInterfaces && !config.metrics_networkPeak;
+    if (noNetwork) {
       await this.deleteChannelIfExists(`${sysId}.network`);
     }
 
@@ -406,6 +997,12 @@ export class StateManager {
     }
 
     // Sub-channels
+    if (!config.metrics_cpuCores) {
+      await this.deleteChannelIfExists(`${sysId}.cpu.cores`);
+    }
+    if (!config.metrics_networkInterfaces) {
+      await this.deleteChannelIfExists(`${sysId}.network.interfaces`);
+    }
     if (!config.metrics_temperatureDetails) {
       await this.deleteChannelIfExists(`${sysId}.temperature.sensors`);
     }
@@ -505,134 +1102,14 @@ export class StateManager {
   // Private helpers
   // -------------------------------------------------------------------------
 
-  private async updateStatsStates(
-    sysId: string,
-    system: BeszelSystem,
-    stats: SystemStats,
-    config: AdapterConfig,
-  ): Promise<void> {
-    // Ensure channels for enabled metric groups
-    if (config.metrics_cpu || config.metrics_loadAvg || config.metrics_cpuBreakdown) {
-      await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
-    }
-    if (config.metrics_memory || config.metrics_memoryDetails || config.metrics_swap) {
-      await this.ensureChannel(`${sysId}.memory`, tName("channelMemory"));
-    }
-    if (config.metrics_disk || config.metrics_diskSpeed) {
-      await this.ensureChannel(`${sysId}.disk`, tName("channelDisk"));
-    }
-    if (config.metrics_network) {
-      await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
-    }
-    if (config.metrics_temperature || config.metrics_temperatureDetails) {
-      await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
-    }
-    if (config.metrics_battery) {
-      await this.ensureChannel(`${sysId}.battery`, tName("channelBattery"));
-    }
-
-    // CPU
-    if (config.metrics_cpu) {
-      await this.createAndSetState(`${sysId}.cpu.usage`, this.percentCommon(tName("cpuUsage")), stats.cpu ?? null);
-    }
-
-    // Load avg — prefer stats.la, fallback to system.info.la
-    if (config.metrics_loadAvg) {
-      await this.createLoadAvgStates(sysId, stats.la ?? system.info.la);
-    }
-
-    // CPU breakdown
-    if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
-      const [user, sys, iowait, steal, idle] = stats.cpub;
-      await this.createAndSetState(`${sysId}.cpu.user`, this.percentCommon(tName("cpuUser")), user);
-      await this.createAndSetState(`${sysId}.cpu.system`, this.percentCommon(tName("cpuSystem")), sys);
-      await this.createAndSetState(`${sysId}.cpu.iowait`, this.percentCommon(tName("cpuIowait")), iowait);
-      await this.createAndSetState(`${sysId}.cpu.steal`, this.percentCommon(tName("cpuSteal")), steal);
-      await this.createAndSetState(`${sysId}.cpu.idle`, this.percentCommon(tName("cpuIdle")), idle);
-    }
-
-    // Memory
-    if (config.metrics_memory) {
-      await this.createAndSetState(
-        `${sysId}.memory.percent`,
-        this.percentCommon(tName("memoryPercent")),
-        stats.mp ?? null,
-      );
-      await this.createAndSetState(`${sysId}.memory.used`, this.numCommon(tName("memoryUsed"), "GB"), stats.mu ?? null);
-      await this.createAndSetState(
-        `${sysId}.memory.total`,
-        this.numCommon(tName("memoryTotal"), "GB"),
-        stats.m ?? null,
-      );
-    }
-
-    // Memory details
-    if (config.metrics_memoryDetails) {
-      await this.createAndSetState(
-        `${sysId}.memory.buffers`,
-        this.numCommon(tName("memoryBuffers"), "GB"),
-        stats.mb ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.zfs_arc`,
-        this.numCommon(tName("memoryZfsArc"), "GB"),
-        stats.mz ?? null,
-      );
-    }
-
-    // Swap
-    if (config.metrics_swap) {
-      await this.createAndSetState(
-        `${sysId}.memory.swap_used`,
-        this.numCommon(tName("swapUsed"), "GB"),
-        stats.su ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.swap_total`,
-        this.numCommon(tName("swapTotal"), "GB"),
-        stats.s ?? null,
-      );
-    }
-
-    // Disk
-    if (config.metrics_disk) {
-      await this.createAndSetState(`${sysId}.disk.percent`, this.percentCommon(tName("diskPercent")), stats.dp ?? null);
-      await this.createAndSetState(`${sysId}.disk.used`, this.numCommon(tName("diskUsed"), "GB"), stats.du ?? null);
-      await this.createAndSetState(`${sysId}.disk.total`, this.numCommon(tName("diskTotal"), "GB"), stats.d ?? null);
-    }
-
-    // Disk speed
-    if (config.metrics_diskSpeed) {
-      await this.createAndSetState(`${sysId}.disk.read`, this.numCommon(tName("diskRead"), "MB/s"), stats.dr ?? null);
-      await this.createAndSetState(`${sysId}.disk.write`, this.numCommon(tName("diskWrite"), "MB/s"), stats.dw ?? null);
-    }
-
-    // Network
-    if (config.metrics_network) {
-      await this.createAndSetState(
-        `${sysId}.network.sent`,
-        this.numCommon(tName("networkSent"), "MB/s"),
-        stats.ns ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.network.recv`,
-        this.numCommon(tName("networkReceived"), "MB/s"),
-        stats.nr ?? null,
-      );
-    }
-
-    // Temperature (average of top 3)
-    if (config.metrics_temperature) {
-      await this.createAndSetState(
-        `${sysId}.temperature.average`,
-        this.numCommon(tName("temperatureAvg"), "°C", "value.temperature"),
-        this.computeTopAvgTemp(stats.t),
-      );
-    }
-
-    // Temperature details — sensor names come from the agent (e.g. "coretemp_package0")
-    // and have no fixed translation — we display them as-is.
+  private async updateDynamicStats(sysId: string, stats: SystemStats, config: AdapterConfig): Promise<void> {
+    // Temperature details — per-sensor. Sensor names come from the agent
+    // (e.g. "coretemp_package0") and have no fixed translation — shown as-is.
+    // Ensure the parent `temperature` channel here too: the registry only
+    // creates it when the average (metrics_temperature) is enabled, but the
+    // details can be on with the average off.
     if (config.metrics_temperatureDetails && stats.t) {
+      await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
       await this.ensureChannel(`${sysId}.temperature.sensors`, tName("channelSensors"));
       for (const [sensor, temp] of Object.entries(stats.t)) {
         await this.createAndSetState(
@@ -643,19 +1120,47 @@ export class StateManager {
       }
     }
 
-    // Battery
-    if (config.metrics_battery) {
-      const bat = stats.bat ?? system.info.bat;
-      await this.createAndSetState(
-        `${sysId}.battery.percent`,
-        this.percentCommon(tName("batteryPercent")),
-        bat?.[0] ?? null,
-      );
-      await this.createAndSetState(
-        `${sysId}.battery.charging`,
-        this.boolCommon(tName("batteryCharging")),
-        bat ? bat[1] > 0 : null,
-      );
+    // Per-core CPU usage (v0.6.0). Core labels are positional (CPU0..), shown as-is.
+    if (config.metrics_cpuCores && stats.cpus && stats.cpus.length > 0) {
+      await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
+      await this.ensureChannel(`${sysId}.cpu.cores`, tName("channelCores"));
+      for (let i = 0; i < stats.cpus.length; i++) {
+        await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), stats.cpus[i]);
+      }
+    }
+
+    // Per-network-interface (v0.6.0). ni: name -> [up, down, total up, total down] bytes.
+    if (config.metrics_networkInterfaces && stats.ni && Object.keys(stats.ni).length > 0) {
+      await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
+      await this.ensureChannel(`${sysId}.network.interfaces`, tName("channelInterfaces"));
+      for (const [iface, vals] of Object.entries(stats.ni)) {
+        const safeId = this.sanitize(iface);
+        if (!safeId) {
+          continue;
+        }
+        // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
+        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, iface);
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.up`,
+          this.numCommon(tName("ifaceUp"), "B/s"),
+          vals[0] ?? null,
+        );
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.down`,
+          this.numCommon(tName("ifaceDown"), "B/s"),
+          vals[1] ?? null,
+        );
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.total_up`,
+          this.numCommon(tName("ifaceTotalUp"), "B"),
+          vals[2] ?? null,
+        );
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.total_down`,
+          this.numCommon(tName("ifaceTotalDown"), "B"),
+          vals[3] ?? null,
+        );
+      }
     }
 
     // GPU — gpuData.n is the raw vendor name; we keep it as a plain string.
@@ -671,12 +1176,12 @@ export class StateManager {
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_used`,
-          this.numCommon(tName("gpuMemoryUsed"), "GB"),
+          this.numCommon(tName("gpuMemoryUsed"), "MB"),
           gpuData.mu ?? null,
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_total`,
-          this.numCommon(tName("gpuMemoryTotal"), "GB"),
+          this.numCommon(tName("gpuMemoryTotal"), "MB"),
           gpuData.mt ?? null,
         );
         await this.createAndSetState(
@@ -684,6 +1189,28 @@ export class StateManager {
           this.numCommon(tName("gpuPower"), "W"),
           gpuData.p ?? null,
         );
+        // GPU details (v0.6.0): package power + per-engine usage.
+        if (config.metrics_gpuDetails) {
+          await this.createAndSetState(
+            `${sysId}.gpu.${safeId}.power_package`,
+            this.numCommon(tName("gpuPowerPackage"), "W"),
+            gpuData.pp ?? null,
+          );
+          if (gpuData.e && Object.keys(gpuData.e).length > 0) {
+            await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, tName("channelEngines"));
+            for (const [engine, value] of Object.entries(gpuData.e)) {
+              const safeEngine = this.sanitize(engine);
+              if (safeEngine) {
+                // Engine name is vendor-defined → kept as-is.
+                await this.createAndSetState(
+                  `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
+                  this.percentCommon(engine),
+                  value,
+                );
+              }
+            }
+          }
+        }
       }
     }
 
@@ -735,6 +1262,20 @@ export class StateManager {
 
   private async updateContainers(sysId: string, systemId: string, allContainers: BeszelContainer[]): Promise<void> {
     const sysContainers = allContainers.filter(c => c.system === systemId);
+
+    // F1: prune containers that disappeared from the host. Build the active set
+    // and prune BEFORE the early-return — otherwise a system that drops to zero
+    // containers would keep its old container state-trees forever (only stale
+    // *systems* were cleaned up before, never stale containers within a system).
+    const activeIds = new Set<string>();
+    for (const container of sysContainers) {
+      const cId = this.sanitize(container.name);
+      if (cId) {
+        activeIds.add(cId);
+      }
+    }
+    await this.cleanupStaleContainers(sysId, activeIds);
+
     if (sysContainers.length === 0) {
       return;
     }
@@ -778,7 +1319,57 @@ export class StateManager {
         this.textCommon(tName("containerImage")),
         container.image,
       );
+      // v0.6.0: combined network throughput (sent + recv, bytes/s). Only when
+      // the Hub provides it — older Hubs omit the `net` column.
+      if (container.net != null) {
+        await this.createAndSetState(
+          `${sysId}.containers.${cId}.network`,
+          this.numCommon(tName("containerNetwork"), "B/s"),
+          container.net,
+        );
+      }
     }
+  }
+
+  /**
+   * F1: remove container channels under a system that are no longer reported
+   * by Beszel (container stopped/removed/renamed on the host). Looks up the
+   * direct children of `<sysId>.containers` and deletes any whose sanitized id
+   * is not in `activeIds`.
+   *
+   * @param sysId State prefix (`systems.<safeName>`)
+   * @param activeIds Sanitized ids of the containers currently present
+   */
+  private async cleanupStaleContainers(sysId: string, activeIds: Set<string>): Promise<void> {
+    const base = `${sysId}.containers`;
+    const view = await this.adapter.getObjectViewAsync("system", "channel", {
+      startkey: `${this.adapter.namespace}.${base}.`,
+      endkey: `${this.adapter.namespace}.${base}.香`,
+    });
+    if (!view?.rows) {
+      return;
+    }
+    const stale = new Set<string>();
+    for (const row of view.rows) {
+      const id = row.id.startsWith(`${this.adapter.namespace}.`)
+        ? row.id.slice(this.adapter.namespace.length + 1)
+        : row.id;
+      if (!id.startsWith(`${base}.`)) {
+        continue;
+      }
+      // Only the direct child segment (`<base>.<cId>`), not deeper state ids.
+      const cId = id.slice(base.length + 1).split(".")[0];
+      if (cId && !activeIds.has(cId)) {
+        stale.add(cId);
+      }
+    }
+    await Promise.all(
+      [...stale].map(async cId => {
+        this.adapter.log.debug(`Removing stale container: ${base}.${cId}`);
+        await this.adapter.delObjectAsync(`${base}.${cId}`, { recursive: true });
+        this.dropCacheUnder(`${base}.${cId}`);
+      }),
+    );
   }
 
   private async ensureChannel(id: string, name: LocalizedName): Promise<void> {
@@ -806,18 +1397,6 @@ export class StateManager {
       // user log but leave a breadcrumb for diagnostics.
       this.adapter.log.debug(`deleteChannelIfExists(${id}) ignored: ${errText(err)}`);
     }
-  }
-
-  /**
-   * Create or update the three load average states.
-   *
-   * @param sysId State ID prefix (e.g. "systems.my_server")
-   * @param la Load average tuple [1m, 5m, 15m], or undefined
-   */
-  private async createLoadAvgStates(sysId: string, la: [number, number, number] | undefined): Promise<void> {
-    await this.createAndSetState(`${sysId}.cpu.load_1m`, this.numCommon(tName("load1m")), la?.[0] ?? null);
-    await this.createAndSetState(`${sysId}.cpu.load_5m`, this.numCommon(tName("load5m")), la?.[1] ?? null);
-    await this.createAndSetState(`${sysId}.cpu.load_15m`, this.numCommon(tName("load15m")), la?.[2] ?? null);
   }
 
   private async createAndSetState(id: string, common: ioBroker.StateCommon, value: ioBroker.StateValue): Promise<void> {
@@ -896,6 +1475,45 @@ export class StateManager {
     const top3 = values.slice(0, 3);
     const avg = top3.reduce((sum, v) => sum + v, 0) / top3.length;
     return Math.round(avg * 10) / 10;
+  }
+
+  /**
+   * F7: hottest single sensor — the actionable "is anything overheating" value
+   * (vs. the top-3 average). Returns null when there are no finite readings.
+   *
+   * @param temps Sensor → °C map, or undefined.
+   */
+  private computeMaxTemp(temps: Record<string, number> | undefined): number | null {
+    if (!temps) {
+      return null;
+    }
+    const values = Object.values(temps).filter(v => typeof v === "number" && isFinite(v));
+    if (values.length === 0) {
+      return null;
+    }
+    return Math.round(Math.max(...values) * 10) / 10;
+  }
+
+  /**
+   * F2: map the numeric OS platform enum from system_details into a readable
+   * label. Values verified against the v0.18.7 source
+   * (`Ressourcen/beszel/beszel-0.18.7/internal/entities/system/system.go`).
+   *
+   * @param os Platform enum (0=Linux, 1=Darwin/macOS, 2=Windows, 3=FreeBSD).
+   */
+  private osLabel(os: number | undefined): string | null {
+    switch (os) {
+      case 0:
+        return "Linux";
+      case 1:
+        return "macOS";
+      case 2:
+        return "Windows";
+      case 3:
+        return "FreeBSD";
+      default:
+        return os == null ? null : `Unknown (${os})`;
+    }
   }
 
   private formatUptime(seconds: number): string {

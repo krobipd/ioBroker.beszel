@@ -151,16 +151,785 @@ class StateManager {
     }
     return names;
   }
+  // -------------------------------------------------------------------------
+  // Metric registry (K1): single source of truth for every toggled scalar
+  // state. Both the create-path (`applyMetrics`) and the cleanup-path
+  // (`cleanupMetrics`) iterate this list, so a metric's toggle → state-id
+  // mapping can never drift between "create" and "delete".
+  //
+  // Dynamic groups (per-sensor temperature, per-GPU, per-filesystem,
+  // per-container) are NOT in here — they fan out to N items and stay in
+  // their dedicated handlers (`updateDynamicStats`, `updateContainers`).
+  // -------------------------------------------------------------------------
+  /**
+   * Beszel battery charge-state value that means "actively charging"
+   * (agent/battery/battery.go enum: 0=unknown 1=empty 2=full 3=charging
+   * 4=discharging 5=idle). Used to map `bat[1]` to the `charging` boolean.
+   */
+  static BATTERY_STATE_CHARGING = 3;
+  /** i18n key for each metric channel. */
+  static CHANNEL_NAME_KEY = {
+    info: "channelInfo",
+    cpu: "channelCpu",
+    memory: "channelMemory",
+    disk: "channelDisk",
+    network: "channelNetwork",
+    temperature: "channelTemperature",
+    battery: "channelBattery"
+  };
+  /**
+   * v0.6.0: each detail/peak toggle depends on its category's base toggle —
+   * when the category is off, the detail is off too. This mirrors the admin
+   * grey-out (`disabled` in jsonConfig) in the DATA logic, so a sub-metric
+   * never creates states while its category is disabled (krobi: "Kategorie aus
+   * → Unterkategorie automatisch mit aus"). Must stay in sync with the
+   * `disabled` conditions in admin/jsonConfig.json. Every non-base metric in a
+   * category gates on the category's base/usage metric — including the
+   * default-on co-metrics `loadAvg` (→ CPU) and `diskSpeed` (→ Disk): krobi
+   * wants a category to switch off completely, no "logischer Ausreißer". Only
+   * the System category (uptime / system-info / services) has no single base,
+   * so its three independent metrics are not gated.
+   */
+  static METRIC_DEPENDENCIES = {
+    metrics_loadAvg: "metrics_cpu",
+    metrics_cpuBreakdown: "metrics_cpu",
+    metrics_cpuCores: "metrics_cpu",
+    metrics_cpuPeak: "metrics_cpu",
+    metrics_memoryDetails: "metrics_memory",
+    metrics_swap: "metrics_memory",
+    metrics_memoryPeak: "metrics_memory",
+    metrics_diskSpeed: "metrics_disk",
+    metrics_extraFs: "metrics_disk",
+    metrics_diskIo: "metrics_disk",
+    metrics_diskPeak: "metrics_disk",
+    metrics_networkInterfaces: "metrics_network",
+    metrics_networkPeak: "metrics_network",
+    metrics_temperatureDetails: "metrics_temperature",
+    metrics_gpuDetails: "metrics_gpu"
+  };
+  /**
+   * Return a config copy where every detail/peak toggle whose category base is
+   * disabled is forced to `false` (see `METRIC_DEPENDENCIES`). Applied at the
+   * top of `updateSystem` and `cleanupMetrics` so both create- and cleanup-path
+   * see the same effective values — a disabled category's sub-states are never
+   * created, and existing ones are pruned.
+   *
+   * @param config Raw adapter configuration.
+   */
+  effectiveConfig(config) {
+    const out = { ...config };
+    for (const detail of Object.keys(
+      StateManager.METRIC_DEPENDENCIES
+    )) {
+      const base = StateManager.METRIC_DEPENDENCIES[detail];
+      if (!config[base]) {
+        out[detail] = false;
+      }
+    }
+    return out;
+  }
+  /**
+   * Shared metric definitions. `extract` returns the value (or null);
+   * `available` (default: always) gates state CREATION exactly like the old
+   * inline guards (e.g. cpuBreakdown needs `cpub.length >= 5`). Entries that
+   * need live stats set `available: hasStats`.
+   *
+   * Note: `loadAvg` is defined once here and falls back `stats.la ?? info.la`
+   * — this unifies the two old code paths (with-stats in updateStatsStates,
+   * without-stats in updateSystem) that previously duplicated it.
+   */
+  metricDefs() {
+    const hasStats = (s) => !!s;
+    const la = (system, stats) => {
+      var _a;
+      return (_a = stats == null ? void 0 : stats.la) != null ? _a : system.info.la;
+    };
+    return [
+      // info (no stats required)
+      {
+        toggle: "metrics_uptime",
+        channel: "info",
+        id: "info.uptime",
+        nameKey: "uptime",
+        kind: "num",
+        unit: "s",
+        extract: (s) => {
+          var _a;
+          return (_a = s.info.u) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_uptime",
+        channel: "info",
+        id: "info.uptime_text",
+        nameKey: "uptimeFormatted",
+        kind: "text",
+        extract: (s) => s.info.u != null ? this.formatUptime(s.info.u) : null
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.agent_version",
+        nameKey: "agentVersion",
+        kind: "text",
+        extract: (s) => {
+          var _a;
+          return (_a = s.info.v) != null ? _a : null;
+        }
+      },
+      // F2: static hardware/OS info from the system_details collection (attached
+      // to system.details by the poll loop). Each field gated on its own presence
+      // so a partially-populated agent yields no empty states; all share the
+      // "System info" toggle (metrics_agentVersion) and the existing info channel.
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.hostname",
+        nameKey: "hostname",
+        kind: "text",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.hostname) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.hostname) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.os",
+        nameKey: "os",
+        kind: "text",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.os) != null;
+        },
+        extract: (s) => {
+          var _a;
+          return this.osLabel((_a = s.details) == null ? void 0 : _a.os);
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.os_name",
+        nameKey: "osName",
+        kind: "text",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.os_name) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.os_name) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.kernel",
+        nameKey: "kernel",
+        kind: "text",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.kernel) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.kernel) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.cpu_model",
+        nameKey: "cpuModel",
+        kind: "text",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.cpu) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.cpu) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.arch",
+        nameKey: "arch",
+        kind: "text",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.arch) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.arch) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.cores",
+        nameKey: "cores",
+        kind: "num",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.cores) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.cores) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.threads",
+        nameKey: "threads",
+        kind: "num",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.threads) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.threads) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_agentVersion",
+        channel: "info",
+        id: "info.podman",
+        nameKey: "podman",
+        kind: "bool",
+        available: (_st, s) => {
+          var _a;
+          return ((_a = s.details) == null ? void 0 : _a.podman) != null;
+        },
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.details) == null ? void 0 : _a.podman) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_services",
+        channel: "info",
+        id: "info.services_total",
+        nameKey: "servicesTotal",
+        kind: "num",
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.info.sv) == null ? void 0 : _a[0]) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_services",
+        channel: "info",
+        id: "info.services_failed",
+        nameKey: "servicesFailed",
+        kind: "num",
+        extract: (s) => {
+          var _a, _b;
+          return (_b = (_a = s.info.sv) == null ? void 0 : _a[1]) != null ? _b : null;
+        }
+      },
+      // load average — always created if toggled (stats.la or info.la fallback)
+      {
+        toggle: "metrics_loadAvg",
+        channel: "cpu",
+        id: "cpu.load_1m",
+        nameKey: "load1m",
+        kind: "num",
+        extract: (s, st) => {
+          var _a, _b;
+          return (_b = (_a = la(s, st)) == null ? void 0 : _a[0]) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_loadAvg",
+        channel: "cpu",
+        id: "cpu.load_5m",
+        nameKey: "load5m",
+        kind: "num",
+        extract: (s, st) => {
+          var _a, _b;
+          return (_b = (_a = la(s, st)) == null ? void 0 : _a[1]) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_loadAvg",
+        channel: "cpu",
+        id: "cpu.load_15m",
+        nameKey: "load15m",
+        kind: "num",
+        extract: (s, st) => {
+          var _a, _b;
+          return (_b = (_a = la(s, st)) == null ? void 0 : _a[2]) != null ? _b : null;
+        }
+      },
+      // stats-gated scalar metrics
+      {
+        toggle: "metrics_cpu",
+        channel: "cpu",
+        id: "cpu.usage",
+        nameKey: "cpuUsage",
+        kind: "percent",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.cpu) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.user",
+        nameKey: "cpuUser",
+        kind: "percent",
+        available: (st) => !!(st == null ? void 0 : st.cpub) && st.cpub.length >= 5,
+        extract: (_s, st) => st.cpub[0]
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.system",
+        nameKey: "cpuSystem",
+        kind: "percent",
+        available: (st) => !!(st == null ? void 0 : st.cpub) && st.cpub.length >= 5,
+        extract: (_s, st) => st.cpub[1]
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.iowait",
+        nameKey: "cpuIowait",
+        kind: "percent",
+        available: (st) => !!(st == null ? void 0 : st.cpub) && st.cpub.length >= 5,
+        extract: (_s, st) => st.cpub[2]
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.steal",
+        nameKey: "cpuSteal",
+        kind: "percent",
+        available: (st) => !!(st == null ? void 0 : st.cpub) && st.cpub.length >= 5,
+        extract: (_s, st) => st.cpub[3]
+      },
+      {
+        toggle: "metrics_cpuBreakdown",
+        channel: "cpu",
+        id: "cpu.idle",
+        nameKey: "cpuIdle",
+        kind: "percent",
+        available: (st) => !!(st == null ? void 0 : st.cpub) && st.cpub.length >= 5,
+        extract: (_s, st) => st.cpub[4]
+      },
+      {
+        toggle: "metrics_memory",
+        channel: "memory",
+        id: "memory.percent",
+        nameKey: "memoryPercent",
+        kind: "percent",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.mp) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_memory",
+        channel: "memory",
+        id: "memory.used",
+        nameKey: "memoryUsed",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.mu) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_memory",
+        channel: "memory",
+        id: "memory.total",
+        nameKey: "memoryTotal",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.m) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_memoryDetails",
+        channel: "memory",
+        id: "memory.buffers",
+        nameKey: "memoryBuffers",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.mb) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_memoryDetails",
+        channel: "memory",
+        id: "memory.zfs_arc",
+        nameKey: "memoryZfsArc",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.mz) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_swap",
+        channel: "memory",
+        id: "memory.swap_used",
+        nameKey: "swapUsed",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.su) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_swap",
+        channel: "memory",
+        id: "memory.swap_total",
+        nameKey: "swapTotal",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.s) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_disk",
+        channel: "disk",
+        id: "disk.percent",
+        nameKey: "diskPercent",
+        kind: "percent",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.dp) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_disk",
+        channel: "disk",
+        id: "disk.used",
+        nameKey: "diskUsed",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.du) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_disk",
+        channel: "disk",
+        id: "disk.total",
+        nameKey: "diskTotal",
+        kind: "num",
+        unit: "GB",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.d) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_diskSpeed",
+        channel: "disk",
+        id: "disk.read",
+        nameKey: "diskRead",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.dr) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_diskSpeed",
+        channel: "disk",
+        id: "disk.write",
+        nameKey: "diskWrite",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.dw) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_network",
+        channel: "network",
+        id: "network.sent",
+        nameKey: "networkSent",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.ns) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_network",
+        channel: "network",
+        id: "network.recv",
+        nameKey: "networkReceived",
+        kind: "num",
+        unit: "MB/s",
+        available: hasStats,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.nr) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_temperature",
+        channel: "temperature",
+        id: "temperature.average",
+        nameKey: "temperatureAvg",
+        kind: "num",
+        unit: "\xB0C",
+        role: "value.temperature",
+        available: hasStats,
+        extract: (_s, st) => this.computeTopAvgTemp(st == null ? void 0 : st.t)
+      },
+      {
+        toggle: "metrics_temperature",
+        channel: "temperature",
+        id: "temperature.max",
+        nameKey: "temperatureMax",
+        kind: "num",
+        unit: "\xB0C",
+        role: "value.temperature",
+        available: hasStats,
+        extract: (_s, st) => this.computeMaxTemp(st == null ? void 0 : st.t)
+      },
+      {
+        toggle: "metrics_battery",
+        channel: "battery",
+        id: "battery.percent",
+        nameKey: "batteryPercent",
+        kind: "percent",
+        available: hasStats,
+        extract: (s, st) => {
+          var _a, _b, _c;
+          return (_c = (_b = (_a = st == null ? void 0 : st.bat) != null ? _a : s.info.bat) == null ? void 0 : _b[0]) != null ? _c : null;
+        }
+      },
+      {
+        toggle: "metrics_battery",
+        channel: "battery",
+        id: "battery.charging",
+        nameKey: "batteryCharging",
+        kind: "bool",
+        available: hasStats,
+        extract: (s, st) => {
+          var _a;
+          const b = (_a = st == null ? void 0 : st.bat) != null ? _a : s.info.bat;
+          if (!b) {
+            return null;
+          }
+          return b[1] === StateManager.BATTERY_STATE_CHARGING;
+        }
+      },
+      // --- v0.6.0 peaks + detail (available-gated on the field being present,
+      // so an older Beszel that doesn't send it gets no empty state) ---
+      {
+        toggle: "metrics_cpuPeak",
+        channel: "cpu",
+        id: "cpu.peak",
+        nameKey: "cpuPeak",
+        kind: "percent",
+        available: (st) => (st == null ? void 0 : st.cpum) != null,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.cpum) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_memoryPeak",
+        channel: "memory",
+        id: "memory.peak",
+        nameKey: "memoryPeak",
+        kind: "num",
+        unit: "GB",
+        available: (st) => (st == null ? void 0 : st.mm) != null,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.mm) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_diskPeak",
+        channel: "disk",
+        id: "disk.read_peak",
+        nameKey: "diskReadPeak",
+        kind: "num",
+        unit: "MB/s",
+        available: (st) => (st == null ? void 0 : st.drm) != null,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.drm) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_diskPeak",
+        channel: "disk",
+        id: "disk.write_peak",
+        nameKey: "diskWritePeak",
+        kind: "num",
+        unit: "MB/s",
+        available: (st) => (st == null ? void 0 : st.dwm) != null,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.dwm) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_networkPeak",
+        channel: "network",
+        id: "network.sent_peak",
+        nameKey: "networkSentPeak",
+        kind: "num",
+        unit: "MB/s",
+        available: (st) => (st == null ? void 0 : st.nsm) != null,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.nsm) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_networkPeak",
+        channel: "network",
+        id: "network.recv_peak",
+        nameKey: "networkRecvPeak",
+        kind: "num",
+        unit: "MB/s",
+        available: (st) => (st == null ? void 0 : st.nrm) != null,
+        extract: (_s, st) => {
+          var _a;
+          return (_a = st == null ? void 0 : st.nrm) != null ? _a : null;
+        }
+      },
+      {
+        toggle: "metrics_diskIo",
+        channel: "disk",
+        id: "disk.io_util",
+        nameKey: "diskIoUtil",
+        kind: "percent",
+        available: (st) => !!(st == null ? void 0 : st.dios) && st.dios.length >= 3,
+        extract: (_s, st) => {
+          var _a, _b;
+          return (_b = (_a = st == null ? void 0 : st.dios) == null ? void 0 : _a[2]) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_diskIo",
+        channel: "disk",
+        id: "disk.io_await_read",
+        nameKey: "diskIoAwaitRead",
+        kind: "num",
+        unit: "ms",
+        available: (st) => !!(st == null ? void 0 : st.dios) && st.dios.length >= 5,
+        extract: (_s, st) => {
+          var _a, _b;
+          return (_b = (_a = st == null ? void 0 : st.dios) == null ? void 0 : _a[3]) != null ? _b : null;
+        }
+      },
+      {
+        toggle: "metrics_diskIo",
+        channel: "disk",
+        id: "disk.io_await_write",
+        nameKey: "diskIoAwaitWrite",
+        kind: "num",
+        unit: "ms",
+        available: (st) => !!(st == null ? void 0 : st.dios) && st.dios.length >= 5,
+        extract: (_s, st) => {
+          var _a, _b;
+          return (_b = (_a = st == null ? void 0 : st.dios) == null ? void 0 : _a[4]) != null ? _b : null;
+        }
+      }
+    ];
+  }
+  /**
+   * Build the StateCommon for a metric definition via the existing factories.
+   *
+   * @param def Metric definition (kind/unit/role/nameKey) to build the common from.
+   */
+  commonFor(def) {
+    var _a;
+    const name = (0, import_i18n.tName)(def.nameKey);
+    switch (def.kind) {
+      case "percent":
+        return this.percentCommon(name);
+      case "text":
+        return this.textCommon(name);
+      case "bool":
+        return this.boolCommon(name);
+      default:
+        return this.numCommon(name, def.unit, (_a = def.role) != null ? _a : "value");
+    }
+  }
+  /**
+   * Create + set every enabled scalar metric for one system, driven by the
+   * registry. Ensures each needed channel once.
+   *
+   * @param sysId State prefix (`systems.<safeName>`)
+   * @param system The Beszel system record
+   * @param stats Latest stats, or undefined
+   * @param config Current adapter configuration
+   */
+  async applyMetrics(sysId, system, stats, config) {
+    const active = this.metricDefs().filter((d) => config[d.toggle] && (d.available ? d.available(stats, system) : true));
+    const channels = new Set(active.map((d) => d.channel));
+    for (const ch of channels) {
+      await this.ensureChannel(
+        `${sysId}.${ch}`,
+        (0, import_i18n.tName)(StateManager.CHANNEL_NAME_KEY[ch])
+      );
+    }
+    for (const def of active) {
+      await this.createAndSetState(`${sysId}.${def.id}`, this.commonFor(def), def.extract(system, stats));
+    }
+  }
   /**
    * Update all states for a single system.
    *
    * @param system Beszel system record
    * @param stats Latest stats for this system, or undefined if unavailable
    * @param containers Container records belonging to this system
-   * @param config Current adapter configuration
+   * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
    */
-  async updateSystem(system, stats, containers, config) {
-    var _a, _b, _c, _d;
+  async updateSystem(system, stats, containers, rawConfig) {
+    const config = this.effectiveConfig(rawConfig);
     const safeName = this.resolvedSafeName(system);
     if (safeName.length === 0) {
       this.adapter.log.warn(
@@ -191,41 +960,9 @@ class StateManager {
       system.status === "up"
     );
     await this.createAndSetState(`${sysId}.info.status`, this.textCommon((0, import_i18n.tName)("status")), system.status);
-    if (config.metrics_uptime) {
-      const uptime = (_a = system.info.u) != null ? _a : null;
-      await this.createAndSetState(`${sysId}.info.uptime`, this.numCommon((0, import_i18n.tName)("uptime"), "s"), uptime);
-      await this.createAndSetState(
-        `${sysId}.info.uptime_text`,
-        this.textCommon((0, import_i18n.tName)("uptimeFormatted")),
-        uptime !== null ? this.formatUptime(uptime) : null
-      );
-    }
-    if (config.metrics_agentVersion) {
-      await this.createAndSetState(
-        `${sysId}.info.agent_version`,
-        this.textCommon((0, import_i18n.tName)("agentVersion")),
-        (_b = system.info.v) != null ? _b : null
-      );
-    }
-    if (config.metrics_services) {
-      const sv = system.info.sv;
-      await this.createAndSetState(
-        `${sysId}.info.services_total`,
-        this.numCommon((0, import_i18n.tName)("servicesTotal")),
-        (_c = sv == null ? void 0 : sv[0]) != null ? _c : null
-      );
-      await this.createAndSetState(
-        `${sysId}.info.services_failed`,
-        this.numCommon((0, import_i18n.tName)("servicesFailed")),
-        (_d = sv == null ? void 0 : sv[1]) != null ? _d : null
-      );
-    }
+    await this.applyMetrics(sysId, system, stats, config);
     if (stats) {
-      await this.updateStatsStates(sysId, system, stats, config);
-    }
-    if (config.metrics_loadAvg && !stats) {
-      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n.tName)("channelCpu"));
-      await this.createLoadAvgStates(sysId, system.info.la);
+      await this.updateDynamicStats(sysId, stats, config);
     }
     if (config.metrics_containers) {
       await this.updateContainers(sysId, system.id, containers);
@@ -273,58 +1010,16 @@ class StateManager {
    * Called on startup to clean up previously-enabled states.
    *
    * @param systemId Sanitized system name (the part after "systems.")
-   * @param config Current adapter configuration
+   * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
    */
-  async cleanupMetrics(systemId, config) {
+  async cleanupMetrics(systemId, rawConfig) {
+    const config = this.effectiveConfig(rawConfig);
     const sysId = `systems.${systemId}`;
     const toDelete = [];
-    if (!config.metrics_uptime) {
-      toDelete.push(`${sysId}.info.uptime`, `${sysId}.info.uptime_text`);
-    }
-    if (!config.metrics_agentVersion) {
-      toDelete.push(`${sysId}.info.agent_version`);
-    }
-    if (!config.metrics_services) {
-      toDelete.push(`${sysId}.info.services_total`, `${sysId}.info.services_failed`);
-    }
-    if (!config.metrics_cpu) {
-      toDelete.push(`${sysId}.cpu.usage`);
-    }
-    if (!config.metrics_loadAvg) {
-      toDelete.push(`${sysId}.cpu.load_1m`, `${sysId}.cpu.load_5m`, `${sysId}.cpu.load_15m`);
-    }
-    if (!config.metrics_cpuBreakdown) {
-      toDelete.push(
-        `${sysId}.cpu.user`,
-        `${sysId}.cpu.system`,
-        `${sysId}.cpu.iowait`,
-        `${sysId}.cpu.steal`,
-        `${sysId}.cpu.idle`
-      );
-    }
-    if (!config.metrics_memory) {
-      toDelete.push(`${sysId}.memory.percent`, `${sysId}.memory.used`, `${sysId}.memory.total`);
-    }
-    if (!config.metrics_memoryDetails) {
-      toDelete.push(`${sysId}.memory.buffers`, `${sysId}.memory.zfs_arc`);
-    }
-    if (!config.metrics_swap) {
-      toDelete.push(`${sysId}.memory.swap_used`, `${sysId}.memory.swap_total`);
-    }
-    if (!config.metrics_disk) {
-      toDelete.push(`${sysId}.disk.percent`, `${sysId}.disk.used`, `${sysId}.disk.total`);
-    }
-    if (!config.metrics_diskSpeed) {
-      toDelete.push(`${sysId}.disk.read`, `${sysId}.disk.write`);
-    }
-    if (!config.metrics_network) {
-      toDelete.push(`${sysId}.network.sent`, `${sysId}.network.recv`);
-    }
-    if (!config.metrics_temperature) {
-      toDelete.push(`${sysId}.temperature.average`);
-    }
-    if (!config.metrics_battery) {
-      toDelete.push(`${sysId}.battery.percent`, `${sysId}.battery.charging`);
+    for (const def of this.metricDefs()) {
+      if (!config[def.toggle]) {
+        toDelete.push(`${sysId}.${def.id}`);
+      }
     }
     await Promise.all(
       toDelete.map(async (id) => {
@@ -335,19 +1030,20 @@ class StateManager {
         }
       })
     );
-    const noCpu = !config.metrics_cpu && !config.metrics_loadAvg && !config.metrics_cpuBreakdown;
+    const noCpu = !config.metrics_cpu && !config.metrics_loadAvg && !config.metrics_cpuBreakdown && !config.metrics_cpuCores && !config.metrics_cpuPeak;
     if (noCpu) {
       await this.deleteChannelIfExists(`${sysId}.cpu`);
     }
-    const noMemory = !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap;
+    const noMemory = !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap && !config.metrics_memoryPeak;
     if (noMemory) {
       await this.deleteChannelIfExists(`${sysId}.memory`);
     }
-    const noDisk = !config.metrics_disk && !config.metrics_diskSpeed;
+    const noDisk = !config.metrics_disk && !config.metrics_diskSpeed && !config.metrics_diskIo && !config.metrics_diskPeak;
     if (noDisk) {
       await this.deleteChannelIfExists(`${sysId}.disk`);
     }
-    if (!config.metrics_network) {
+    const noNetwork = !config.metrics_network && !config.metrics_networkInterfaces && !config.metrics_networkPeak;
+    if (noNetwork) {
       await this.deleteChannelIfExists(`${sysId}.network`);
     }
     const noTemp = !config.metrics_temperature && !config.metrics_temperatureDetails;
@@ -356,6 +1052,12 @@ class StateManager {
     }
     if (!config.metrics_battery) {
       await this.deleteChannelIfExists(`${sysId}.battery`);
+    }
+    if (!config.metrics_cpuCores) {
+      await this.deleteChannelIfExists(`${sysId}.cpu.cores`);
+    }
+    if (!config.metrics_networkInterfaces) {
+      await this.deleteChannelIfExists(`${sysId}.network.interfaces`);
     }
     if (!config.metrics_temperatureDetails) {
       await this.deleteChannelIfExists(`${sysId}.temperature.sensors`);
@@ -442,106 +1144,10 @@ class StateManager {
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
-  async updateStatsStates(sysId, system, stats, config) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
-    if (config.metrics_cpu || config.metrics_loadAvg || config.metrics_cpuBreakdown) {
-      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n.tName)("channelCpu"));
-    }
-    if (config.metrics_memory || config.metrics_memoryDetails || config.metrics_swap) {
-      await this.ensureChannel(`${sysId}.memory`, (0, import_i18n.tName)("channelMemory"));
-    }
-    if (config.metrics_disk || config.metrics_diskSpeed) {
-      await this.ensureChannel(`${sysId}.disk`, (0, import_i18n.tName)("channelDisk"));
-    }
-    if (config.metrics_network) {
-      await this.ensureChannel(`${sysId}.network`, (0, import_i18n.tName)("channelNetwork"));
-    }
-    if (config.metrics_temperature || config.metrics_temperatureDetails) {
-      await this.ensureChannel(`${sysId}.temperature`, (0, import_i18n.tName)("channelTemperature"));
-    }
-    if (config.metrics_battery) {
-      await this.ensureChannel(`${sysId}.battery`, (0, import_i18n.tName)("channelBattery"));
-    }
-    if (config.metrics_cpu) {
-      await this.createAndSetState(`${sysId}.cpu.usage`, this.percentCommon((0, import_i18n.tName)("cpuUsage")), (_a = stats.cpu) != null ? _a : null);
-    }
-    if (config.metrics_loadAvg) {
-      await this.createLoadAvgStates(sysId, (_b = stats.la) != null ? _b : system.info.la);
-    }
-    if (config.metrics_cpuBreakdown && stats.cpub && stats.cpub.length >= 5) {
-      const [user, sys, iowait, steal, idle] = stats.cpub;
-      await this.createAndSetState(`${sysId}.cpu.user`, this.percentCommon((0, import_i18n.tName)("cpuUser")), user);
-      await this.createAndSetState(`${sysId}.cpu.system`, this.percentCommon((0, import_i18n.tName)("cpuSystem")), sys);
-      await this.createAndSetState(`${sysId}.cpu.iowait`, this.percentCommon((0, import_i18n.tName)("cpuIowait")), iowait);
-      await this.createAndSetState(`${sysId}.cpu.steal`, this.percentCommon((0, import_i18n.tName)("cpuSteal")), steal);
-      await this.createAndSetState(`${sysId}.cpu.idle`, this.percentCommon((0, import_i18n.tName)("cpuIdle")), idle);
-    }
-    if (config.metrics_memory) {
-      await this.createAndSetState(
-        `${sysId}.memory.percent`,
-        this.percentCommon((0, import_i18n.tName)("memoryPercent")),
-        (_c = stats.mp) != null ? _c : null
-      );
-      await this.createAndSetState(`${sysId}.memory.used`, this.numCommon((0, import_i18n.tName)("memoryUsed"), "GB"), (_d = stats.mu) != null ? _d : null);
-      await this.createAndSetState(
-        `${sysId}.memory.total`,
-        this.numCommon((0, import_i18n.tName)("memoryTotal"), "GB"),
-        (_e = stats.m) != null ? _e : null
-      );
-    }
-    if (config.metrics_memoryDetails) {
-      await this.createAndSetState(
-        `${sysId}.memory.buffers`,
-        this.numCommon((0, import_i18n.tName)("memoryBuffers"), "GB"),
-        (_f = stats.mb) != null ? _f : null
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.zfs_arc`,
-        this.numCommon((0, import_i18n.tName)("memoryZfsArc"), "GB"),
-        (_g = stats.mz) != null ? _g : null
-      );
-    }
-    if (config.metrics_swap) {
-      await this.createAndSetState(
-        `${sysId}.memory.swap_used`,
-        this.numCommon((0, import_i18n.tName)("swapUsed"), "GB"),
-        (_h = stats.su) != null ? _h : null
-      );
-      await this.createAndSetState(
-        `${sysId}.memory.swap_total`,
-        this.numCommon((0, import_i18n.tName)("swapTotal"), "GB"),
-        (_i = stats.s) != null ? _i : null
-      );
-    }
-    if (config.metrics_disk) {
-      await this.createAndSetState(`${sysId}.disk.percent`, this.percentCommon((0, import_i18n.tName)("diskPercent")), (_j = stats.dp) != null ? _j : null);
-      await this.createAndSetState(`${sysId}.disk.used`, this.numCommon((0, import_i18n.tName)("diskUsed"), "GB"), (_k = stats.du) != null ? _k : null);
-      await this.createAndSetState(`${sysId}.disk.total`, this.numCommon((0, import_i18n.tName)("diskTotal"), "GB"), (_l = stats.d) != null ? _l : null);
-    }
-    if (config.metrics_diskSpeed) {
-      await this.createAndSetState(`${sysId}.disk.read`, this.numCommon((0, import_i18n.tName)("diskRead"), "MB/s"), (_m = stats.dr) != null ? _m : null);
-      await this.createAndSetState(`${sysId}.disk.write`, this.numCommon((0, import_i18n.tName)("diskWrite"), "MB/s"), (_n = stats.dw) != null ? _n : null);
-    }
-    if (config.metrics_network) {
-      await this.createAndSetState(
-        `${sysId}.network.sent`,
-        this.numCommon((0, import_i18n.tName)("networkSent"), "MB/s"),
-        (_o = stats.ns) != null ? _o : null
-      );
-      await this.createAndSetState(
-        `${sysId}.network.recv`,
-        this.numCommon((0, import_i18n.tName)("networkReceived"), "MB/s"),
-        (_p = stats.nr) != null ? _p : null
-      );
-    }
-    if (config.metrics_temperature) {
-      await this.createAndSetState(
-        `${sysId}.temperature.average`,
-        this.numCommon((0, import_i18n.tName)("temperatureAvg"), "\xB0C", "value.temperature"),
-        this.computeTopAvgTemp(stats.t)
-      );
-    }
+  async updateDynamicStats(sysId, stats, config) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (config.metrics_temperatureDetails && stats.t) {
+      await this.ensureChannel(`${sysId}.temperature`, (0, import_i18n.tName)("channelTemperature"));
       await this.ensureChannel(`${sysId}.temperature.sensors`, (0, import_i18n.tName)("channelSensors"));
       for (const [sensor, temp] of Object.entries(stats.t)) {
         await this.createAndSetState(
@@ -551,44 +1157,89 @@ class StateManager {
         );
       }
     }
-    if (config.metrics_battery) {
-      const bat = (_q = stats.bat) != null ? _q : system.info.bat;
-      await this.createAndSetState(
-        `${sysId}.battery.percent`,
-        this.percentCommon((0, import_i18n.tName)("batteryPercent")),
-        (_r = bat == null ? void 0 : bat[0]) != null ? _r : null
-      );
-      await this.createAndSetState(
-        `${sysId}.battery.charging`,
-        this.boolCommon((0, import_i18n.tName)("batteryCharging")),
-        bat ? bat[1] > 0 : null
-      );
+    if (config.metrics_cpuCores && stats.cpus && stats.cpus.length > 0) {
+      await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n.tName)("channelCpu"));
+      await this.ensureChannel(`${sysId}.cpu.cores`, (0, import_i18n.tName)("channelCores"));
+      for (let i = 0; i < stats.cpus.length; i++) {
+        await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), stats.cpus[i]);
+      }
+    }
+    if (config.metrics_networkInterfaces && stats.ni && Object.keys(stats.ni).length > 0) {
+      await this.ensureChannel(`${sysId}.network`, (0, import_i18n.tName)("channelNetwork"));
+      await this.ensureChannel(`${sysId}.network.interfaces`, (0, import_i18n.tName)("channelInterfaces"));
+      for (const [iface, vals] of Object.entries(stats.ni)) {
+        const safeId = this.sanitize(iface);
+        if (!safeId) {
+          continue;
+        }
+        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, iface);
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.up`,
+          this.numCommon((0, import_i18n.tName)("ifaceUp"), "B/s"),
+          (_a = vals[0]) != null ? _a : null
+        );
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.down`,
+          this.numCommon((0, import_i18n.tName)("ifaceDown"), "B/s"),
+          (_b = vals[1]) != null ? _b : null
+        );
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.total_up`,
+          this.numCommon((0, import_i18n.tName)("ifaceTotalUp"), "B"),
+          (_c = vals[2]) != null ? _c : null
+        );
+        await this.createAndSetState(
+          `${sysId}.network.interfaces.${safeId}.total_down`,
+          this.numCommon((0, import_i18n.tName)("ifaceTotalDown"), "B"),
+          (_d = vals[3]) != null ? _d : null
+        );
+      }
     }
     if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
       await this.ensureChannel(`${sysId}.gpu`, (0, import_i18n.tName)("channelGpu"));
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
         const safeId = this.sanitize(gpuId);
-        await this.ensureChannel(`${sysId}.gpu.${safeId}`, (_s = gpuData.n) != null ? _s : gpuId);
+        await this.ensureChannel(`${sysId}.gpu.${safeId}`, (_e = gpuData.n) != null ? _e : gpuId);
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
           this.percentCommon((0, import_i18n.tName)("gpuUsage")),
-          (_t = gpuData.u) != null ? _t : null
+          (_f = gpuData.u) != null ? _f : null
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_used`,
-          this.numCommon((0, import_i18n.tName)("gpuMemoryUsed"), "GB"),
-          (_u = gpuData.mu) != null ? _u : null
+          this.numCommon((0, import_i18n.tName)("gpuMemoryUsed"), "MB"),
+          (_g = gpuData.mu) != null ? _g : null
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.memory_total`,
-          this.numCommon((0, import_i18n.tName)("gpuMemoryTotal"), "GB"),
-          (_v = gpuData.mt) != null ? _v : null
+          this.numCommon((0, import_i18n.tName)("gpuMemoryTotal"), "MB"),
+          (_h = gpuData.mt) != null ? _h : null
         );
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.power`,
           this.numCommon((0, import_i18n.tName)("gpuPower"), "W"),
-          (_w = gpuData.p) != null ? _w : null
+          (_i = gpuData.p) != null ? _i : null
         );
+        if (config.metrics_gpuDetails) {
+          await this.createAndSetState(
+            `${sysId}.gpu.${safeId}.power_package`,
+            this.numCommon((0, import_i18n.tName)("gpuPowerPackage"), "W"),
+            (_j = gpuData.pp) != null ? _j : null
+          );
+          if (gpuData.e && Object.keys(gpuData.e).length > 0) {
+            await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, (0, import_i18n.tName)("channelEngines"));
+            for (const [engine, value] of Object.entries(gpuData.e)) {
+              const safeEngine = this.sanitize(engine);
+              if (safeEngine) {
+                await this.createAndSetState(
+                  `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
+                  this.percentCommon(engine),
+                  value
+                );
+              }
+            }
+          }
+        }
       }
     }
     if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
@@ -596,8 +1247,8 @@ class StateManager {
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
         const safeId = this.sanitize(fsName);
         await this.ensureChannel(`${sysId}.filesystems.${safeId}`, fsName);
-        const total = (_x = fsData.d) != null ? _x : null;
-        const used = (_y = fsData.du) != null ? _y : null;
+        const total = (_k = fsData.d) != null ? _k : null;
+        const used = (_l = fsData.du) != null ? _l : null;
         const percent = total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.disk_percent`,
@@ -617,12 +1268,12 @@ class StateManager {
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.read_speed`,
           this.numCommon((0, import_i18n.tName)("readSpeed"), "MB/s"),
-          (_z = fsData.r) != null ? _z : null
+          (_m = fsData.r) != null ? _m : null
         );
         await this.createAndSetState(
           `${sysId}.filesystems.${safeId}.write_speed`,
           this.numCommon((0, import_i18n.tName)("writeSpeed"), "MB/s"),
-          (_A = fsData.w) != null ? _A : null
+          (_n = fsData.w) != null ? _n : null
         );
       }
     }
@@ -630,6 +1281,14 @@ class StateManager {
   async updateContainers(sysId, systemId, allContainers) {
     var _a;
     const sysContainers = allContainers.filter((c) => c.system === systemId);
+    const activeIds = /* @__PURE__ */ new Set();
+    for (const container of sysContainers) {
+      const cId = this.sanitize(container.name);
+      if (cId) {
+        activeIds.add(cId);
+      }
+    }
+    await this.cleanupStaleContainers(sysId, activeIds);
     if (sysContainers.length === 0) {
       return;
     }
@@ -667,7 +1326,51 @@ class StateManager {
         this.textCommon((0, import_i18n.tName)("containerImage")),
         container.image
       );
+      if (container.net != null) {
+        await this.createAndSetState(
+          `${sysId}.containers.${cId}.network`,
+          this.numCommon((0, import_i18n.tName)("containerNetwork"), "B/s"),
+          container.net
+        );
+      }
     }
+  }
+  /**
+   * F1: remove container channels under a system that are no longer reported
+   * by Beszel (container stopped/removed/renamed on the host). Looks up the
+   * direct children of `<sysId>.containers` and deletes any whose sanitized id
+   * is not in `activeIds`.
+   *
+   * @param sysId State prefix (`systems.<safeName>`)
+   * @param activeIds Sanitized ids of the containers currently present
+   */
+  async cleanupStaleContainers(sysId, activeIds) {
+    const base = `${sysId}.containers`;
+    const view = await this.adapter.getObjectViewAsync("system", "channel", {
+      startkey: `${this.adapter.namespace}.${base}.`,
+      endkey: `${this.adapter.namespace}.${base}.\u9999`
+    });
+    if (!(view == null ? void 0 : view.rows)) {
+      return;
+    }
+    const stale = /* @__PURE__ */ new Set();
+    for (const row of view.rows) {
+      const id = row.id.startsWith(`${this.adapter.namespace}.`) ? row.id.slice(this.adapter.namespace.length + 1) : row.id;
+      if (!id.startsWith(`${base}.`)) {
+        continue;
+      }
+      const cId = id.slice(base.length + 1).split(".")[0];
+      if (cId && !activeIds.has(cId)) {
+        stale.add(cId);
+      }
+    }
+    await Promise.all(
+      [...stale].map(async (cId) => {
+        this.adapter.log.debug(`Removing stale container: ${base}.${cId}`);
+        await this.adapter.delObjectAsync(`${base}.${cId}`, { recursive: true });
+        this.dropCacheUnder(`${base}.${cId}`);
+      })
+    );
   }
   async ensureChannel(id, name) {
     if (this.createdIds.has(id)) {
@@ -690,18 +1393,6 @@ class StateManager {
     } catch (err) {
       this.adapter.log.debug(`deleteChannelIfExists(${id}) ignored: ${(0, import_coerce.errText)(err)}`);
     }
-  }
-  /**
-   * Create or update the three load average states.
-   *
-   * @param sysId State ID prefix (e.g. "systems.my_server")
-   * @param la Load average tuple [1m, 5m, 15m], or undefined
-   */
-  async createLoadAvgStates(sysId, la) {
-    var _a, _b, _c;
-    await this.createAndSetState(`${sysId}.cpu.load_1m`, this.numCommon((0, import_i18n.tName)("load1m")), (_a = la == null ? void 0 : la[0]) != null ? _a : null);
-    await this.createAndSetState(`${sysId}.cpu.load_5m`, this.numCommon((0, import_i18n.tName)("load5m")), (_b = la == null ? void 0 : la[1]) != null ? _b : null);
-    await this.createAndSetState(`${sysId}.cpu.load_15m`, this.numCommon((0, import_i18n.tName)("load15m")), (_c = la == null ? void 0 : la[2]) != null ? _c : null);
   }
   async createAndSetState(id, common, value) {
     if (!this.createdIds.has(id)) {
@@ -772,6 +1463,43 @@ class StateManager {
     const top3 = values.slice(0, 3);
     const avg = top3.reduce((sum, v) => sum + v, 0) / top3.length;
     return Math.round(avg * 10) / 10;
+  }
+  /**
+   * F7: hottest single sensor — the actionable "is anything overheating" value
+   * (vs. the top-3 average). Returns null when there are no finite readings.
+   *
+   * @param temps Sensor → °C map, or undefined.
+   */
+  computeMaxTemp(temps) {
+    if (!temps) {
+      return null;
+    }
+    const values = Object.values(temps).filter((v) => typeof v === "number" && isFinite(v));
+    if (values.length === 0) {
+      return null;
+    }
+    return Math.round(Math.max(...values) * 10) / 10;
+  }
+  /**
+   * F2: map the numeric OS platform enum from system_details into a readable
+   * label. Values verified against the v0.18.7 source
+   * (`Ressourcen/beszel/beszel-0.18.7/internal/entities/system/system.go`).
+   *
+   * @param os Platform enum (0=Linux, 1=Darwin/macOS, 2=Windows, 3=FreeBSD).
+   */
+  osLabel(os) {
+    switch (os) {
+      case 0:
+        return "Linux";
+      case 1:
+        return "macOS";
+      case 2:
+        return "Windows";
+      case 3:
+        return "FreeBSD";
+      default:
+        return os == null ? null : `Unknown (${os})`;
+    }
   }
   formatUptime(seconds) {
     const s = Math.max(0, seconds);

@@ -85,13 +85,15 @@ function createMockAdapter(): MockAdapter {
     },
     getObjectViewAsync: async (
       _design: string,
-      _search: string,
+      search: string,
       params: { startkey: string; endkey: string },
     ): Promise<{ rows: Array<{ id: string; value: ObjectDef }> }> => {
       const rows: Array<{ id: string; value: ObjectDef }> = [];
       const prefix = params.startkey.replace("beszel.0.", "");
+      // Faithfully filter by the requested object type (`search`): "device" for
+      // getExistingSystemNames, "channel" for cleanupStaleContainers.
       for (const [key, value] of objects.entries()) {
-        if (key.startsWith(prefix) && value.type === "device") {
+        if (key.startsWith(prefix) && value.type === search) {
           rows.push({ id: `beszel.0.${key}`, value });
         }
       }
@@ -213,7 +215,7 @@ const testStats: SystemStats = {
   efs: {
     "/data": { d: 1000, du: 400, r: 100, w: 50 },
   },
-  bat: [85, 1],
+  bat: [85, 3], // 85 %, charge-state 3 = charging (agent/battery/battery.go enum)
   cpub: [30, 10, 5, 2, 53],
 };
 
@@ -770,10 +772,23 @@ describe("StateManager", () => {
   // -----------------------------------------------------------------------
 
   describe("updateSystem — battery", () => {
-    it("should create battery states from stats", async () => {
+    it("should create battery states from stats (state 3 = charging → true)", async () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       expect(adapter.states.get("systems.my_server.battery.percent")?.val).to.equal(85);
       expect(adapter.states.get("systems.my_server.battery.charging")?.val).to.be.true;
+    });
+
+    it("reports charging=false while discharging (state 4) — not just any non-zero state", async () => {
+      const onBattery = { ...testStats, bat: [60, 4] as [number, number] };
+      await manager.updateSystem(testSystem, onBattery, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.battery.percent")?.val).to.equal(60);
+      expect(adapter.states.get("systems.my_server.battery.charging")?.val).to.be.false;
+    });
+
+    it("reports charging=false when full (state 2)", async () => {
+      const full = { ...testStats, bat: [100, 2] as [number, number] };
+      await manager.updateSystem(testSystem, full, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.battery.charging")?.val).to.be.false;
     });
 
     it("should fallback to system.info.bat when stats have no bat", async () => {
@@ -813,6 +828,13 @@ describe("StateManager", () => {
       expect(adapter.states.get("systems.my_server.gpu.gpu0.power")?.val).to.equal(350);
     });
 
+    it("labels GPU memory in MB (agent reports MB, not GB)", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.gpu.gpu0.memory_used")?.common.unit).to.equal("MB");
+      expect(adapter.objects.get("systems.my_server.gpu.gpu0.memory_total")?.common.unit).to.equal("MB");
+      expect(adapter.objects.get("systems.my_server.gpu.gpu0.power")?.common.unit).to.equal("W");
+    });
+
     it("should NOT create GPU states when disabled", async () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig({ metrics_gpu: false }));
       expect(adapter.objects.has("systems.my_server.gpu")).to.be.false;
@@ -823,6 +845,309 @@ describe("StateManager", () => {
       await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
       // Channel should not be created for empty map
       expect(adapter.states.has("systems.my_server.gpu.gpu0.usage")).to.be.false;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.6.0 — peaks, disk-IO, per-core, per-interface, GPU details
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — v0.6.0 peaks + disk-IO scalars", () => {
+    const statsV2: SystemStats = {
+      ...testStats,
+      cpum: 92.5,
+      mm: 15.2,
+      drm: 130,
+      dwm: 90,
+      nsm: 5.5,
+      nrm: 6.6,
+      dios: [10, 20, 35.5, 1.2, 2.4, 50],
+    };
+    const v2cfg = (extra: Partial<AdapterConfig> = {}): AdapterConfig =>
+      allMetricsConfig({
+        metrics_cpuPeak: true,
+        metrics_memoryPeak: true,
+        metrics_diskPeak: true,
+        metrics_networkPeak: true,
+        metrics_diskIo: true,
+        ...extra,
+      });
+
+    it("creates peak states from the v0.18.7 peak fields", async () => {
+      await manager.updateSystem(testSystem, statsV2, [], v2cfg());
+      expect(adapter.states.get("systems.my_server.cpu.peak")?.val).to.equal(92.5);
+      expect(adapter.states.get("systems.my_server.memory.peak")?.val).to.equal(15.2);
+      expect(adapter.states.get("systems.my_server.disk.read_peak")?.val).to.equal(130);
+      expect(adapter.states.get("systems.my_server.disk.write_peak")?.val).to.equal(90);
+      expect(adapter.states.get("systems.my_server.network.sent_peak")?.val).to.equal(5.5);
+      expect(adapter.states.get("systems.my_server.network.recv_peak")?.val).to.equal(6.6);
+    });
+
+    it("creates disk I/O load states from dios (utilization + wait times)", async () => {
+      await manager.updateSystem(testSystem, statsV2, [], v2cfg());
+      expect(adapter.states.get("systems.my_server.disk.io_util")?.val).to.equal(35.5);
+      expect(adapter.states.get("systems.my_server.disk.io_await_read")?.val).to.equal(1.2);
+      expect(adapter.states.get("systems.my_server.disk.io_await_write")?.val).to.equal(2.4);
+    });
+
+    it("does NOT create the redundant byte-rate states (b/dio are duplicates of sent/recv and read/write)", async () => {
+      await manager.updateSystem(testSystem, statsV2, [], v2cfg());
+      expect(adapter.states.has("systems.my_server.network.total_sent")).to.be.false;
+      expect(adapter.states.has("systems.my_server.network.total_recv")).to.be.false;
+      expect(adapter.states.has("systems.my_server.disk.io_read")).to.be.false;
+      expect(adapter.states.has("systems.my_server.disk.io_write")).to.be.false;
+    });
+
+    it("does NOT create peak/io states when the toggles are off", async () => {
+      await manager.updateSystem(testSystem, statsV2, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.cpu.peak")).to.be.false;
+      expect(adapter.states.has("systems.my_server.disk.io_util")).to.be.false;
+    });
+
+    it("does NOT create peak/io states on an older Beszel that omits the fields", async () => {
+      // testStats has no cpum/mm/drm/dios → available() gate skips them
+      await manager.updateSystem(testSystem, testStats, [], v2cfg());
+      expect(adapter.states.has("systems.my_server.cpu.peak")).to.be.false;
+      expect(adapter.states.has("systems.my_server.memory.peak")).to.be.false;
+      expect(adapter.states.has("systems.my_server.disk.io_util")).to.be.false;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Metric dependency gating (category off → detail off) — v0.6.0
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — detail toggles inherit their category base", () => {
+    const statsV2: SystemStats = { ...testStats, cpum: 92.5, mm: 15.2, dios: [10, 20, 35.5, 1.2, 2.4, 50] };
+
+    it("does NOT create a peak state when its category base is off (cpu off, cpuPeak on)", async () => {
+      await manager.updateSystem(
+        testSystem,
+        statsV2,
+        [],
+        allMetricsConfig({ metrics_cpu: false, metrics_cpuPeak: true }),
+      );
+      expect(adapter.states.has("systems.my_server.cpu.peak")).to.be.false;
+    });
+
+    it("does NOT create per-core states when cpu base is off", async () => {
+      const stats = { ...statsV2, cpus: [10, 20] };
+      await manager.updateSystem(
+        testSystem,
+        stats,
+        [],
+        allMetricsConfig({ metrics_cpu: false, metrics_cpuCores: true }),
+      );
+      expect(adapter.objects.has("systems.my_server.cpu.cores")).to.be.false;
+    });
+
+    it("does NOT create disk I/O states when disk base is off", async () => {
+      await manager.updateSystem(
+        testSystem,
+        statsV2,
+        [],
+        allMetricsConfig({ metrics_disk: false, metrics_diskIo: true }),
+      );
+      expect(adapter.states.has("systems.my_server.disk.io_util")).to.be.false;
+    });
+
+    it("couples load average to the CPU base (cpu off → no load states)", async () => {
+      await manager.updateSystem(
+        testSystem,
+        statsV2,
+        [],
+        allMetricsConfig({ metrics_cpu: false, metrics_loadAvg: true }),
+      );
+      expect(adapter.states.has("systems.my_server.cpu.load_1m")).to.be.false;
+    });
+
+    it("couples disk speed to the disk base (disk off → no read/write states)", async () => {
+      await manager.updateSystem(
+        testSystem,
+        statsV2,
+        [],
+        allMetricsConfig({ metrics_disk: false, metrics_diskSpeed: true }),
+      );
+      expect(adapter.states.has("systems.my_server.disk.read")).to.be.false;
+      expect(adapter.states.has("systems.my_server.disk.write")).to.be.false;
+    });
+
+    it("still creates the detail when the category base is on", async () => {
+      await manager.updateSystem(
+        testSystem,
+        statsV2,
+        [],
+        allMetricsConfig({ metrics_cpu: true, metrics_cpuPeak: true }),
+      );
+      expect(adapter.states.get("systems.my_server.cpu.peak")?.val).to.equal(92.5);
+    });
+
+    it("cleanupMetrics prunes a detail state when its category base is off", async () => {
+      // Create cpu.peak first (cpu on + cpuPeak on)
+      await manager.updateSystem(testSystem, statsV2, [], allMetricsConfig({ metrics_cpuPeak: true }));
+      expect(adapter.states.has("systems.my_server.cpu.peak")).to.be.true;
+      // Now the user disables the whole CPU category but leaves cpuPeak checked
+      await manager.cleanupMetrics("my_server", allMetricsConfig({ metrics_cpu: false, metrics_cpuPeak: true }));
+      expect(adapter.states.has("systems.my_server.cpu.peak")).to.be.false;
+    });
+  });
+
+  describe("updateSystem — per-core CPU (v0.6.0)", () => {
+    it("creates one state per core under cpu.cores", async () => {
+      const stats = { ...testStats, cpus: [12, 34, 56, 78] };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_cpuCores: true }));
+      expect(adapter.objects.get("systems.my_server.cpu.cores")?.type).to.equal("channel");
+      expect(adapter.states.get("systems.my_server.cpu.cores.core0")?.val).to.equal(12);
+      expect(adapter.states.get("systems.my_server.cpu.cores.core3")?.val).to.equal(78);
+    });
+
+    it("does NOT create per-core states when disabled", async () => {
+      const stats = { ...testStats, cpus: [12, 34] };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.cpu.cores")).to.be.false;
+    });
+  });
+
+  describe("updateSystem — per-interface network (v0.6.0)", () => {
+    it("creates up/down/total states per interface", async () => {
+      const stats = { ...testStats, ni: { eth0: [10, 20, 1000, 2000] as [number, number, number, number] } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_networkInterfaces: true }));
+      expect(adapter.objects.get("systems.my_server.network.interfaces.eth0")?.type).to.equal("channel");
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.up")?.val).to.equal(10);
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.down")?.val).to.equal(20);
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.total_up")?.val).to.equal(1000);
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.total_down")?.val).to.equal(2000);
+    });
+
+    it("does NOT create interface states when disabled", async () => {
+      const stats = { ...testStats, ni: { eth0: [10, 20, 1000, 2000] as [number, number, number, number] } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.network.interfaces")).to.be.false;
+    });
+  });
+
+  describe("updateSystem — GPU details (v0.6.0)", () => {
+    it("creates package power + per-engine states when enabled", async () => {
+      const stats = {
+        ...testStats,
+        g: { gpu0: { n: "Intel Arc", u: 30, pp: 18.5, e: { render: 40, video: 5 } } },
+      };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_gpuDetails: true }));
+      expect(adapter.states.get("systems.my_server.gpu.gpu0.power_package")?.val).to.equal(18.5);
+      expect(adapter.objects.get("systems.my_server.gpu.gpu0.engines")?.type).to.equal("channel");
+      expect(adapter.states.get("systems.my_server.gpu.gpu0.engines.render")?.val).to.equal(40);
+      expect(adapter.states.get("systems.my_server.gpu.gpu0.engines.video")?.val).to.equal(5);
+    });
+
+    it("does NOT create GPU detail states when the detail toggle is off", async () => {
+      const stats = {
+        ...testStats,
+        g: { gpu0: { n: "Intel Arc", u: 30, pp: 18.5, e: { render: 40 } } },
+      };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_gpuDetails: false }));
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.power_package")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.engines")).to.be.false;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // updateSystem — temperature max (F7 v0.6.0)
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — temperature max (F7)", () => {
+    it("creates the hottest-sensor state alongside the average", async () => {
+      // testStats.t = Core0=65, Core1=70, Core2=60, SSD=45 → max 70
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.temperature.max")?.val).to.equal(70);
+    });
+
+    it("rounds the max to one decimal", async () => {
+      const stats = { ...testStats, t: { A: 71.25, B: 50 } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.temperature.max")?.val).to.equal(71.3);
+    });
+
+    it("is null when there are no temperatures", async () => {
+      const stats = { ...testStats, t: {} };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.temperature.max")?.val).to.be.null;
+    });
+
+    it("is gated on the temperature toggle", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig({ metrics_temperature: false }));
+      expect(adapter.states.has("systems.my_server.temperature.max")).to.be.false;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // updateSystem — system info / hardware (F2 v0.6.0)
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — system info hardware (F2)", () => {
+    const sysWithDetails: BeszelSystem = {
+      ...testSystem,
+      details: {
+        hostname: "server-a",
+        os: 1,
+        os_name: "macOS 14.1",
+        kernel: "23.1.0",
+        cpu: "Apple M2",
+        arch: "arm64",
+        cores: 8,
+        threads: 8,
+        podman: false,
+      },
+    };
+
+    it("creates hardware states from system.details when System info is enabled", async () => {
+      await manager.updateSystem(sysWithDetails, undefined, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.info.hostname")?.val).to.equal("server-a");
+      expect(adapter.states.get("systems.my_server.info.os")?.val).to.equal("macOS"); // enum 1 → label
+      expect(adapter.states.get("systems.my_server.info.os_name")?.val).to.equal("macOS 14.1");
+      expect(adapter.states.get("systems.my_server.info.kernel")?.val).to.equal("23.1.0");
+      expect(adapter.states.get("systems.my_server.info.cpu_model")?.val).to.equal("Apple M2");
+      expect(adapter.states.get("systems.my_server.info.arch")?.val).to.equal("arm64");
+      expect(adapter.states.get("systems.my_server.info.cores")?.val).to.equal(8);
+      expect(adapter.states.get("systems.my_server.info.threads")?.val).to.equal(8);
+      expect(adapter.states.get("systems.my_server.info.podman")?.val).to.equal(false);
+    });
+
+    it("maps the OS enum to a readable label", async () => {
+      for (const [os, label] of [
+        [0, "Linux"],
+        [1, "macOS"],
+        [2, "Windows"],
+        [3, "FreeBSD"],
+      ] as Array<[number, string]>) {
+        const a = createMockAdapter();
+        const m = new StateManager(a as never);
+        const sys = { ...testSystem, details: { os } };
+        await m.updateSystem(sys, undefined, [], allMetricsConfig());
+        expect(a.states.get("systems.my_server.info.os")?.val).to.equal(label);
+      }
+    });
+
+    it("creates NO hardware states when details are absent (older Beszel / not fetched)", async () => {
+      await manager.updateSystem(testSystem, undefined, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.info.hostname")).to.be.false;
+      expect(adapter.states.has("systems.my_server.info.cpu_model")).to.be.false;
+      // agent_version (from info.v, not details) is still created
+      expect(adapter.states.get("systems.my_server.info.agent_version")?.val).to.equal("0.8.0");
+    });
+
+    it("creates only the fields present in details", async () => {
+      const sys = { ...testSystem, details: { hostname: "partial", cores: 4 } };
+      await manager.updateSystem(sys, undefined, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.info.hostname")?.val).to.equal("partial");
+      expect(adapter.states.get("systems.my_server.info.cores")?.val).to.equal(4);
+      expect(adapter.states.has("systems.my_server.info.kernel")).to.be.false;
+      expect(adapter.states.has("systems.my_server.info.arch")).to.be.false;
+    });
+
+    it("creates NO hardware states when System info is disabled", async () => {
+      await manager.updateSystem(sysWithDetails, undefined, [], allMetricsConfig({ metrics_agentVersion: false }));
+      expect(adapter.states.has("systems.my_server.info.hostname")).to.be.false;
+      expect(adapter.states.has("systems.my_server.info.cpu_model")).to.be.false;
     });
   });
 
@@ -927,6 +1252,33 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.containers")).to.be.false;
     });
 
+    it("F1: removes container channels that disappeared from the host", async () => {
+      const two: BeszelContainer[] = [
+        { id: "c1", system: testSystem.id, name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx" },
+        { id: "c2", system: testSystem.id, name: "postgres", status: "running", health: 2, cpu: 1, memory: 10, image: "pg" },
+      ];
+      await manager.updateSystem(testSystem, testStats, two, allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+      expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.true;
+
+      // postgres is removed on the host → only nginx reported next poll
+      await manager.updateSystem(testSystem, testStats, two.slice(0, 1), allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+      expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.false;
+      expect(adapter.states.has("systems.my_server.containers.postgres.cpu")).to.be.false;
+    });
+
+    it("F1: removes all container channels when the system drops to zero containers", async () => {
+      const one: BeszelContainer[] = [
+        { id: "c1", system: testSystem.id, name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx" },
+      ];
+      await manager.updateSystem(testSystem, testStats, one, allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.false;
+    });
+
     it("should map health codes to labels", async () => {
       const healthTests: BeszelContainer[] = [
         { id: "h0", system: "sys001", name: "h_none", status: "exited", health: 0, cpu: 0, memory: 0, image: "test" },
@@ -989,6 +1341,23 @@ describe("StateManager", () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       // The containers channel should not be created if no containers match
       expect(adapter.states.has("systems.my_server.containers.nginx.status")).to.be.false;
+    });
+
+    it("v0.6.0: creates a network state when the container reports net (bytes/s)", async () => {
+      const withNet: BeszelContainer[] = [
+        { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx", net: 123456 },
+      ];
+      await manager.updateSystem(testSystem, testStats, withNet, allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.containers.nginx.network")?.val).to.equal(123456);
+      expect(adapter.objects.get("systems.my_server.containers.nginx.network")?.common.unit).to.equal("B/s");
+    });
+
+    it("v0.6.0: creates NO network state when the container omits net (older Hub)", async () => {
+      const noNet: BeszelContainer[] = [
+        { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx" },
+      ];
+      await manager.updateSystem(testSystem, testStats, noNet, allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.containers.nginx.network")).to.be.false;
     });
   });
 
@@ -1412,7 +1781,7 @@ describe("StateManager", () => {
     });
 
     it("handles battery as [percent, chargeState] tuple correctly", async () => {
-      const stats: SystemStats = { bat: [75, 1] };
+      const stats: SystemStats = { bat: [75, 3] }; // state 3 = charging
       await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
       expect(adapter.states.get("systems.my_server.battery.percent")?.val).to.equal(75);
       expect(adapter.states.get("systems.my_server.battery.charging")?.val).to.be.true;

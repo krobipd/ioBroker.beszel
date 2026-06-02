@@ -2,10 +2,12 @@ import type {
   AuthResponse,
   BeszelContainer,
   BeszelSystem,
+  BeszelSystemDetailsRecord,
   BeszelSystemStats,
   FsStats,
   GPUData,
   PocketBaseList,
+  SystemDetails,
   SystemInfo,
   SystemStats,
 } from "./types";
@@ -52,16 +54,6 @@ export function coerceString(value: unknown, maxLength = 1024): string | null {
     return null;
   }
   return value.length > maxLength ? value.slice(0, maxLength) : value;
-}
-
-/**
- * Coerce into a boolean, returning null for anything that is not exactly
- * `true` or `false`.
- *
- * @param value Unknown value from external API
- */
-export function coerceBoolean(value: unknown): boolean | null {
-  return typeof value === "boolean" ? value : null;
 }
 
 /**
@@ -250,6 +242,72 @@ export function coerceSystem(value: unknown): BeszelSystem | null {
   };
 }
 
+/**
+ * Coerce the static hardware/OS fields of a system_details record. Each field
+ * passes through its own coercer so a missing/wrong-typed column is simply
+ * dropped (→ no state created). Reads the columns off the record directly —
+ * they are top-level on the record, not nested under a `stats` key.
+ *
+ * @param obj The (already object-validated) system_details record.
+ */
+function coerceSystemDetails(obj: Record<string, unknown>): SystemDetails {
+  const out: SystemDetails = {};
+  const hostname = coerceString(obj.hostname);
+  if (hostname !== null) {
+    out.hostname = hostname;
+  }
+  const os = coerceFiniteNumber(obj.os);
+  if (os !== null) {
+    out.os = os;
+  }
+  const osName = coerceString(obj.os_name);
+  if (osName !== null) {
+    out.os_name = osName;
+  }
+  const kernel = coerceString(obj.kernel);
+  if (kernel !== null) {
+    out.kernel = kernel;
+  }
+  const cpu = coerceString(obj.cpu);
+  if (cpu !== null) {
+    out.cpu = cpu;
+  }
+  const arch = coerceString(obj.arch);
+  if (arch !== null) {
+    out.arch = arch;
+  }
+  const cores = coerceFiniteNumber(obj.cores);
+  if (cores !== null) {
+    out.cores = cores;
+  }
+  const threads = coerceFiniteNumber(obj.threads);
+  if (threads !== null) {
+    out.threads = threads;
+  }
+  if (typeof obj.podman === "boolean") {
+    out.podman = obj.podman;
+  }
+  return out;
+}
+
+/**
+ * Coerce a raw system_details record. Returns null if the `system` relation
+ * is missing — such records are silently skipped.
+ *
+ * @param value Unknown record from PocketBase /system_details/records
+ */
+export function coerceSystemDetailsRecord(value: unknown): BeszelSystemDetailsRecord | null {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const system = coerceString(obj.system);
+  if (system === null) {
+    return null;
+  }
+  return { system, details: coerceSystemDetails(obj) };
+}
+
 function coerceGPUData(value: unknown): GPUData {
   const obj = coerceObject(value);
   if (!obj) {
@@ -275,6 +333,14 @@ function coerceGPUData(value: unknown): GPUData {
   const p = coerceFiniteNumber(obj.p);
   if (p !== null) {
     out.p = p;
+  }
+  const pp = coerceFiniteNumber(obj.pp);
+  if (pp !== null) {
+    out.pp = pp;
+  }
+  const e = coerceNumberMap(obj.e);
+  if (e && Object.keys(e).length > 0) {
+    out.e = e;
   }
   return out;
 }
@@ -341,66 +407,40 @@ export function coerceSystemStats(value: unknown): SystemStats {
   }
   const s: SystemStats = {};
 
-  const cpu = coerceFiniteNumber(obj.cpu);
-  if (cpu !== null) {
-    s.cpu = cpu;
+  // Single finite-number fields — one loop (each value through coerceFiniteNumber
+  // so NaN/Infinity/wrong-type never reach a state; a field absent on an older
+  // Beszel version is simply skipped). Includes the v0.18.7 peak values.
+  const NUMBER_FIELDS: (keyof SystemStats)[] = [
+    "cpu",
+    "mu",
+    "m",
+    "mp",
+    "mb",
+    "mz",
+    "su",
+    "s",
+    "du",
+    "d",
+    "dp",
+    "dr",
+    "dw",
+    "ns",
+    "nr",
+    "cpum",
+    "mm",
+    "drm",
+    "dwm",
+    "nsm",
+    "nrm",
+  ];
+  for (const k of NUMBER_FIELDS) {
+    const n = coerceFiniteNumber(obj[k]);
+    if (n !== null) {
+      (s as Record<string, number>)[k] = n;
+    }
   }
-  const mu = coerceFiniteNumber(obj.mu);
-  if (mu !== null) {
-    s.mu = mu;
-  }
-  const m = coerceFiniteNumber(obj.m);
-  if (m !== null) {
-    s.m = m;
-  }
-  const mp = coerceFiniteNumber(obj.mp);
-  if (mp !== null) {
-    s.mp = mp;
-  }
-  const mb = coerceFiniteNumber(obj.mb);
-  if (mb !== null) {
-    s.mb = mb;
-  }
-  const mz = coerceFiniteNumber(obj.mz);
-  if (mz !== null) {
-    s.mz = mz;
-  }
-  const su = coerceFiniteNumber(obj.su);
-  if (su !== null) {
-    s.su = su;
-  }
-  const sw = coerceFiniteNumber(obj.s);
-  if (sw !== null) {
-    s.s = sw;
-  }
-  const du = coerceFiniteNumber(obj.du);
-  if (du !== null) {
-    s.du = du;
-  }
-  const d = coerceFiniteNumber(obj.d);
-  if (d !== null) {
-    s.d = d;
-  }
-  const dp = coerceFiniteNumber(obj.dp);
-  if (dp !== null) {
-    s.dp = dp;
-  }
-  const dr = coerceFiniteNumber(obj.dr);
-  if (dr !== null) {
-    s.dr = dr;
-  }
-  const dw = coerceFiniteNumber(obj.dw);
-  if (dw !== null) {
-    s.dw = dw;
-  }
-  const ns = coerceFiniteNumber(obj.ns);
-  if (ns !== null) {
-    s.ns = ns;
-  }
-  const nr = coerceFiniteNumber(obj.nr);
-  if (nr !== null) {
-    s.nr = nr;
-  }
+
+  // Tuple / map / array fields.
   const t = coerceNumberMap(obj.t);
   if (t) {
     s.t = t;
@@ -424,6 +464,31 @@ export function coerceSystemStats(value: unknown): SystemStats {
   const cpub = coerceNumberArray(obj.cpub);
   if (cpub) {
     s.cpub = cpub;
+  }
+  // v0.18.7: variable-length number arrays — per-core usage + disk-IO stats.
+  // (b/bm/dio/diom byte-rate tuples are intentionally not coerced; they
+  // duplicate ns/nr and dr/dw — see types.ts.)
+  const cpus = coerceNumberArray(obj.cpus);
+  if (cpus) {
+    s.cpus = cpus;
+  }
+  const dios = coerceNumberArray(obj.dios);
+  if (dios) {
+    s.dios = dios;
+  }
+  // v0.18.7: per-interface [up, down, total up, total down] bytes.
+  const niObj = coerceObject(obj.ni);
+  if (niObj) {
+    const ni: Record<string, [number, number, number, number]> = {};
+    for (const [k, v] of Object.entries(niObj)) {
+      const tup = coerceNumberTuple(v, 4);
+      if (tup) {
+        ni[k] = [tup[0], tup[1], tup[2], tup[3]];
+      }
+    }
+    if (Object.keys(ni).length > 0) {
+      s.ni = ni;
+    }
   }
   return s;
 }
@@ -471,7 +536,7 @@ export function coerceContainer(value: unknown): BeszelContainer | null {
   if (id === null || system === null || name === null) {
     return null;
   }
-  return {
+  const container: BeszelContainer = {
     id,
     system,
     name,
@@ -481,6 +546,13 @@ export function coerceContainer(value: unknown): BeszelContainer | null {
     memory: coerceFiniteNumber(obj.memory) ?? 0,
     image: coerceString(obj.image) ?? "",
   };
+  // Optional combined network throughput (bytes/s) — only set when present so
+  // an older Hub without the `net` column yields no empty container state.
+  const net = coerceFiniteNumber(obj.net);
+  if (net !== null) {
+    container.net = net;
+  }
+  return container;
 }
 
 /**
@@ -522,6 +594,22 @@ export function coercePollInterval(raw: unknown): number {
     return 60;
   }
   return Math.max(10, Math.min(300, Math.floor(n)));
+}
+
+/**
+ * v0.6.0 (F2): decide whether the static `system_details` collection needs a
+ * (re)fetch this poll. True only when at least one current system id has never
+ * been *attempted* — so the first poll fetches, a newly-added system triggers
+ * one refetch, and a details-less / older-Hub-404 system (attempted but never
+ * in the result) does NOT refetch every poll. Pure so the cadence — which
+ * lives in the untested poll loop — can be unit-tested directly.
+ *
+ * @param systemIds Ids of the systems present in the current poll.
+ * @param attempted Ids we've already attempted a details fetch for (grows after
+ *   each attempt, success or failure).
+ */
+export function shouldFetchSystemDetails(systemIds: string[], attempted: ReadonlySet<string>): boolean {
+  return systemIds.some(id => !attempted.has(id));
 }
 
 /**
@@ -582,11 +670,7 @@ export function coerceAuthResponse(value: unknown): AuthResponse | null {
   if (token === null) {
     return null;
   }
-  const recordObj = coerceObject(obj.record) ?? {};
-  const id = coerceString(recordObj.id) ?? "";
-  const email = coerceString(recordObj.email) ?? "";
-  return {
-    token,
-    record: { ...recordObj, id, email },
-  };
+  // Only the token is consumed (kept in memory for the Authorization header);
+  // the user `record` from the auth response is intentionally not surfaced.
+  return { token };
 }

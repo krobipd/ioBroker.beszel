@@ -24,8 +24,8 @@ __export(message_router_exports, {
 module.exports = __toCommonJS(message_router_exports);
 var import_beszel_client = require("./beszel-client");
 var import_coerce = require("./coerce");
-function makeTestClientFactory(logger) {
-  return (url, username, password) => new import_beszel_client.BeszelClient(url, username, password, void 0, logger);
+function makeTestClientFactory(logger, delay) {
+  return (url, username, password) => new import_beszel_client.BeszelClient(url, username, password, void 0, logger, delay);
 }
 async function dispatchMessage(obj, deps) {
   var _a, _b, _c;

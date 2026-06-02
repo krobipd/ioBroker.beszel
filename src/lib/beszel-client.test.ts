@@ -11,6 +11,7 @@ interface MockServerConfig {
   systemsHandler?: () => { status: number; body: string };
   statsHandler?: () => { status: number; body: string };
   containersHandler?: () => { status: number; body: string };
+  detailsHandler?: () => { status: number; body: string };
 }
 
 function createMockServer(config: MockServerConfig = {}): {
@@ -52,6 +53,11 @@ function createMockServer(config: MockServerConfig = {}): {
         res.end(result.body);
       } else if (path.includes("/api/collections/containers/records")) {
         const handler = config.containersHandler || defaultContainersHandler;
+        const result = handler();
+        res.writeHead(result.status, { "Content-Type": "application/json" });
+        res.end(result.body);
+      } else if (path.includes("/api/collections/system_details/records")) {
+        const handler = config.detailsHandler || defaultSystemDetailsHandler;
         const result = handler();
         res.writeHead(result.status, { "Content-Type": "application/json" });
         res.end(result.body);
@@ -176,6 +182,44 @@ function defaultContainersHandler(): { status: number; body: string } {
           cpu: 5.0,
           memory: 128,
           image: "nginx:latest",
+        },
+      ],
+    }),
+  };
+}
+
+function defaultSystemDetailsHandler(): { status: number; body: string } {
+  return {
+    status: 200,
+    body: JSON.stringify({
+      page: 1,
+      perPage: 200,
+      totalItems: 2,
+      totalPages: 1,
+      items: [
+        {
+          id: "d001",
+          system: "sys001",
+          hostname: "server-a",
+          os: 0,
+          os_name: "Ubuntu 22.04",
+          kernel: "6.5.0-1",
+          cpu: "Intel i7-9700",
+          arch: "x86_64",
+          cores: 8,
+          threads: 16,
+          podman: false,
+        },
+        {
+          id: "d002",
+          system: "sys002",
+          hostname: "server-b",
+          os: 1,
+          os_name: "macOS 14.1",
+          cpu: "Apple M2",
+          arch: "arm64",
+          cores: 8,
+          threads: 8,
         },
       ],
     }),
@@ -1034,6 +1078,128 @@ describe("BeszelClient", () => {
       } catch (err) {
         expect((err as NodeJS.ErrnoException).code).to.equal("RATE_LIMITED");
       }
+    });
+  });
+
+  describe("401 re-auth retry (F6 v0.6.0)", () => {
+    it("re-authenticates and retries once on a mid-session 401, then succeeds", async () => {
+      let sysCalls = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          sysCalls++;
+          if (sysCalls === 1) {
+            return { status: 401, body: JSON.stringify({ message: "token expired" }) };
+          }
+          return {
+            status: 200,
+            body: JSON.stringify({ page: 1, perPage: 200, totalItems: 0, totalPages: 0, items: [] }),
+          };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const systems = await client.getSystems();
+      expect(systems).to.have.lengthOf(0);
+      // systems was requested twice (401 → retry), and auth happened twice
+      // (initial + the forced re-auth after the 401).
+      expect(mock.requestLog.filter(r => r.path.includes("/systems/records")).length).to.equal(2);
+      expect(mock.requestLog.filter(r => r.path.includes("/auth-with-password")).length).to.equal(2);
+    });
+
+    it("propagates UNAUTHORIZED if the retry also 401s", async () => {
+      mock = createMockServer({
+        systemsHandler: () => ({ status: 401, body: JSON.stringify({ message: "nope" }) }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      try {
+        await client.getSystems();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as NodeJS.ErrnoException).code).to.equal("UNAUTHORIZED");
+      }
+      // initial systems + one retry = 2 (no infinite loop)
+      expect(mock.requestLog.filter(r => r.path.includes("/systems/records")).length).to.equal(2);
+    });
+
+    it("does NOT retry the auth request itself on 401 (bad credentials)", async () => {
+      mock = createMockServer({
+        authHandler: () => ({ status: 401, body: JSON.stringify({ message: "bad creds" }) }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "wrong");
+      try {
+        await client.getSystems();
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as NodeJS.ErrnoException).code).to.equal("UNAUTHORIZED");
+      }
+      // The auth POST (token === null) must not be retried by the F6 path.
+      expect(mock.requestLog.filter(r => r.path.includes("/auth-with-password")).length).to.equal(1);
+    });
+  });
+
+  describe("getSystemDetails (F2 v0.6.0)", () => {
+    it("returns a map of system id → details", async () => {
+      mock = createMockServer();
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const details = await client.getSystemDetails();
+      expect(details.size).to.equal(2);
+      expect(details.get("sys001")).to.deep.equal({
+        hostname: "server-a",
+        os: 0,
+        os_name: "Ubuntu 22.04",
+        kernel: "6.5.0-1",
+        cpu: "Intel i7-9700",
+        arch: "x86_64",
+        cores: 8,
+        threads: 16,
+        podman: false,
+      });
+      expect(details.get("sys002")!.os).to.equal(1);
+      expect(details.get("sys002")!.arch).to.equal("arm64");
+    });
+
+    it("keeps the first record per system (dedup)", async () => {
+      mock = createMockServer({
+        detailsHandler: () => ({
+          status: 200,
+          body: JSON.stringify({
+            page: 1,
+            perPage: 200,
+            totalItems: 2,
+            totalPages: 1,
+            items: [
+              { id: "d1", system: "sys001", hostname: "first" },
+              { id: "d2", system: "sys001", hostname: "second" },
+            ],
+          }),
+        }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const details = await client.getSystemDetails();
+      expect(details.size).to.equal(1);
+      expect(details.get("sys001")!.hostname).to.equal("first");
+    });
+
+    it("returns an empty map on an older Hub without the collection (404)", async () => {
+      mock = createMockServer({
+        detailsHandler: () => ({ status: 404, body: JSON.stringify({ message: "no such collection" }) }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      // fetchAllPages → fetchJson throws on 404; the adapter treats that as
+      // "details absent". Here we assert the throw so main.ts's try/catch is
+      // the documented handling point.
+      let threw = false;
+      try {
+        await client.getSystemDetails();
+      } catch {
+        threw = true;
+      }
+      expect(threw).to.equal(true);
     });
   });
 

@@ -60,9 +60,14 @@ export interface MessageRouterDeps {
  * `debug`/`warn` through it.
  *
  * @param logger Adapter debug logger to forward into the BeszelClient.
+ * @param delay Adapter-managed delay (`this.delay.bind(this)`) so a 429 during
+ *   checkConnection backs off and any in-flight wait is cancelled on unload.
  */
-export function makeTestClientFactory(logger: BeszelClientLogger): MessageRouterDeps["createTestClient"] {
-  return (url, username, password) => new BeszelClient(url, username, password, undefined, logger);
+export function makeTestClientFactory(
+  logger: BeszelClientLogger,
+  delay: (ms: number) => Promise<void>,
+): MessageRouterDeps["createTestClient"] {
+  return (url, username, password) => new BeszelClient(url, username, password, undefined, logger, delay);
 }
 
 /**

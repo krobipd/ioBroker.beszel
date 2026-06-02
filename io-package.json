@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.5.12",
+    "version": "0.6.0",
     "news": {
+      "0.6.0": {
+        "en": "More optional metrics, plus system info, container network and GPU details. Fixed the GPU memory unit and the battery charging indicator.",
+        "de": "Mehr optionale Metriken, dazu System-Infos, Container-Netzwerk und GPU-Details. GPU-Speichereinheit und Akku-Ladeanzeige korrigiert.",
+        "ru": "Больше необязательных метрик, информация о системе, сеть контейнеров и детали GPU. Исправлены единица памяти GPU и индикатор зарядки батареи.",
+        "pt": "Mais métricas opcionais, além de informações do sistema, rede de contêineres e detalhes da GPU. Corrigidos a unidade de memória da GPU e o indicador de carga da bateria.",
+        "nl": "Meer optionele metrieken, plus systeeminfo, containernetwerk en GPU-details. GPU-geheugeneenheid en batterij-laadindicator gecorrigeerd.",
+        "fr": "Plus de métriques optionnelles, des infos système, le réseau des conteneurs et les détails GPU. Correction de l'unité de mémoire GPU et de l'indicateur de charge de la batterie.",
+        "it": "Più metriche opzionali, info di sistema, rete dei container e dettagli GPU. Corrette l'unità di memoria GPU e l'indicatore di carica della batteria.",
+        "es": "Más métricas opcionales, información del sistema, red de contenedores y detalles de la GPU. Corregidos la unidad de memoria de la GPU y el indicador de carga de la batería.",
+        "pl": "Więcej opcjonalnych metryk, informacje o systemie, sieć kontenerów i szczegóły GPU. Poprawiono jednostkę pamięci GPU i wskaźnik ładowania baterii.",
+        "uk": "Більше необов'язкових метрик, інформація про систему, мережа контейнерів і деталі GPU. Виправлено одиницю пам'яті GPU та індикатор заряджання батареї.",
+        "zh-cn": "更多可选指标，以及系统信息、容器网络和 GPU 详情。修复了 GPU 显存单位和电池充电指示。"
+      },
       "0.5.12": {
         "en": "Reduced unnecessary state-change events. Fixed duplicate error messages in compact mode.",
         "de": "Unnötige State-Change-Events reduziert. Doppelte Fehlermeldungen im Compact-Modus behoben.",
@@ -80,19 +93,6 @@
         "pl": "Nazwy stanów zmienione przez użytkownika nie są już nadpisywane przy ponownym uruchomieniu adaptera",
         "uk": "Змінені користувачем назви станів більше не перезаписуються при перезапуску адаптера",
         "zh-cn": "用户修改的状态名称在适配器重启时不再被覆盖"
-      },
-      "0.5.6": {
-        "en": "Improved adapter stability.",
-        "de": "Verbesserte Adapter-Stabilität.",
-        "ru": "Улучшена стабильность адаптера.",
-        "pt": "Melhoria na estabilidade do adaptador.",
-        "nl": "Verbeterde adapterstabiliteit.",
-        "fr": "Amélioration de la stabilité de l'adaptateur.",
-        "it": "Migliorata la stabilità dell'adattatore.",
-        "es": "Mejora en la estabilidad del adaptador.",
-        "pl": "Poprawiona stabilność adaptera.",
-        "uk": "Покращено стабільність адаптера.",
-        "zh-cn": "提高了适配器稳定性。"
       }
     },
     "titleLang": {
@@ -263,6 +263,14 @@
     "metrics_temperatureDetails": false,
     "metrics_gpu": false,
     "metrics_containers": false,
-    "metrics_battery": false
+    "metrics_battery": false,
+    "metrics_cpuCores": false,
+    "metrics_cpuPeak": false,
+    "metrics_memoryPeak": false,
+    "metrics_diskIo": false,
+    "metrics_diskPeak": false,
+    "metrics_networkInterfaces": false,
+    "metrics_networkPeak": false,
+    "metrics_gpuDetails": false
   }
 }

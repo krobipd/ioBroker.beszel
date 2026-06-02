@@ -10,7 +10,6 @@
           "type": "text",
           "label": "label_url",
           "help": "help_url",
-          "placeholder": "http://192.168.1.100:8090",
           "xs": 12,
           "sm": 12,
           "md": 8,
@@ -139,6 +138,7 @@
         "metrics_uptime": {
           "type": "checkbox",
           "label": "metric_uptime",
+          "help": "help_metric_uptime",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -149,6 +149,7 @@
         "metrics_agentVersion": {
           "type": "checkbox",
           "label": "metric_agentVersion",
+          "help": "help_metric_agentVersion",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -159,6 +160,7 @@
         "metrics_services": {
           "type": "checkbox",
           "label": "metric_services",
+          "help": "help_metric_services",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -178,6 +180,7 @@
         "metrics_cpu": {
           "type": "checkbox",
           "label": "metric_cpu",
+          "help": "help_metric_cpu",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -188,6 +191,8 @@
         "metrics_loadAvg": {
           "type": "checkbox",
           "label": "metric_loadAvg",
+          "help": "help_metric_loadAvg",
+          "disabled": "!data.metrics_cpu",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -198,6 +203,32 @@
         "metrics_cpuBreakdown": {
           "type": "checkbox",
           "label": "metric_cpuBreakdown",
+          "help": "help_metric_cpuBreakdown",
+          "disabled": "!data.metrics_cpu",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_cpuCores": {
+          "type": "checkbox",
+          "label": "metric_cpuCores",
+          "help": "help_metric_cpuCores",
+          "disabled": "!data.metrics_cpu",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_cpuPeak": {
+          "type": "checkbox",
+          "label": "metric_cpuPeak",
+          "help": "help_metric_cpuPeak",
+          "disabled": "!data.metrics_cpu",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -217,6 +248,7 @@
         "metrics_memory": {
           "type": "checkbox",
           "label": "metric_memory",
+          "help": "help_metric_memory",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -227,6 +259,8 @@
         "metrics_memoryDetails": {
           "type": "checkbox",
           "label": "metric_memoryDetails",
+          "help": "help_metric_memoryDetails",
+          "disabled": "!data.metrics_memory",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -237,6 +271,20 @@
         "metrics_swap": {
           "type": "checkbox",
           "label": "metric_swap",
+          "help": "help_metric_swap",
+          "disabled": "!data.metrics_memory",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_memoryPeak": {
+          "type": "checkbox",
+          "label": "metric_memoryPeak",
+          "help": "help_metric_memoryPeak",
+          "disabled": "!data.metrics_memory",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -256,6 +304,7 @@
         "metrics_disk": {
           "type": "checkbox",
           "label": "metric_disk",
+          "help": "help_metric_disk",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -266,6 +315,8 @@
         "metrics_diskSpeed": {
           "type": "checkbox",
           "label": "metric_diskSpeed",
+          "help": "help_metric_diskSpeed",
+          "disabled": "!data.metrics_disk",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -276,6 +327,32 @@
         "metrics_extraFs": {
           "type": "checkbox",
           "label": "metric_extraFs",
+          "help": "help_metric_extraFs",
+          "disabled": "!data.metrics_disk",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_diskIo": {
+          "type": "checkbox",
+          "label": "metric_diskIo",
+          "help": "help_metric_diskIo",
+          "disabled": "!data.metrics_disk",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_diskPeak": {
+          "type": "checkbox",
+          "label": "metric_diskPeak",
+          "help": "help_metric_diskPeak",
+          "disabled": "!data.metrics_disk",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -295,7 +372,32 @@
         "metrics_network": {
           "type": "checkbox",
           "label": "metric_network",
+          "help": "help_metric_network",
           "default": true,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_networkInterfaces": {
+          "type": "checkbox",
+          "label": "metric_networkInterfaces",
+          "help": "help_metric_networkInterfaces",
+          "disabled": "!data.metrics_network",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_networkPeak": {
+          "type": "checkbox",
+          "label": "metric_networkPeak",
+          "help": "help_metric_networkPeak",
+          "disabled": "!data.metrics_network",
+          "default": false,
           "xs": 12,
           "sm": 12,
           "md": 6,
@@ -314,6 +416,7 @@
         "metrics_temperature": {
           "type": "checkbox",
           "label": "metric_temperature",
+          "help": "help_metric_temperature",
           "default": true,
           "xs": 12,
           "sm": 12,
@@ -324,6 +427,8 @@
         "metrics_temperatureDetails": {
           "type": "checkbox",
           "label": "metric_temperatureDetails",
+          "help": "help_metric_temperatureDetails",
+          "disabled": "!data.metrics_temperature",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -343,6 +448,19 @@
         "metrics_gpu": {
           "type": "checkbox",
           "label": "metric_gpu",
+          "help": "help_metric_gpu",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_gpuDetails": {
+          "type": "checkbox",
+          "label": "metric_gpuDetails",
+          "help": "help_metric_gpuDetails",
+          "disabled": "!data.metrics_gpu",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -362,6 +480,7 @@
         "metrics_containers": {
           "type": "checkbox",
           "label": "metric_containers",
+          "help": "help_metric_containers",
           "default": false,
           "xs": 12,
           "sm": 12,
@@ -381,6 +500,7 @@
         "metrics_battery": {
           "type": "checkbox",
           "label": "metric_battery",
+          "help": "help_metric_battery",
           "default": false,
           "xs": 12,
           "sm": 12,

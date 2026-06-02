@@ -62,6 +62,24 @@ export interface AdapterConfig {
 
   /** Enable battery states */
   metrics_battery: boolean;
+
+  // --- v0.6.0 additions (all default off — opt-in detail/peaks) ---
+  /** Per-core CPU usage states */
+  metrics_cpuCores?: boolean;
+  /** Peak CPU usage state */
+  metrics_cpuPeak?: boolean;
+  /** Peak memory state */
+  metrics_memoryPeak?: boolean;
+  /** Disk I/O detail (bytes + utilization + wait times) */
+  metrics_diskIo?: boolean;
+  /** Peak disk read/write speed states */
+  metrics_diskPeak?: boolean;
+  /** Per-network-interface states */
+  metrics_networkInterfaces?: boolean;
+  /** Peak network sent/received states */
+  metrics_networkPeak?: boolean;
+  /** GPU detail states (package power + per-engine usage) */
+  metrics_gpuDetails?: boolean;
 }
 
 /**
@@ -81,6 +99,39 @@ export interface SystemInfo {
 }
 
 /**
+ * Static hardware / OS info for one system. Lives in the `system_details`
+ * collection (Beszel v0.18.0+); the adapter fetches it only when the
+ * "System info" metric is enabled, and rarely (once at start + when a new
+ * system appears) because it changes only on agent restart/upgrade.
+ *
+ * Every field is optional — an older Beszel without the collection, or a
+ * partially-populated agent, simply yields absent fields (→ no state created).
+ * Column names verified against the v0.18.7 collection snapshot
+ * (`Ressourcen/beszel/beszel-0.18.7/`) — note `os_name` is snake_case and
+ * `os` is a numeric platform enum, not a string.
+ */
+export interface SystemDetails {
+  /** Host name */
+  hostname?: string;
+  /** OS platform enum: 0=Linux, 1=Darwin (macOS), 2=Windows, 3=FreeBSD */
+  os?: number;
+  /** Full OS name, e.g. "Ubuntu 22.04" / "macOS 14.1" */
+  os_name?: string;
+  /** Kernel version */
+  kernel?: string;
+  /** CPU model name */
+  cpu?: string;
+  /** CPU architecture, e.g. "x86_64" / "arm64" */
+  arch?: string;
+  /** Physical CPU cores */
+  cores?: number;
+  /** Logical CPU threads */
+  threads?: number;
+  /** Container engine is Podman (vs Docker) */
+  podman?: boolean;
+}
+
+/**
  * A system record from /api/collections/systems/records
  */
 export interface BeszelSystem {
@@ -94,6 +145,22 @@ export interface BeszelSystem {
   host: string;
   /** System info object */
   info: SystemInfo;
+  /**
+   * Static hardware/OS info, attached by the poll loop from the separately
+   * fetched `system_details` collection (only when "System info" is enabled).
+   * Absent on systems whose details aren't (yet) cached.
+   */
+  details?: SystemDetails;
+}
+
+/**
+ * A system_details record from /api/collections/system_details/records.
+ */
+export interface BeszelSystemDetailsRecord {
+  /** Reference to systems.id */
+  system: string;
+  /** Static hardware/OS fields */
+  details: SystemDetails;
 }
 
 /**
@@ -118,12 +185,16 @@ export interface GPUData {
   n?: string;
   /** GPU usage % */
   u?: number;
-  /** GPU memory used GB */
+  /** GPU memory used MB (agent reports MiB/bytes → MB, verified gpu.go) */
   mu?: number;
-  /** GPU memory total GB */
+  /** GPU memory total MB (agent reports MiB/bytes → MB, verified gpu.go) */
   mt?: number;
   /** GPU power W */
   p?: number;
+  /** Package power W (v0.18.7) */
+  pp?: number;
+  /** Per-engine usage %: engine name -> % (v0.18.7) */
+  e?: Record<string, number>;
 }
 
 /**
@@ -172,7 +243,36 @@ export interface SystemStats {
   bat?: [number, number];
   /** CPU breakdown [user, sys, iowait, steal, idle] % */
   cpub?: number[];
+  // --- v0.18.7 additions (all optional → absent on older Beszel versions) ---
+  /** Peak CPU usage % in the interval */
+  cpum?: number;
+  /** Peak RAM used GB */
+  mm?: number;
+  /** Peak disk read MB/s */
+  drm?: number;
+  /** Peak disk write MB/s */
+  dwm?: number;
+  /** Peak network sent MB/s */
+  nsm?: number;
+  /** Peak network received MB/s */
+  nrm?: number;
+  /**
+   * Per-interface bandwidth: name -> [up bytes/s, down bytes/s, total up bytes,
+   * total down bytes]. up/down are rates; total_up/total_down are cumulative
+   * since boot (the only genuine cumulative network counters Beszel exposes).
+   */
+  ni?: Record<string, [number, number, number, number]>;
+  /** Per-core CPU busy % */
+  cpus?: number[];
+  /** Disk I/O stats [read time %, write time %, io util %, r_await ms, w_await ms, weighted io %] */
+  dios?: number[];
 }
+
+// Note: `b`/`bm` (Bandwidth) and `dio`/`diom` (DiskIO) are deliberately NOT in
+// this interface. Verified against agent/network.go:231 + agent/disk.go:638-641
+// (Ressourcen/beszel/beszel-0.18.7): they are byte/s *rates*, identical to
+// `ns`/`nr` and `dr`/`dw` in different units — redundant, so not surfaced.
+// `diosm` (peak dios) has no consumer either. See VERIFIED-v0.18.7.md.
 
 /**
  * A system_stats record from /api/collections/system_stats/records
@@ -210,6 +310,12 @@ export interface BeszelContainer {
   memory: number;
   /** Docker image name */
   image: string;
+  /**
+   * Combined network throughput in bytes/s (sent + recv). Hub stores
+   * `Bandwidth[0] + Bandwidth[1]` in the `net` column (v0.18.7). Optional —
+   * absent on an older Hub → no container network state.
+   */
+  net?: number;
 }
 
 /**
@@ -232,14 +338,6 @@ export interface PocketBaseList<T> {
  * PocketBase auth response
  */
 export interface AuthResponse {
-  /** Bearer token for subsequent requests */
+  /** Auth token — sent as the bare `Authorization` header value (Beszel/PocketBase uses no "Bearer " prefix). */
   token: string;
-  /** Authenticated user record */
-  record: {
-    /** User ID */
-    id: string;
-    /** User email */
-    email: string;
-    [key: string]: unknown;
-  };
 }

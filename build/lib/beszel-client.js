@@ -59,7 +59,12 @@ class BeszelClient {
   inflight = /* @__PURE__ */ new Set();
   /** v0.4.4: optional logger for the HTTP-layer / auth / pagination trace. */
   log;
-  /** Injected delay — adapter passes `this.delay.bind(this)` so it auto-cancels on unload. */
+  /**
+   * Injected delay — production passes the adapter-managed `this.delay.bind(this)`
+   * (auto-cancels on unload). When omitted (only outside the adapter, e.g. a bare
+   * unit-test client), it degrades to an immediate resolve — i.e. the 429-retry
+   * fires without back-off rather than pulling in a plain `setTimeout`.
+   */
   delay;
   /**
    * @param url Beszel Hub base URL, e.g. http://192.168.1.100:8090
@@ -75,7 +80,7 @@ class BeszelClient {
     this.password = password;
     this.timeoutMs = timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
     this.log = log;
-    this.delay = delay != null ? delay : ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.delay = delay != null ? delay : (() => Promise.resolve());
   }
   /** Force token re-authentication on the next request */
   invalidateToken() {
@@ -135,6 +140,27 @@ class BeszelClient {
     for (const record of items) {
       if (record && !result.has(record.system)) {
         result.set(record.system, record.stats);
+      }
+    }
+    return result;
+  }
+  /**
+   * Fetch static system details (Beszel v0.18.0+), keyed by system id.
+   * Returns an empty Map on an older Hub without the collection (the list
+   * endpoint 404s → caught by the caller, which treats details as absent).
+   *
+   * Access is scoped to the user's own systems (same `systemScopedReadRule`
+   * as system_stats), so the regular auth token used everywhere else works.
+   * Called rarely (start + new-system), not in every poll — the data is
+   * static (changes only on agent restart/upgrade).
+   */
+  async getSystemDetails() {
+    await this.ensureToken();
+    const items = await this.fetchAllPages("/api/collections/system_details/records", import_coerce.coerceSystemDetailsRecord);
+    const result = /* @__PURE__ */ new Map();
+    for (const rec of items) {
+      if (rec && !result.has(rec.system)) {
+        result.set(rec.system, rec.details);
       }
     }
     return result;
@@ -227,17 +253,23 @@ class BeszelClient {
     return out;
   }
   async request(method, path, body, token) {
-    var _a, _b;
+    var _a, _b, _c;
     try {
       return await this.requestOnce(method, path, body, token);
     } catch (err) {
       const e = err;
+      if (e.code === "UNAUTHORIZED" && token !== null) {
+        (_a = this.log) == null ? void 0 : _a.debug(`request: 401 on ${path} \u2014 re-authenticating and retrying once`);
+        this.invalidateToken();
+        await this.ensureToken();
+        return this.requestOnce(method, path, body, this.token);
+      }
       if (e.code !== "RATE_LIMITED") {
         throw err;
       }
-      const retrySec = (_a = e.retryAfter) != null ? _a : 1;
+      const retrySec = (_b = e.retryAfter) != null ? _b : 1;
       const retryMs = Math.min(Math.max(1, retrySec), 30) * 1e3;
-      (_b = this.log) == null ? void 0 : _b.debug(`request: 429 retry for ${path}, waiting ${retryMs}ms`);
+      (_c = this.log) == null ? void 0 : _c.debug(`request: 429 retry for ${path}, waiting ${retryMs}ms`);
       await this.delay(retryMs);
       return this.requestOnce(method, path, body, token);
     }

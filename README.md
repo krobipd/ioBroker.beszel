@@ -19,11 +19,12 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 
 - Fetches metrics from all systems registered in your Beszel Hub
 - Per-system states: CPU, memory, disk, network, temperature, load average
-- Optional: GPU metrics, Docker/Podman containers, battery, extra filesystems, CPU breakdown, systemd services
+- Optional detail: per-core CPU, peak values, disk I/O load, per-interface traffic, GPU details, hardware/OS info, Docker/Podman containers, battery, extra filesystems, CPU breakdown, systemd services
+- Each option has a help text explaining the states it creates; detail options stay greyed out until their category is enabled
 - Configurable poll interval (10–300 seconds)
-- Automatic re-authentication when the token expires
+- Automatic re-authentication when the token expires (including mid-poll)
 - Connection test button in the admin UI
-- Automatic cleanup of states for removed systems and disabled metrics
+- Automatic cleanup of states for removed systems, stale containers and disabled metrics
 
 ---
 
@@ -54,25 +55,35 @@ Use the **Test Connection** button to verify your credentials before saving.
 
 All metrics are global toggles that apply to **all** systems. Disabled metrics are automatically removed from the state tree on the next adapter start.
 
+Detail options stay greyed out until their category's main metric is enabled, and each option carries a help text describing exactly which states it creates.
+
 | Group | Metric | Default |
 |-------|--------|---------|
 | **System** | Uptime | on |
-| | Agent Version | off |
+| | System info (hardware, OS, agent version) | off |
 | | Systemd Services (total / failed) | off |
 | **CPU** | CPU Usage (%) | on |
 | | Load Average (1m / 5m / 15m) | on |
 | | CPU Breakdown (User / System / IOWait / Steal / Idle) | off |
+| | Per-core usage | off |
+| | Peak values | off |
 | **Memory** | Memory Usage (% and GB) | on |
 | | Memory Details (Buffers, ZFS ARC) | off |
 | | Swap | off |
+| | Peak values | off |
 | **Disk** | Disk Usage (% and GB) | on |
-| | Disk Read/Write Speed | on |
+| | Read/Write Speed | on |
+| | I/O load (utilization, read/write wait times) | off |
 | | Additional Filesystems | off |
+| | Peak values | off |
 | **Network** | Network Traffic (Upload / Download MB/s) | on |
-| **Temperature** | Temperature (hottest sensors avg) | on |
+| | Per interface | off |
+| | Peak values | off |
+| **Temperature** | Temperature (hottest sensors avg + hottest single) | on |
 | | Individual Temperature Sensors | off |
 | **GPU** | GPU Metrics (Usage, Memory, Power) | off |
-| **Containers** | Container Monitoring (Docker / Podman) | off |
+| | GPU details (engines, package power) | off |
+| **Containers** | Container Monitoring incl. network (Docker / Podman) | off |
 | **Battery** | Battery Status | off |
 
 ---
@@ -92,6 +103,15 @@ beszel.0.
         │   ├── uptime               — Uptime in seconds
         │   ├── uptime_text          — Human-readable uptime (e.g. "14d 6h")
         │   ├── agent_version *      — Beszel agent version
+        │   ├── hostname *           — Host name (System info)
+        │   ├── os *                 — Operating system (Linux/macOS/Windows/FreeBSD)
+        │   ├── os_name *            — OS version (e.g. "Ubuntu 22.04")
+        │   ├── kernel *             — Kernel version
+        │   ├── cpu_model *          — CPU model
+        │   ├── arch *               — CPU architecture
+        │   ├── cores *              — Physical CPU cores
+        │   ├── threads *            — Logical CPU threads
+        │   ├── podman *             — Container engine is Podman (bool)
         │   ├── services_total *     — Systemd services total
         │   └── services_failed *    — Systemd services failed
         ├── cpu/                      — CPU metrics
@@ -103,7 +123,9 @@ beszel.0.
         │   ├── system *             — CPU system (%)
         │   ├── iowait *             — CPU I/O wait (%)
         │   ├── steal *              — CPU steal (%)
-        │   └── idle *               — CPU idle (%)
+        │   ├── idle *               — CPU idle (%)
+        │   ├── peak *               — Peak CPU usage in interval (%)
+        │   └── cores/ *             — Per-core usage (core0, core1, …) (%)
         ├── memory/                   — Memory metrics
         │   ├── percent              — RAM usage (%)
         │   ├── used                 — RAM used (GB)
@@ -111,18 +133,28 @@ beszel.0.
         │   ├── buffers *            — Buffers + cache (GB)
         │   ├── zfs_arc *            — ZFS ARC (GB)
         │   ├── swap_used *          — Swap used (GB)
-        │   └── swap_total *         — Swap total (GB)
+        │   ├── swap_total *         — Swap total (GB)
+        │   └── peak *               — Peak RAM used in interval (GB)
         ├── disk/                     — Disk metrics
         │   ├── percent              — Disk usage (%)
         │   ├── used                 — Disk used (GB)
         │   ├── total                — Disk total (GB)
         │   ├── read                 — Disk read (MB/s)
-        │   └── write                — Disk write (MB/s)
+        │   ├── write                — Disk write (MB/s)
+        │   ├── read_peak *          — Peak read in interval (MB/s)
+        │   ├── write_peak *         — Peak write in interval (MB/s)
+        │   ├── io_util *            — I/O utilization (%)
+        │   ├── io_await_read *      — Read wait time (ms)
+        │   └── io_await_write *     — Write wait time (ms)
         ├── network/                  — Network metrics
         │   ├── sent                 — Upload (MB/s)
-        │   └── recv                 — Download (MB/s)
+        │   ├── recv                 — Download (MB/s)
+        │   ├── sent_peak *          — Peak upload in interval (MB/s)
+        │   ├── recv_peak *          — Peak download in interval (MB/s)
+        │   └── interfaces/ *        — Per interface: up, down (bytes/s) + total_up, total_down (cumulative bytes)
         ├── temperature/              — Temperature metrics
         │   ├── average              — Avg of top 3 sensors (°C)
+        │   ├── max                  — Hottest single sensor (°C)
         │   └── sensors/ *           — Individual sensor readings
         ├── battery/ *                — Battery metrics
         │   ├── percent              — Battery level (%)
@@ -130,9 +162,11 @@ beszel.0.
         ├── gpu/ *                    — GPU metrics (per GPU)
         │   └── {gpu_name}/
         │       ├── usage            — GPU usage (%)
-        │       ├── memory_used      — VRAM used (GB)
-        │       ├── memory_total     — VRAM total (GB)
-        │       └── power            — Power draw (W)
+        │       ├── memory_used      — VRAM used (MB)
+        │       ├── memory_total     — VRAM total (MB)
+        │       ├── power            — Power draw (W)
+        │       ├── power_package *  — Package power (W) (GPU details)
+        │       └── engines/ *       — Per-engine usage (render, video, …) (%)
         ├── filesystems/ *            — Extra filesystems (per mount)
         │   └── {fs_name}/
         │       ├── disk_percent     — Usage (%)
@@ -146,7 +180,8 @@ beszel.0.
                 ├── health           — Health (none/starting/healthy/unhealthy)
                 ├── cpu              — CPU usage (%)
                 ├── memory           — Memory (MB)
-                └── image            — Image name
+                ├── image            — Image name
+                └── network          — Combined network throughput (bytes/s)
 ```
 
 > **Breaking change in 0.3.0:** States moved from flat paths (e.g. `cpu_usage`) to channels (e.g. `cpu.usage`). Legacy states are automatically cleaned up on first start.
@@ -172,6 +207,18 @@ beszel.0.
 ---
 
 ## Changelog
+### 0.6.0 (2026-06-02)
+
+- New optional metrics, all off by default: CPU usage per core, peak values, disk I/O load, and traffic per network interface.
+- New "System info" option adds hardware and OS details per server: hostname, CPU model, cores/threads, operating system, kernel and architecture.
+- Temperature now also reports the single hottest sensor, in addition to the average of the three hottest.
+- Containers now report their combined network throughput.
+- GPU details option adds package power and per-engine usage.
+- Every option now shows a short help text explaining which values it creates; detail options stay greyed out until their category is enabled.
+- An expired session is now refreshed automatically during a poll, so a single token timeout no longer skips a data update.
+- Fixed GPU memory unit: now correctly shown in MB (was wrongly labeled GB). Existing GPU users: delete the old `gpu.*` states once and restart to get the new unit.
+- Fixed battery charging indicator: now only true while actually charging (previously also true while discharging or full).
+
 ### 0.5.12 (2026-05-23)
 
 - Reduced unnecessary state-change events by skipping writes when the value has not changed.
@@ -186,10 +233,6 @@ beszel.0.
 - Internal cleanup. No user-facing changes.
 
 ### 0.5.9 (2026-05-23)
-
-- Internal cleanup. No user-facing changes.
-
-### 0.5.8 (2026-05-23)
 
 - Internal cleanup. No user-facing changes.
 

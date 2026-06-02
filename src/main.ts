@@ -2,10 +2,10 @@ import * as utils from "@iobroker/adapter-core";
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { BeszelClient } from "./lib/beszel-client";
-import { coercePollInterval, coerceTimeoutMs, errText, validateHubUrl } from "./lib/coerce";
+import { coercePollInterval, coerceTimeoutMs, errText, shouldFetchSystemDetails, validateHubUrl } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
-import type { AdapterConfig } from "./lib/types";
+import type { AdapterConfig, SystemDetails } from "./lib/types";
 
 let processHandlersInstalled = false;
 let installedUnhandledHandler: ((reason: unknown) => void) | null = null;
@@ -20,6 +20,20 @@ class BeszelAdapter extends utils.Adapter {
   private lastErrorCode = "";
   private authFailCount = 0;
   private failedSystems = new Set<string>();
+  /**
+   * v0.6.0 (F2): cache of static system_details (hardware/OS) keyed by system
+   * id, plus the set of system ids we've already *attempted* to fetch. Fetched
+   * only when "System info" is enabled and only when a never-seen system id
+   * appears — the data is static, so re-fetching every 60 s would be waste.
+   *
+   * The trigger keys on *attempted* ids (added after each attempt, success or
+   * failure), NOT on which ids ended up in `systemDetails`: a `pending` system
+   * with no details row, or an older Hub that 404s, must not retrigger a fetch
+   * every single poll. A config toggle change restarts the instance, resetting
+   * both back to empty.
+   */
+  private systemDetails: Map<string, SystemDetails> = new Map();
+  private detailsAttempted = new Set<string>();
   /**
    * v0.4.5: short-lived test-clients spawned from `checkConnection` admin
    * messages. The prod-`this.client` is what `onUnload` cancels, so these
@@ -149,10 +163,13 @@ class BeszelAdapter extends utils.Adapter {
           warn: (m: string) => this.log.warn(m),
         },
         sendTo: this.sendTo.bind(this),
-        createTestClient: makeTestClientFactory({
-          debug: (m: string) => this.log.debug(m),
-          warn: (m: string) => this.log.warn(m),
-        }),
+        createTestClient: makeTestClientFactory(
+          {
+            debug: (m: string) => this.log.debug(m),
+            warn: (m: string) => this.log.warn(m),
+          },
+          this.delay.bind(this),
+        ),
         onTestClientCreated: client => {
           this.testClients.add(client);
         },
@@ -231,6 +248,42 @@ class BeszelAdapter extends utils.Adapter {
 
       // Update connection state
       await this.setStateAsync("info.connection", { val: true, ack: true });
+
+      // v0.6.0 (F2): static hardware/OS details. Only when "System info" is
+      // enabled, and only fetched when we don't already have details for every
+      // current system (first poll, or a newly-added system) — the data is
+      // static so re-fetching each poll would be waste. A failed fetch (e.g.
+      // older Hub without the collection) is non-fatal: details stay absent →
+      // no hardware states are created.
+      if (config.metrics_agentVersion) {
+        // Refetch only when a system id we've never attempted appears. Marking
+        // every current id as attempted afterwards (even on failure) stops a
+        // details-less system or an older Hub's 404 from refetching each poll.
+        // Edge: a system that is `pending` at this moment gets marked attempted,
+        // so its hardware info appears only after the next adapter restart — an
+        // accepted trait of the "static data, restart-to-refresh" model.
+        const needFetch = shouldFetchSystemDetails(
+          systems.map(s => s.id),
+          this.detailsAttempted,
+        );
+        if (needFetch) {
+          try {
+            this.systemDetails = await this.client.getSystemDetails();
+            this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
+          } catch (err) {
+            this.log.debug(`system_details fetch failed (non-fatal): ${errText(err)}`);
+          }
+          for (const s of systems) {
+            this.detailsAttempted.add(s.id);
+          }
+        }
+        for (const system of systems) {
+          const d = this.systemDetails.get(system.id);
+          if (d) {
+            system.details = d;
+          }
+        }
+      }
 
       // v0.4.3 (SM5): pre-resolve safeNames deterministically so collisions
       // between two systems with the same sanitized name get suffixed
