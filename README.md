@@ -238,6 +238,8 @@ beszel.0.
 
 Older entries are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
+[Older changelogs can be found there](CHANGELOG_OLD.md)
+
 ## Support
 
 - [ioBroker Forum](https://forum.iobroker.net/)
