@@ -1,4 +1,8 @@
 # Older Changes
+## 0.5.9 (2026-05-23)
+
+- Internal cleanup. No user-facing changes.
+
 ## 0.5.8 (2026-05-23)
 
 - Internal cleanup. No user-facing changes.
