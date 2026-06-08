@@ -23,10 +23,18 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 
 ---
 
+## Sentry / Error reporting
+
+**This adapter uses Sentry libraries to automatically report exceptions and code errors to the developers.** Reporting only happens if you have enabled error reporting in the ioBroker diagnostics (**System settings → Diagnostics and error reporting**). Only an anonymous installation ID is transmitted — no name, e-mail address or IP address.
+
+For details and how to disable it, see the [Sentry plugin documentation](https://github.com/ioBroker/plugin-sentry#plugin-sentry). Error reporting requires js-controller 3.0 or newer.
+
+---
+
 ## Requirements
 
 - **Node.js >= 22**
-- **ioBroker js-controller >= 7.0.7**
+- **ioBroker js-controller >= 7.1.2**
 - **ioBroker Admin >= 7.8.23**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
 
@@ -36,13 +44,13 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 
 ### Connection
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| **Beszel Hub URL** | Full URL of your Beszel Hub (e.g. `http://192.168.1.100:8090`) | — |
-| **Username** | Beszel Hub login email/username | — |
-| **Password** | Beszel Hub password | — |
-| **Poll Interval (s)** | How often to fetch data from the Hub (10–300) | `60` |
-| **Request Timeout (s)** | Per-request HTTP timeout. Raise for slow Hubs or large container/stats payloads (5–120) | `15` |
+| Option                  | Description                                                                             | Default |
+| ----------------------- | --------------------------------------------------------------------------------------- | ------- |
+| **Beszel Hub URL**      | Full URL of your Beszel Hub (e.g. `http://192.168.1.100:8090`)                          | —       |
+| **Username**            | Beszel Hub login email/username                                                         | —       |
+| **Password**            | Beszel Hub password                                                                     | —       |
+| **Poll Interval (s)**   | How often to fetch data from the Hub (10–300)                                           | `60`    |
+| **Request Timeout (s)** | Per-request HTTP timeout. Raise for slow Hubs or large container/stats payloads (5–120) | `15`    |
 
 Use the **Test Connection** button to verify your credentials before saving.
 
@@ -52,40 +60,40 @@ All metrics are global toggles that apply to **all** systems. Disabled metrics a
 
 Detail options stay greyed out until their category's main metric is enabled, and each option carries a help text describing exactly which states it creates.
 
-| Group | Metric | Default |
-|-------|--------|---------|
-| **System** | Uptime | on |
-| | System info (hardware, OS, agent version) | off |
-| | Systemd Services (total / failed) | off |
-| **CPU** | CPU Usage (%) | on |
-| | Load Average (1m / 5m / 15m) | on |
-| | CPU Breakdown (User / System / IOWait / Steal / Idle) | off |
-| | Per-core usage | off |
-| | Peak values | off |
-| **Memory** | Memory Usage (% and GB) | on |
-| | Memory Details (Buffers, ZFS ARC) | off |
-| | Swap | off |
-| | Peak values | off |
-| **Disk** | Disk Usage (% and GB) | on |
-| | Read/Write Speed | on |
-| | I/O load (utilization, read/write wait times) | off |
-| | Additional Filesystems | off |
-| | Peak values | off |
-| **Network** | Network Traffic (Upload / Download MB/s) | on |
-| | Per interface | off |
-| | Peak values | off |
-| **Temperature** | Temperature (hottest sensors avg + hottest single) | on |
-| | Individual Temperature Sensors | off |
-| **GPU** | GPU Metrics (Usage, Memory, Power) | off |
-| | GPU details (engines, package power) | off |
-| **Containers** | Container Monitoring incl. network (Docker / Podman) | off |
-| **Battery** | Battery Status | off |
+| Group           | Metric                                                | Default |
+| --------------- | ----------------------------------------------------- | ------- |
+| **System**      | Uptime                                                | on      |
+|                 | System info (hardware, OS, agent version)             | off     |
+|                 | Systemd Services (total / failed)                     | off     |
+| **CPU**         | CPU Usage (%)                                         | on      |
+|                 | Load Average (1m / 5m / 15m)                          | on      |
+|                 | CPU Breakdown (User / System / IOWait / Steal / Idle) | off     |
+|                 | Per-core usage                                        | off     |
+|                 | Peak values                                           | off     |
+| **Memory**      | Memory Usage (% and GB)                               | on      |
+|                 | Memory Details (Buffers, ZFS ARC)                     | off     |
+|                 | Swap                                                  | off     |
+|                 | Peak values                                           | off     |
+| **Disk**        | Disk Usage (% and GB)                                 | on      |
+|                 | Read/Write Speed                                      | on      |
+|                 | I/O load (utilization, read/write wait times)         | off     |
+|                 | Additional Filesystems                                | off     |
+|                 | Peak values                                           | off     |
+| **Network**     | Network Traffic (Upload / Download MB/s)              | on      |
+|                 | Per interface                                         | off     |
+|                 | Peak values                                           | off     |
+| **Temperature** | Temperature (hottest sensors avg + hottest single)    | on      |
+|                 | Individual Temperature Sensors                        | off     |
+| **GPU**         | GPU Metrics (Usage, Memory, Power)                    | off     |
+|                 | GPU details (engines, package power)                  | off     |
+| **Containers**  | Container Monitoring incl. network (Docker / Podman)  | off     |
+| **Battery**     | Battery Status                                        | off     |
 
 ---
 
 ## State Tree
 
-States are organized into channels per metric group. Optional channels (marked *) are only created when the corresponding metric is enabled.
+States are organized into channels per metric group. Optional channels (marked \*) are only created when the corresponding metric is enabled.
 
 ```
 beszel.0.
@@ -186,28 +194,26 @@ beszel.0.
 ## Troubleshooting
 
 ### Connection failed
+
 - Verify the Hub URL is reachable from the ioBroker host
 - Check username and password (use the Test Connection button)
 - Check that no firewall blocks access to the Beszel Hub port
 
 ### States not updating
+
 - Check the ioBroker log for errors from the `beszel` adapter
 - Ensure the poll interval is not too short (minimum 10 seconds)
 - Check `info.connection` state — if `false`, authentication failed
 
 ### Missing states for a system
+
 - The system may be `down` or `paused` in Beszel — no stats records exist yet
 - Verify the metric is enabled in the adapter configuration
 
 ---
 
-## Sentry / Error reporting
-
-This adapter uses [Sentry](https://sentry.io) to automatically report exceptions and errors to the developer, so problems can be found and fixed quickly. Reporting only happens if you have enabled error reporting in the ioBroker diagnostics (**System settings → Diagnostics and error reporting**). Only an anonymous installation ID is transmitted — no name, e-mail address or IP address.
-
-For details and how to disable it, see the [Sentry plugin documentation](https://github.com/ioBroker/plugin-sentry#plugin-sentry). Error reporting requires js-controller 3.0 or newer.
-
 ## Changelog
+
 ### 0.7.0 (2026-06-07)
 
 - Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.
@@ -279,4 +285,4 @@ SOFTWARE.
 
 ---
 
-*Developed with assistance from Claude.ai*
+_Developed with assistance from Claude.ai_
