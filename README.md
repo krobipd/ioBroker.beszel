@@ -213,6 +213,9 @@ beszel.0.
 ---
 
 ## Changelog
+### 0.7.1 (2026-06-09)
+
+- Improved compact-mode behavior: beszel no longer registers global process error handlers that could interfere with other adapters running in the same process.
 
 ### 0.7.0 (2026-06-07)
 
@@ -238,10 +241,6 @@ beszel.0.
 ### 0.5.11 (2026-05-23)
 
 - Changelog rewritten in user-centric style across all versions.
-
-### 0.5.10 (2026-05-23)
-
-- Internal cleanup. No user-facing changes.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

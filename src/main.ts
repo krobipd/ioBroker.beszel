@@ -7,10 +7,6 @@ import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig, SystemDetails } from "./lib/types";
 
-let processHandlersInstalled = false;
-let installedUnhandledHandler: ((reason: unknown) => void) | null = null;
-let installedUncaughtHandler: ((err: Error) => void) | null = null;
-
 class BeszelAdapter extends utils.Adapter {
   private client: BeszelClient | null = null;
   private stateManager: StateManager | null = null;
@@ -51,17 +47,6 @@ class BeszelAdapter extends utils.Adapter {
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
     this.on("message", this.onMessage.bind(this));
-    if (!processHandlersInstalled) {
-      installedUnhandledHandler = (reason: unknown): void => {
-        console.error(`[beszel] Unhandled rejection: ${reason instanceof Error ? reason.message : String(reason)}`);
-      };
-      installedUncaughtHandler = (err: Error): void => {
-        console.error(`[beszel] Uncaught exception: ${err.message}`);
-      };
-      process.on("unhandledRejection", installedUnhandledHandler);
-      process.on("uncaughtException", installedUncaughtHandler);
-      processHandlersInstalled = true;
-    }
   }
 
   private async onReady(): Promise<void> {

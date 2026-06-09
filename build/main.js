@@ -28,9 +28,6 @@ var import_beszel_client = require("./lib/beszel-client");
 var import_coerce = require("./lib/coerce");
 var import_message_router = require("./lib/message-router");
 var import_state_manager = require("./lib/state-manager");
-let processHandlersInstalled = false;
-let installedUnhandledHandler = null;
-let installedUncaughtHandler = null;
 class BeszelAdapter extends utils.Adapter {
   client = null;
   stateManager = null;
@@ -70,17 +67,6 @@ class BeszelAdapter extends utils.Adapter {
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
     this.on("message", this.onMessage.bind(this));
-    if (!processHandlersInstalled) {
-      installedUnhandledHandler = (reason) => {
-        console.error(`[beszel] Unhandled rejection: ${reason instanceof Error ? reason.message : String(reason)}`);
-      };
-      installedUncaughtHandler = (err) => {
-        console.error(`[beszel] Uncaught exception: ${err.message}`);
-      };
-      process.on("unhandledRejection", installedUnhandledHandler);
-      process.on("uncaughtException", installedUncaughtHandler);
-      processHandlersInstalled = true;
-    }
   }
   async onReady() {
     try {

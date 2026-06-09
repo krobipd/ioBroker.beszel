@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "news": {
+      "0.7.1": {
+        "en": "Improved compact-mode behavior: beszel no longer registers global process error handlers that could interfere with other adapters in the same process.",
+        "de": "Verbessertes Verhalten im Compact-Modus: beszel registriert keine globalen Prozess-Fehlerbehandler mehr, die andere Adapter im selben Prozess stören konnten.",
+        "ru": "Улучшено поведение в compact-режиме: beszel больше не регистрирует глобальные обработчики ошибок процесса, которые могли мешать другим адаптерам в том же процессе.",
+        "pt": "Comportamento melhorado no modo compact: o beszel já não regista manipuladores globais de erros de processo que podiam interferir com outros adaptadores no mesmo processo.",
+        "nl": "Verbeterd gedrag in compact-modus: beszel registreert geen globale procesfoutafhandelaars meer die andere adapters in hetzelfde proces konden verstoren.",
+        "fr": "Comportement amélioré en mode compact : beszel n'enregistre plus de gestionnaires d'erreurs de processus globaux pouvant perturber d'autres adaptateurs dans le même processus.",
+        "it": "Comportamento migliorato in modalità compact: beszel non registra più gestori di errori di processo globali che potevano interferire con altri adattatori nello stesso processo.",
+        "es": "Comportamiento mejorado en modo compact: beszel ya no registra manejadores de errores de proceso globales que podían interferir con otros adaptadores en el mismo proceso.",
+        "pl": "Ulepszone zachowanie w trybie compact: beszel nie rejestruje już globalnych obsług błędów procesu, które mogły zakłócać inne adaptery w tym samym procesie.",
+        "uk": "Покращено поведінку в compact-режимі: beszel більше не реєструє глобальні обробники помилок процесу, які могли заважати іншим адаптерам у тому ж процесі.",
+        "zh-cn": "改进了 compact 模式下的行为：beszel 不再注册可能干扰同一进程中其他适配器的全局进程错误处理程序。"
+      },
       "0.7.0": {
         "en": "Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.",
         "de": "Optionale Fehlermeldung über Sentry hinzugefügt: Abstürze werden an den Entwickler gesendet, damit Probleme schneller behoben werden. Nur aktiv bei eingeschalteter ioBroker-Diagnose; anonym.",
@@ -69,19 +82,6 @@
         "zh-cn": "内部清理。无用户可见的更改。"
       },
       "0.5.9": {
-        "en": "Internal cleanup. No user-facing changes.",
-        "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
-        "ru": "Внутренняя очистка. Нет видимых изменений для пользователей.",
-        "pt": "Limpeza interna. Sem alterações visíveis para o utilizador.",
-        "nl": "Interne opruiming. Geen zichtbare wijzigingen voor gebruikers.",
-        "fr": "Nettoyage interne. Aucun changement visible pour l'utilisateur.",
-        "it": "Pulizia interna. Nessuna modifica visibile per l'utente.",
-        "es": "Limpieza interna. Sin cambios visibles para el usuario.",
-        "pl": "Wewnętrzne porządki. Brak widocznych zmian dla użytkownika.",
-        "uk": "Внутрішнє прибирання. Без видимих змін для користувача.",
-        "zh-cn": "内部清理。无用户可见的更改。"
-      },
-      "0.5.8": {
         "en": "Internal cleanup. No user-facing changes.",
         "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
         "ru": "Внутренняя очистка. Нет видимых изменений для пользователей.",
