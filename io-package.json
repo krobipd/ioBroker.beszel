@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "news": {
-      "NEXT": {
+      "0.7.2": {
         "en": "Much lighter polling: no more paging through hours of stats history each poll. Vanished sensors, interfaces, GPUs and filesystems are now cleaned up instead of keeping frozen values.",
         "de": "Deutlich leichteres Polling: keine stundenlange Statistik-Historie mehr pro Abfrage. Verschwundene Sensoren, Interfaces, GPUs und Dateisysteme werden jetzt aufgeräumt statt eingefroren zu bleiben.",
         "ru": "Опрос стал заметно легче: история статистики больше не листается часами при каждом цикле. Исчезнувшие датчики, интерфейсы, GPU и файловые системы теперь удаляются, а не остаются замороженными.",

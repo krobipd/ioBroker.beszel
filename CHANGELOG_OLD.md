@@ -1,4 +1,8 @@
 # Older Changes
+## 0.5.11 (2026-05-23)
+
+- Changelog rewritten in user-centric style across all versions.
+
 ## 0.5.10 (2026-05-23)
 
 - Internal cleanup. No user-facing changes.
