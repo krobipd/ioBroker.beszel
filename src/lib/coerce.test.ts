@@ -1,4 +1,3 @@
-import { expect } from "chai";
 import {
   coerceArray,
   coerceAuthResponse,
@@ -65,6 +64,25 @@ describe("coerce", () => {
       expect(coerceFiniteNumber({})).to.be.null;
       expect(coerceFiniteNumber([1])).to.be.null;
       expect(coerceFiniteNumber(true)).to.be.null;
+    });
+
+    // v0.7.2 — strict decimal regex (fleet hardening, hassemu E8 / homewizard D8)
+    it("rejects HEX strings (Number() would parse them)", () => {
+      expect(coerceFiniteNumber("0x1F")).to.be.null;
+      expect(coerceFiniteNumber("0X10")).to.be.null;
+    });
+
+    it("rejects exponential notation strings", () => {
+      expect(coerceFiniteNumber("1e3")).to.be.null;
+      expect(coerceFiniteNumber("2.5E-3")).to.be.null;
+    });
+
+    it("rejects strings with whitespace, plus sign or bare dots", () => {
+      expect(coerceFiniteNumber(" 42")).to.be.null;
+      expect(coerceFiniteNumber("42 ")).to.be.null;
+      expect(coerceFiniteNumber("+42")).to.be.null;
+      expect(coerceFiniteNumber(".5")).to.be.null;
+      expect(coerceFiniteNumber("5.")).to.be.null;
     });
   });
 

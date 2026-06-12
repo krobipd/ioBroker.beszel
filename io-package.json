@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.7.1",
     "news": {
+      "NEXT": {
+        "en": "Much lighter polling: no more paging through hours of stats history each poll. Vanished sensors, interfaces, GPUs and filesystems are now cleaned up instead of keeping frozen values.",
+        "de": "Deutlich leichteres Polling: keine stundenlange Statistik-Historie mehr pro Abfrage. Verschwundene Sensoren, Interfaces, GPUs und Dateisysteme werden jetzt aufgeräumt statt eingefroren zu bleiben.",
+        "ru": "Опрос стал заметно легче: история статистики больше не листается часами при каждом цикле. Исчезнувшие датчики, интерфейсы, GPU и файловые системы теперь удаляются, а не остаются замороженными.",
+        "pt": "Sondagem muito mais leve: o histórico de estatísticas não é mais percorrido a cada ciclo. Sensores, interfaces, GPUs e sistemas de arquivos desaparecidos agora são limpos em vez de ficarem congelados.",
+        "nl": "Veel lichtere polling: er wordt niet langer urenlange statistiekgeschiedenis doorlopen per cyclus. Verdwenen sensoren, interfaces, GPU's en bestandssystemen worden nu opgeruimd in plaats van bevroren.",
+        "fr": "Interrogation bien plus légère : l'historique des stats n'est plus parcouru à chaque cycle. Capteurs, interfaces, GPU et systèmes de fichiers disparus sont désormais nettoyés au lieu de rester figés.",
+        "it": "Polling molto più leggero: la cronologia delle statistiche non viene più scorsa a ogni ciclo. Sensori, interfacce, GPU e filesystem scomparsi ora vengono ripuliti invece di restare congelati.",
+        "es": "Sondeo mucho más ligero: ya no se recorre el historial de estadísticas en cada ciclo. Sensores, interfaces, GPU y sistemas de archivos desaparecidos ahora se limpian en vez de quedar congelados.",
+        "pl": "Znacznie lżejsze odpytywanie: historia statystyk nie jest już przeglądana w każdym cyklu. Zniknięte czujniki, interfejsy, GPU i systemy plików są teraz sprzątane zamiast pozostawać zamrożone.",
+        "uk": "Опитування стало значно легшим: історія статистики більше не гортається щоциклу. Зниклі датчики, інтерфейси, GPU та файлові системи тепер прибираються, а не лишаються замороженими.",
+        "zh-cn": "轮询大幅减负：每次轮询不再翻阅数小时的统计历史。消失的传感器、网卡、GPU 和文件系统现在会被自动清理，而不是永远保留冻结的数值。"
+      },
       "0.7.1": {
         "en": "Improved compact-mode behavior: beszel no longer registers global process error handlers that could interfere with other adapters in the same process.",
         "de": "Verbessertes Verhalten im Compact-Modus: beszel registriert keine globalen Prozess-Fehlerbehandler mehr, die andere Adapter im selben Prozess stören konnten.",
@@ -69,19 +82,6 @@
         "zh-cn": "所有版本的更新日志已改写为面向用户的风格。"
       },
       "0.5.10": {
-        "en": "Internal cleanup. No user-facing changes.",
-        "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
-        "ru": "Внутренняя очистка. Нет видимых изменений для пользователей.",
-        "pt": "Limpeza interna. Sem alterações visíveis para o utilizador.",
-        "nl": "Interne opruiming. Geen zichtbare wijzigingen voor gebruikers.",
-        "fr": "Nettoyage interne. Aucun changement visible pour l'utilisateur.",
-        "it": "Pulizia interna. Nessuna modifica visibile per l'utente.",
-        "es": "Limpieza interna. Sin cambios visibles para el usuario.",
-        "pl": "Wewnętrzne porządki. Brak widocznych zmian dla użytkownika.",
-        "uk": "Внутрішнє прибирання. Без видимих змін для користувача.",
-        "zh-cn": "内部清理。无用户可见的更改。"
-      },
-      "0.5.9": {
         "en": "Internal cleanup. No user-facing changes.",
         "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
         "ru": "Внутренняя очистка. Нет видимых изменений для пользователей.",

@@ -1,4 +1,3 @@
-import { expect } from "chai";
 import * as http from "node:http";
 import { BeszelClient } from "./beszel-client";
 
@@ -489,6 +488,63 @@ describe("BeszelClient", () => {
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
       const stats = await client.getLatestStats();
       expect(stats.size).to.equal(0);
+    });
+
+    it("v0.7.2: stops paging once a page brings no new system (8h of 1m history is NOT walked)", async () => {
+      // The Hub keeps ~480 1m records per system. Simulate 10 pages of
+      // history where page 1 already contains the newest record of both
+      // systems — the client must stop after page 2 (the first all-known
+      // page), not walk all 10.
+      let pageRequests = 0;
+      mock = createMockServer({
+        statsHandler: () => {
+          pageRequests++;
+          return {
+            status: 200,
+            body: JSON.stringify({
+              page: pageRequests,
+              perPage: 2,
+              totalItems: 20,
+              totalPages: 10,
+              items: [
+                { id: `a${pageRequests}`, system: "sys001", type: "1m", stats: { cpu: 1 }, updated: "t" },
+                { id: `b${pageRequests}`, system: "sys002", type: "1m", stats: { cpu: 2 }, updated: "t" },
+              ],
+            }),
+          };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const stats = await client.getLatestStats();
+      expect(stats.size).to.equal(2);
+      expect(pageRequests).to.equal(2); // page 1 = all new, page 2 = all known → stop
+    });
+
+    it("v0.7.2: keeps paging while new systems keep appearing", async () => {
+      let pageRequests = 0;
+      mock = createMockServer({
+        statsHandler: () => {
+          pageRequests++;
+          return {
+            status: 200,
+            body: JSON.stringify({
+              page: pageRequests,
+              perPage: 1,
+              totalItems: 3,
+              totalPages: 3,
+              items: [
+                { id: `r${pageRequests}`, system: `sys00${pageRequests}`, type: "1m", stats: { cpu: pageRequests }, updated: "t" },
+              ],
+            }),
+          };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const stats = await client.getLatestStats();
+      expect(stats.size).to.equal(3);
+      expect(pageRequests).to.equal(3);
     });
 
     it("should deduplicate and keep newest per system", async () => {

@@ -1,4 +1,3 @@
-import { expect } from "chai";
 import type { BeszelClient } from "./beszel-client";
 import { dispatchMessage, type MessageRouterDeps } from "./message-router";
 

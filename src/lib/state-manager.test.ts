@@ -1,4 +1,6 @@
-import { expect } from "chai";
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 vi.mock("@iobroker/adapter-core", () => ({
   I18n: {
@@ -1943,6 +1945,221 @@ describe("StateManager", () => {
 
       await manager.updateSystem(testSystem, { cpu: 80 }, [], allMetricsConfig());
       expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(80);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.7.2 — device-object write cache
+  // -----------------------------------------------------------------------
+
+  describe("device-object write cache (v0.7.2)", () => {
+    it("writes the device object only once while id/host/name are unchanged", async () => {
+      let extendCalls = 0;
+      const origExtend = adapter.extendObjectAsync;
+      adapter.extendObjectAsync = async (...args): Promise<void> => {
+        extendCalls++;
+        return origExtend(...args);
+      };
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      const afterFirst = extendCalls;
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(extendCalls).to.equal(afterFirst); // poll 2: no device re-write
+    });
+
+    it("re-writes the device object when host data changed on the Hub", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      const moved = { ...testSystem, host: "192.168.1.99" };
+      let extendCalls = 0;
+      const origExtend = adapter.extendObjectAsync;
+      adapter.extendObjectAsync = async (...args): Promise<void> => {
+        extendCalls++;
+        return origExtend(...args);
+      };
+      await manager.updateSystem(moved, testStats, [], allMetricsConfig());
+      expect(extendCalls).to.equal(1);
+      expect(adapter.objects.get("systems.my_server")!.native.host).to.equal("192.168.1.99");
+    });
+
+    it("re-writes after the system was removed and re-added (cache follows lifecycle)", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      await manager.cleanupSystems([]); // removes systems.my_server
+      let extendCalls = 0;
+      const origExtend = adapter.extendObjectAsync;
+      adapter.extendObjectAsync = async (...args): Promise<void> => {
+        extendCalls++;
+        return origExtend(...args);
+      };
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(extendCalls).to.equal(1);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.7.2 — stale-pruning for dynamic groups (generalised F1)
+  // -----------------------------------------------------------------------
+
+  describe("dynamic-group pruning (v0.7.2)", () => {
+    it("prunes a sensor state when the sensor disappears", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.temperature.sensors.ssd")).to.be.true;
+
+      const withoutSsd = { ...testStats, t: { "Core 0": 65, "Core 1": 70, "Core 2": 60 } };
+      await manager.updateSystem(testSystem, withoutSsd, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.temperature.sensors.ssd")).to.be.false;
+      expect(adapter.states.has("systems.my_server.temperature.sensors.core_0")).to.be.true;
+    });
+
+    it("prunes a renamed network interface channel", async () => {
+      const eth0 = { ...testStats, ni: { eth0: [1, 2, 3, 4] as [number, number, number, number] } };
+      await manager.updateSystem(testSystem, eth0, [], allMetricsConfig({ metrics_networkInterfaces: true }));
+      expect(adapter.objects.has("systems.my_server.network.interfaces.eth0")).to.be.true;
+
+      const enp = { ...testStats, ni: { enp3s0: [1, 2, 3, 4] as [number, number, number, number] } };
+      await manager.updateSystem(testSystem, enp, [], allMetricsConfig({ metrics_networkInterfaces: true }));
+      expect(adapter.objects.has("systems.my_server.network.interfaces.eth0")).to.be.false;
+      expect(adapter.states.has("systems.my_server.network.interfaces.eth0.up")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.network.interfaces.enp3s0")).to.be.true;
+    });
+
+    it("prunes a GPU channel when the GPU disappears from the host", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.true;
+
+      const otherGpu = { ...testStats, g: { gpu1: { n: "Other", u: 1 } } };
+      await manager.updateSystem(testSystem, otherGpu, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.false;
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.usage")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.gpu.gpu1")).to.be.true;
+    });
+
+    it("prunes engine states the driver stopped reporting", async () => {
+      const twoEngines = { ...testStats, g: { gpu0: { n: "Intel", pp: 10, e: { render: 40, video: 5 } } } };
+      await manager.updateSystem(testSystem, twoEngines, [], allMetricsConfig({ metrics_gpuDetails: true }));
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.engines.video")).to.be.true;
+
+      const oneEngine = { ...testStats, g: { gpu0: { n: "Intel", pp: 10, e: { render: 41 } } } };
+      await manager.updateSystem(testSystem, oneEngine, [], allMetricsConfig({ metrics_gpuDetails: true }));
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.engines.video")).to.be.false;
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.engines.render")).to.be.true;
+    });
+
+    it("prunes an unmounted extra filesystem channel", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.filesystems.data")).to.be.true;
+
+      const otherFs = { ...testStats, efs: { "/backup": { d: 10, du: 1 } } };
+      await manager.updateSystem(testSystem, otherFs, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.filesystems.data")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.filesystems.backup")).to.be.true;
+    });
+
+    it("prunes core states beyond a shrunk core count", async () => {
+      const fourCores = { ...testStats, cpus: [10, 20, 30, 40] };
+      await manager.updateSystem(testSystem, fourCores, [], allMetricsConfig({ metrics_cpuCores: true }));
+      expect(adapter.states.has("systems.my_server.cpu.cores.core3")).to.be.true;
+
+      const twoCores = { ...testStats, cpus: [10, 20] };
+      await manager.updateSystem(testSystem, twoCores, [], allMetricsConfig({ metrics_cpuCores: true }));
+      expect(adapter.objects.has("systems.my_server.cpu.cores.core3")).to.be.false;
+      expect(adapter.states.has("systems.my_server.cpu.cores.core1")).to.be.true;
+    });
+
+    it("reconciles zombies from a previous run on the first poll (view fallback)", async () => {
+      // Simulate a leftover container channel from before this adapter start.
+      adapter.objects.set("systems.my_server.containers.ghost", {
+        type: "channel",
+        common: { name: "ghost" },
+        native: {},
+      });
+      adapter.objects.set("systems.my_server.containers.ghost.cpu", {
+        type: "state",
+        common: { name: "cpu" },
+        native: {},
+      });
+      const live: BeszelContainer[] = [
+        { id: "c1", system: testSystem.id, name: "nginx", status: "running", health: 2, cpu: 1, memory: 1, image: "n" },
+      ];
+      await manager.updateSystem(testSystem, testStats, live, allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.ghost")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.containers.ghost.cpu")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+    });
+
+    it("does not touch dynamic groups when the system has no stats (offline)", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.temperature.sensors.ssd")).to.be.true;
+      await manager.updateSystem(testSystem, undefined, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.temperature.sensors.ssd")).to.be.true;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.7.2 — gpuDetails-off start cleanup
+  // -----------------------------------------------------------------------
+
+  describe("cleanupMetrics — gpuDetails toggle (v0.7.2)", () => {
+    it("prunes power_package + engines of every GPU when gpuDetails is turned off", async () => {
+      const stats = { ...testStats, g: { gpu0: { n: "Intel", u: 30, pp: 18.5, e: { render: 40 } } } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_gpuDetails: true }));
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.power_package")).to.be.true;
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.engines")).to.be.true;
+
+      await manager.cleanupMetrics("my_server", allMetricsConfig({ metrics_gpuDetails: false }));
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.power_package")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.engines")).to.be.false;
+      // The GPU itself (category on) survives.
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.true;
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.usage")).to.be.true;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Invariant lock: METRIC_DEPENDENCIES ↔ admin/jsonConfig.json `disabled`
+  // -----------------------------------------------------------------------
+
+  describe("METRIC_DEPENDENCIES ↔ jsonConfig disabled invariant", () => {
+    interface JsonConfigField {
+      disabled?: string;
+    }
+
+    function collectFields(node: unknown, out: Map<string, JsonConfigField>): void {
+      if (typeof node !== "object" || node === null) {
+        return;
+      }
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (key.startsWith("metrics_") && typeof value === "object" && value !== null) {
+          out.set(key, value as JsonConfigField);
+        }
+        collectFields(value, out);
+      }
+    }
+
+    const jsonConfig = JSON.parse(readFileSync(join(__dirname, "../../admin/jsonConfig.json"), "utf8")) as unknown;
+    const fields = new Map<string, JsonConfigField>();
+    collectFields(jsonConfig, fields);
+    const deps = (StateManager as unknown as { METRIC_DEPENDENCIES: Record<string, string> }).METRIC_DEPENDENCIES;
+
+    it("every dependency in code is greyed out in the admin UI (and on the right base)", () => {
+      expect(Object.keys(deps).length).to.be.greaterThan(0);
+      for (const [detail, base] of Object.entries(deps)) {
+        const field = fields.get(detail);
+        expect(field, `jsonConfig has no field for ${detail}`).to.not.be.undefined;
+        expect(field!.disabled, `${detail} must grey out on !data.${base}`).to.equal(`!data.${base}`);
+      }
+    });
+
+    it("every greyed-out admin field is enforced in the data logic too", () => {
+      let checked = 0;
+      for (const [name, field] of fields) {
+        if (!field.disabled) {
+          continue;
+        }
+        const m = /^!data\.(metrics_\w+)$/.exec(field.disabled);
+        expect(m, `unexpected disabled expression on ${name}: ${field.disabled}`).to.not.be.null;
+        expect(deps[name], `${name} is greyed out in admin but missing from METRIC_DEPENDENCIES`).to.equal(m![1]);
+        checked++;
+      }
+      expect(checked).to.be.greaterThan(0);
     });
   });
 

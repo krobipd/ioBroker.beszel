@@ -24,9 +24,17 @@ import type {
 const VALID_SYSTEM_STATUS = ["up", "down", "paused", "pending"] as const;
 type SystemStatus = (typeof VALID_SYSTEM_STATUS)[number];
 
+// Strict decimal regex — only optional minus sign + digits + optional fractional
+// part. Rejects HEX (`0x...`), exponential (`1e3`), Infinity, and
+// leading/trailing whitespace, which plain `Number()` would all accept.
+// Same hardening as hassemu (E8, v1.9.0) and homewizard (D8) — fleet-wide
+// consistency for the shared coerce-helper.
+const DECIMAL_NUMBER_RE = /^-?\d+(\.\d+)?$/;
+
 /**
  * Coerce any value into a finite number, returning null if not possible.
- * Handles NaN, Infinity, -Infinity, numeric strings, and rejects everything else.
+ * Accepts numbers directly; parses strict decimal strings; rejects NaN,
+ * Infinity, HEX (`0x...`) and exponential notation (`1e3`).
  *
  * @param value Unknown value from external API
  */
@@ -34,7 +42,7 @@ export function coerceFiniteNumber(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
   }
-  if (typeof value === "string" && value.length > 0) {
+  if (typeof value === "string" && DECIMAL_NUMBER_RE.test(value)) {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
   }

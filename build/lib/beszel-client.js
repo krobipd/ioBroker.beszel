@@ -129,19 +129,33 @@ class BeszelClient {
    * fetch this concurrently with `getSystems()`.
    *
    * v0.4.3 (B2): paginated so big setups (200+ systems) aren't truncated.
+   *
+   * v0.7.2: early-exit — the Hub keeps ~8 h of 1m records (480 per system),
+   * but only the newest record per system is consumed, and `sort=-updated`
+   * puts those on the earliest pages. Walking the full history burned one
+   * round-trip per 200 stale records on every poll. We stop as soon as a
+   * page contributes no new system to the map. Trade-off: a system whose
+   * last 1m record is hours old (agent down) no longer gets those stale
+   * stats applied — it is offline via `status` anyway and its states simply
+   * keep their last values.
    */
   async getLatestStats() {
     await this.ensureToken();
-    const items = await this.fetchAllPages(
-      "/api/collections/system_stats/records?sort=-updated&filter=type%3D'1m'",
-      import_coerce.coerceSystemStatsRecord
-    );
     const result = /* @__PURE__ */ new Map();
-    for (const record of items) {
-      if (record && !result.has(record.system)) {
-        result.set(record.system, record.stats);
+    await this.fetchAllPages(
+      "/api/collections/system_stats/records?sort=-updated&filter=type%3D'1m'",
+      import_coerce.coerceSystemStatsRecord,
+      (pageItems) => {
+        let addedNew = false;
+        for (const record of pageItems) {
+          if (record && !result.has(record.system)) {
+            result.set(record.system, record.stats);
+            addedNew = true;
+          }
+        }
+        return addedNew;
       }
-    }
+    );
     return result;
   }
   /**
@@ -226,9 +240,13 @@ class BeszelClient {
    *
    * @param path The collection-records path (with or without query string).
    * @param itemCoercer Per-item coercer; `null` items are dropped by the caller.
+   * @param consumePage Optional per-page consumer (v0.7.2). Receives each
+   *   page's coerced items; returning `false` stops the walk early — used by
+   *   `getLatestStats` to stop once a page contributes nothing new instead
+   *   of paging through hours of historical records on every poll.
    */
-  async fetchAllPages(path, itemCoercer) {
-    var _a, _b;
+  async fetchAllPages(path, itemCoercer, consumePage) {
+    var _a, _b, _c;
     const sep = path.includes("?") ? "&" : "?";
     const out = [];
     let totalPages = 1;
@@ -244,9 +262,13 @@ class BeszelClient {
       if (list.items.length === 0) {
         break;
       }
+      if (consumePage && !consumePage(list.items)) {
+        (_b = this.log) == null ? void 0 : _b.debug(`fetchAllPages: early-exit at page ${page}/${totalPages} for ${path} (no new entries)`);
+        return out;
+      }
     }
     if (totalPages > MAX_PAGES) {
-      (_b = this.log) == null ? void 0 : _b.warn(
+      (_c = this.log) == null ? void 0 : _c.warn(
         `fetchAllPages: truncated at MAX_PAGES=${MAX_PAGES} (totalPages=${totalPages}, data may be incomplete) for ${path}`
       );
     }

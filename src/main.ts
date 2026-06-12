@@ -7,9 +7,44 @@ import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig, SystemDetails } from "./lib/types";
 
-class BeszelAdapter extends utils.Adapter {
+/**
+ * Beszel adapter — polls a Beszel Hub (PocketBase) and mirrors systems,
+ * stats and containers into ioBroker states. Exported so the orchestration
+ * unit tests can drive its lifecycle/poll handlers directly.
+ */
+export class BeszelAdapter extends utils.Adapter {
   private client: BeszelClient | null = null;
   private stateManager: StateManager | null = null;
+  /**
+   * Factories for the HTTP client + state manager — default to the real
+   * constructors. Test seams (fleet pattern, see homewizard `makeClient`):
+   * unit tests replace these with fakes to exercise the poll orchestration
+   * (error classification, dedup, auth backoff, details cadence) without
+   * real network or js-controller.
+   *
+   * @param url Hub base URL
+   * @param username Login username
+   * @param password Login password
+   * @param timeoutMs Per-request HTTP timeout (ms)
+   */
+  private makeClient: (url: string, username: string, password: string, timeoutMs: number) => BeszelClient = (
+    url,
+    username,
+    password,
+    timeoutMs,
+  ) =>
+    new BeszelClient(
+      url,
+      username,
+      password,
+      timeoutMs,
+      {
+        debug: (m: string) => this.log.debug(m),
+        warn: (m: string) => this.log.warn(m),
+      },
+      this.delay.bind(this),
+    );
+  private makeStateManager: () => StateManager = () => new StateManager(this);
   private pollTimer: ioBroker.Interval | undefined = undefined;
   private isPolling = false;
   private lastSystemCount = 0;
@@ -39,6 +74,7 @@ class BeszelAdapter extends utils.Adapter {
    */
   private testClients = new Set<BeszelClient>();
 
+  /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({
       ...options,
@@ -75,18 +111,8 @@ class BeszelAdapter extends utils.Adapter {
 
       const timeoutMs = coerceTimeoutMs(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
-      this.client = new BeszelClient(
-        config.url,
-        config.username,
-        config.password,
-        timeoutMs,
-        {
-          debug: (m: string) => this.log.debug(m),
-          warn: (m: string) => this.log.warn(m),
-        },
-        this.delay.bind(this),
-      );
-      this.stateManager = new StateManager(this);
+      this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
+      this.stateManager = this.makeStateManager();
 
       await this.stateManager.migrateLegacyStates();
 
@@ -303,6 +329,28 @@ class BeszelAdapter extends utils.Adapter {
       // An empty list during a transient API issue must NOT wipe all devices.
       if (systems.length > 0 || this.lastSystemCount === 0) {
         await this.stateManager.cleanupSystems(systems.map(s => s.name));
+        // v0.7.2: prune the per-system bookkeeping along with the states —
+        // otherwise the maps grow forever across add/remove cycles, and a
+        // re-added system would inherit the old failure-dedup entry (its
+        // first failure warn silently demoted to debug) and a stale
+        // detailsAttempted marker.
+        const activeNames = new Set(systems.map(s => s.name));
+        for (const name of [...this.failedSystems]) {
+          if (!activeNames.has(name)) {
+            this.failedSystems.delete(name);
+          }
+        }
+        const activeIds = new Set(systems.map(s => s.id));
+        for (const id of [...this.detailsAttempted]) {
+          if (!activeIds.has(id)) {
+            this.detailsAttempted.delete(id);
+          }
+        }
+        for (const id of [...this.systemDetails.keys()]) {
+          if (!activeIds.has(id)) {
+            this.systemDetails.delete(id);
+          }
+        }
       }
 
       this.lastSystemCount = systems.length;

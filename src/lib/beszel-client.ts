@@ -153,20 +153,34 @@ export class BeszelClient {
    * fetch this concurrently with `getSystems()`.
    *
    * v0.4.3 (B2): paginated so big setups (200+ systems) aren't truncated.
+   *
+   * v0.7.2: early-exit — the Hub keeps ~8 h of 1m records (480 per system),
+   * but only the newest record per system is consumed, and `sort=-updated`
+   * puts those on the earliest pages. Walking the full history burned one
+   * round-trip per 200 stale records on every poll. We stop as soon as a
+   * page contributes no new system to the map. Trade-off: a system whose
+   * last 1m record is hours old (agent down) no longer gets those stale
+   * stats applied — it is offline via `status` anyway and its states simply
+   * keep their last values.
    */
   public async getLatestStats(): Promise<Map<string, SystemStats>> {
     await this.ensureToken();
-    const items = await this.fetchAllPages(
+    const result = new Map<string, SystemStats>();
+    await this.fetchAllPages(
       "/api/collections/system_stats/records?sort=-updated&filter=type%3D'1m'",
       coerceSystemStatsRecord,
+      pageItems => {
+        // Deduplicate: keep the newest record per system.
+        let addedNew = false;
+        for (const record of pageItems) {
+          if (record && !result.has(record.system)) {
+            result.set(record.system, record.stats);
+            addedNew = true;
+          }
+        }
+        return addedNew; // a page of only-known systems ends the walk
+      },
     );
-    // Deduplicate: keep the newest record per system
-    const result = new Map<string, SystemStats>();
-    for (const record of items) {
-      if (record && !result.has(record.system)) {
-        result.set(record.system, record.stats);
-      }
-    }
     return result;
   }
 
@@ -270,8 +284,16 @@ export class BeszelClient {
    *
    * @param path The collection-records path (with or without query string).
    * @param itemCoercer Per-item coercer; `null` items are dropped by the caller.
+   * @param consumePage Optional per-page consumer (v0.7.2). Receives each
+   *   page's coerced items; returning `false` stops the walk early — used by
+   *   `getLatestStats` to stop once a page contributes nothing new instead
+   *   of paging through hours of historical records on every poll.
    */
-  private async fetchAllPages<T>(path: string, itemCoercer: (raw: unknown) => T | null): Promise<(T | null)[]> {
+  private async fetchAllPages<T>(
+    path: string,
+    itemCoercer: (raw: unknown) => T | null,
+    consumePage?: (pageItems: (T | null)[]) => boolean,
+  ): Promise<(T | null)[]> {
     const sep = path.includes("?") ? "&" : "?";
     const out: (T | null)[] = [];
     let totalPages = 1;
@@ -288,6 +310,10 @@ export class BeszelClient {
       }
       if (list.items.length === 0) {
         break;
+      }
+      if (consumePage && !consumePage(list.items)) {
+        this.log?.debug(`fetchAllPages: early-exit at page ${page}/${totalPages} for ${path} (no new entries)`);
+        return out;
       }
     }
     // v0.4.4 (C2): warn (not debug) when totalPages exceeds MAX_PAGES — the

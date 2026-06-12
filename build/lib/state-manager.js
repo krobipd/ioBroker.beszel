@@ -37,6 +37,22 @@ class StateManager {
    */
   resolvedSafeNames = /* @__PURE__ */ new Map();
   /**
+   * v0.7.2: per dynamic group (`<sysId>.<group>` → set of child segments seen
+   * in the last poll). Used by {@link pruneDynamicChildren} to delete states
+   * of disappeared members (renamed interface, removed GPU/sensor/filesystem,
+   * stopped container) without a DB round-trip per poll — the object view is
+   * queried only once per group after adapter start (reconciles zombies from
+   * previous runs), afterwards the in-memory diff does the work.
+   */
+  dynamicChildren = /* @__PURE__ */ new Map();
+  /**
+   * v0.7.2: last-written device-object signature per sysId (`id|host|name`).
+   * `updateSystem` used to extendObject the device on EVERY poll — one write
+   * + objectChange event per system per minute for data that practically
+   * never changes. Now the write happens only when the signature differs.
+   */
+  deviceWritten = /* @__PURE__ */ new Map();
+  /**
    * @param adapter The ioBroker adapter instance
    */
   constructor(adapter) {
@@ -190,6 +206,18 @@ class StateManager {
    * the System category (uptime / system-info / services) has no single base,
    * so its three independent metrics are not gated.
    */
+  /**
+   * v0.7.2: dynamic-group toggles that write into a scalar channel without
+   * appearing in `metricDefs` (their states fan out per item in
+   * `updateDynamicStats`). Merged into the derived per-channel toggle sets
+   * when `cleanupMetrics` decides whether a channel is completely empty.
+   * Exported for unit-tests via the class (invariant lock against jsonConfig).
+   */
+  static DYNAMIC_CHANNEL_TOGGLES = {
+    cpu: ["metrics_cpuCores"],
+    network: ["metrics_networkInterfaces"],
+    temperature: ["metrics_temperatureDetails"]
+  };
   static METRIC_DEPENDENCIES = {
     metrics_loadAvg: "metrics_cpu",
     metrics_cpuBreakdown: "metrics_cpu",
@@ -939,20 +967,24 @@ class StateManager {
     }
     const sysId = `systems.${safeName}`;
     this.adapter.log.debug(`updateSystem state-tree: '${system.name}' \u2192 safeName='${safeName}'`);
-    await this.adapter.extendObjectAsync(
-      sysId,
-      {
-        type: "device",
-        common: {
-          name: system.name,
-          statusStates: {
-            onlineId: `${this.adapter.namespace}.${sysId}.info.online`
-          }
+    const deviceSig = `${system.id}\0${system.host}\0${system.name}`;
+    if (this.deviceWritten.get(sysId) !== deviceSig) {
+      await this.adapter.extendObjectAsync(
+        sysId,
+        {
+          type: "device",
+          common: {
+            name: system.name,
+            statusStates: {
+              onlineId: `${this.adapter.namespace}.${sysId}.info.online`
+            }
+          },
+          native: { id: system.id, host: system.host }
         },
-        native: { id: system.id, host: system.host }
-      },
-      { preserve: { common: ["name"] } }
-    );
+        { preserve: { common: ["name"] } }
+      );
+      this.deviceWritten.set(sysId, deviceSig);
+    }
     await this.ensureChannel(`${sysId}.info`, (0, import_i18n.tName)("channelInfo"));
     await this.createAndSetState(
       `${sysId}.info.online`,
@@ -1004,6 +1036,16 @@ class StateManager {
         this.createdIds.delete(id);
       }
     }
+    for (const key of [...this.dynamicChildren.keys()]) {
+      if (key === exact || key.startsWith(dot)) {
+        this.dynamicChildren.delete(key);
+      }
+    }
+    for (const key of [...this.deviceWritten.keys()]) {
+      if (key === exact || key.startsWith(dot)) {
+        this.deviceWritten.delete(key);
+      }
+    }
   }
   /**
    * Delete states for metrics that have been disabled in the config.
@@ -1013,6 +1055,7 @@ class StateManager {
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
    */
   async cleanupMetrics(systemId, rawConfig) {
+    var _a, _b, _c;
     const config = this.effectiveConfig(rawConfig);
     const sysId = `systems.${systemId}`;
     const toDelete = [];
@@ -1030,28 +1073,26 @@ class StateManager {
         }
       })
     );
-    const noCpu = !config.metrics_cpu && !config.metrics_loadAvg && !config.metrics_cpuBreakdown && !config.metrics_cpuCores && !config.metrics_cpuPeak;
-    if (noCpu) {
-      await this.deleteChannelIfExists(`${sysId}.cpu`);
+    const channelToggles = /* @__PURE__ */ new Map();
+    for (const def of this.metricDefs()) {
+      if (def.channel === "info") {
+        continue;
+      }
+      const set = (_a = channelToggles.get(def.channel)) != null ? _a : /* @__PURE__ */ new Set();
+      set.add(def.toggle);
+      channelToggles.set(def.channel, set);
     }
-    const noMemory = !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap && !config.metrics_memoryPeak;
-    if (noMemory) {
-      await this.deleteChannelIfExists(`${sysId}.memory`);
+    for (const [channel, extras] of Object.entries(StateManager.DYNAMIC_CHANNEL_TOGGLES)) {
+      const set = (_b = channelToggles.get(channel)) != null ? _b : /* @__PURE__ */ new Set();
+      for (const t of extras) {
+        set.add(t);
+      }
+      channelToggles.set(channel, set);
     }
-    const noDisk = !config.metrics_disk && !config.metrics_diskSpeed && !config.metrics_diskIo && !config.metrics_diskPeak;
-    if (noDisk) {
-      await this.deleteChannelIfExists(`${sysId}.disk`);
-    }
-    const noNetwork = !config.metrics_network && !config.metrics_networkInterfaces && !config.metrics_networkPeak;
-    if (noNetwork) {
-      await this.deleteChannelIfExists(`${sysId}.network`);
-    }
-    const noTemp = !config.metrics_temperature && !config.metrics_temperatureDetails;
-    if (noTemp) {
-      await this.deleteChannelIfExists(`${sysId}.temperature`);
-    }
-    if (!config.metrics_battery) {
-      await this.deleteChannelIfExists(`${sysId}.battery`);
+    for (const [channel, toggles] of channelToggles) {
+      if ([...toggles].every((t) => !config[t])) {
+        await this.deleteChannelIfExists(`${sysId}.${channel}`);
+      }
     }
     if (!config.metrics_cpuCores) {
       await this.deleteChannelIfExists(`${sysId}.cpu.cores`);
@@ -1064,6 +1105,26 @@ class StateManager {
     }
     if (!config.metrics_gpu) {
       await this.deleteChannelIfExists(`${sysId}.gpu`);
+    }
+    if (config.metrics_gpu && !config.metrics_gpuDetails) {
+      const view = await this.adapter.getObjectViewAsync("system", "channel", {
+        startkey: `${this.adapter.namespace}.${sysId}.gpu.`,
+        endkey: `${this.adapter.namespace}.${sysId}.gpu.\u9999`
+      });
+      for (const row of (_c = view == null ? void 0 : view.rows) != null ? _c : []) {
+        const id = row.id.slice(this.adapter.namespace.length + 1);
+        const child = id.slice(`${sysId}.gpu.`.length);
+        if (!child || child.includes(".")) {
+          continue;
+        }
+        const ppId = `${sysId}.gpu.${child}.power_package`;
+        const ppObj = await this.adapter.getObjectAsync(ppId);
+        if (ppObj) {
+          await this.adapter.delObjectAsync(ppId);
+          this.createdIds.delete(ppId);
+        }
+        await this.deleteChannelIfExists(`${sysId}.gpu.${child}.engines`);
+      }
     }
     if (!config.metrics_extraFs) {
       await this.deleteChannelIfExists(`${sysId}.filesystems`);
@@ -1149,29 +1210,41 @@ class StateManager {
     if (config.metrics_temperatureDetails && stats.t) {
       await this.ensureChannel(`${sysId}.temperature`, (0, import_i18n.tName)("channelTemperature"));
       await this.ensureChannel(`${sysId}.temperature.sensors`, (0, import_i18n.tName)("channelSensors"));
+      const activeSensors = /* @__PURE__ */ new Set();
       for (const [sensor, temp] of Object.entries(stats.t)) {
+        const safeSensor = this.sanitize(sensor);
+        if (!safeSensor) {
+          continue;
+        }
+        activeSensors.add(safeSensor);
         await this.createAndSetState(
-          `${sysId}.temperature.sensors.${this.sanitize(sensor)}`,
+          `${sysId}.temperature.sensors.${safeSensor}`,
           this.numCommon(sensor, "\xB0C", "value.temperature"),
           temp
         );
       }
+      await this.pruneDynamicChildren(`${sysId}.temperature.sensors`, activeSensors, "state");
     }
     if (config.metrics_cpuCores && stats.cpus && stats.cpus.length > 0) {
       await this.ensureChannel(`${sysId}.cpu`, (0, import_i18n.tName)("channelCpu"));
       await this.ensureChannel(`${sysId}.cpu.cores`, (0, import_i18n.tName)("channelCores"));
+      const activeCores = /* @__PURE__ */ new Set();
       for (let i = 0; i < stats.cpus.length; i++) {
+        activeCores.add(`core${i}`);
         await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), stats.cpus[i]);
       }
+      await this.pruneDynamicChildren(`${sysId}.cpu.cores`, activeCores, "state");
     }
     if (config.metrics_networkInterfaces && stats.ni && Object.keys(stats.ni).length > 0) {
       await this.ensureChannel(`${sysId}.network`, (0, import_i18n.tName)("channelNetwork"));
       await this.ensureChannel(`${sysId}.network.interfaces`, (0, import_i18n.tName)("channelInterfaces"));
+      const activeIfaces = /* @__PURE__ */ new Set();
       for (const [iface, vals] of Object.entries(stats.ni)) {
         const safeId = this.sanitize(iface);
         if (!safeId) {
           continue;
         }
+        activeIfaces.add(safeId);
         await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, iface);
         await this.createAndSetState(
           `${sysId}.network.interfaces.${safeId}.up`,
@@ -1194,11 +1267,17 @@ class StateManager {
           (_d = vals[3]) != null ? _d : null
         );
       }
+      await this.pruneDynamicChildren(`${sysId}.network.interfaces`, activeIfaces, "channel");
     }
     if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
       await this.ensureChannel(`${sysId}.gpu`, (0, import_i18n.tName)("channelGpu"));
+      const activeGpus = /* @__PURE__ */ new Set();
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
         const safeId = this.sanitize(gpuId);
+        if (!safeId) {
+          continue;
+        }
+        activeGpus.add(safeId);
         await this.ensureChannel(`${sysId}.gpu.${safeId}`, (_e = gpuData.n) != null ? _e : gpuId);
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
@@ -1226,6 +1305,7 @@ class StateManager {
             this.numCommon((0, import_i18n.tName)("gpuPowerPackage"), "W"),
             (_j = gpuData.pp) != null ? _j : null
           );
+          const activeEngines = /* @__PURE__ */ new Set();
           if (gpuData.e && Object.keys(gpuData.e).length > 0) {
             await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, (0, import_i18n.tName)("channelEngines"));
             for (const [engine, value] of Object.entries(gpuData.e)) {
@@ -1236,16 +1316,24 @@ class StateManager {
                   this.percentCommon(engine),
                   value
                 );
+                activeEngines.add(safeEngine);
               }
             }
           }
+          await this.pruneDynamicChildren(`${sysId}.gpu.${safeId}.engines`, activeEngines, "state");
         }
       }
+      await this.pruneDynamicChildren(`${sysId}.gpu`, activeGpus, "channel");
     }
     if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
       await this.ensureChannel(`${sysId}.filesystems`, (0, import_i18n.tName)("channelFilesystems"));
+      const activeFs = /* @__PURE__ */ new Set();
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
         const safeId = this.sanitize(fsName);
+        if (!safeId) {
+          continue;
+        }
+        activeFs.add(safeId);
         await this.ensureChannel(`${sysId}.filesystems.${safeId}`, fsName);
         const total = (_k = fsData.d) != null ? _k : null;
         const used = (_l = fsData.du) != null ? _l : null;
@@ -1276,6 +1364,7 @@ class StateManager {
           (_n = fsData.w) != null ? _n : null
         );
       }
+      await this.pruneDynamicChildren(`${sysId}.filesystems`, activeFs, "channel");
     }
   }
   async updateContainers(sysId, systemId, allContainers) {
@@ -1288,7 +1377,7 @@ class StateManager {
         activeIds.add(cId);
       }
     }
-    await this.cleanupStaleContainers(sysId, activeIds);
+    await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
     if (sysContainers.length === 0) {
       return;
     }
@@ -1336,41 +1425,49 @@ class StateManager {
     }
   }
   /**
-   * F1: remove container channels under a system that are no longer reported
-   * by Beszel (container stopped/removed/renamed on the host). Looks up the
-   * direct children of `<sysId>.containers` and deletes any whose sanitized id
-   * is not in `activeIds`.
+   * v0.7.2 (generalised F1): remove children of a dynamic group that are no
+   * longer reported by Beszel — stopped container, removed GPU, renamed
+   * network interface or sensor, unmounted filesystem, shrunk core count.
+   * Before this only containers were pruned; every other dynamic group left
+   * zombie states with frozen values behind forever.
    *
-   * @param sysId State prefix (`systems.<safeName>`)
-   * @param activeIds Sanitized ids of the containers currently present
+   * Cost model: the object view is queried only on the FIRST call per group
+   * after adapter start (reconciles leftovers from previous runs). After
+   * that the in-memory set diff detects disappearances with zero DB reads.
+   *
+   * @param base Group prefix (e.g. `systems.<safeName>.containers`)
+   * @param activeIds Sanitized direct-child segments currently present
+   * @param childType Object type of the direct children (`channel` or `state`)
    */
-  async cleanupStaleContainers(sysId, activeIds) {
-    const base = `${sysId}.containers`;
-    const view = await this.adapter.getObjectViewAsync("system", "channel", {
-      startkey: `${this.adapter.namespace}.${base}.`,
-      endkey: `${this.adapter.namespace}.${base}.\u9999`
-    });
-    if (!(view == null ? void 0 : view.rows)) {
-      return;
-    }
-    const stale = /* @__PURE__ */ new Set();
-    for (const row of view.rows) {
-      const id = row.id.startsWith(`${this.adapter.namespace}.`) ? row.id.slice(this.adapter.namespace.length + 1) : row.id;
-      if (!id.startsWith(`${base}.`)) {
-        continue;
+  async pruneDynamicChildren(base, activeIds, childType) {
+    var _a;
+    let known = this.dynamicChildren.get(base);
+    if (!known) {
+      known = /* @__PURE__ */ new Set();
+      const view = await this.adapter.getObjectViewAsync("system", childType, {
+        startkey: `${this.adapter.namespace}.${base}.`,
+        endkey: `${this.adapter.namespace}.${base}.\u9999`
+      });
+      for (const row of (_a = view == null ? void 0 : view.rows) != null ? _a : []) {
+        const id = row.id.startsWith(`${this.adapter.namespace}.`) ? row.id.slice(this.adapter.namespace.length + 1) : row.id;
+        if (!id.startsWith(`${base}.`)) {
+          continue;
+        }
+        const cId = id.slice(base.length + 1).split(".")[0];
+        if (cId) {
+          known.add(cId);
+        }
       }
-      const cId = id.slice(base.length + 1).split(".")[0];
-      if (cId && !activeIds.has(cId)) {
-        stale.add(cId);
-      }
     }
+    const stale = [...known].filter((cId) => !activeIds.has(cId));
     await Promise.all(
-      [...stale].map(async (cId) => {
-        this.adapter.log.debug(`Removing stale container: ${base}.${cId}`);
+      stale.map(async (cId) => {
+        this.adapter.log.debug(`Removing stale ${childType} ${base}.${cId} (no longer reported)`);
         await this.adapter.delObjectAsync(`${base}.${cId}`, { recursive: true });
         this.dropCacheUnder(`${base}.${cId}`);
       })
     );
+    this.dynamicChildren.set(base, new Set(activeIds));
   }
   async ensureChannel(id, name) {
     if (this.createdIds.has(id)) {

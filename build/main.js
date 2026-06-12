@@ -5,6 +5,10 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -21,6 +25,12 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var main_exports = {};
+__export(main_exports, {
+  BeszelAdapter: () => BeszelAdapter
+});
+module.exports = __toCommonJS(main_exports);
 var utils = __toESM(require("@iobroker/adapter-core"));
 var import_adapter_core = require("@iobroker/adapter-core");
 var import_node_path = require("node:path");
@@ -31,6 +41,30 @@ var import_state_manager = require("./lib/state-manager");
 class BeszelAdapter extends utils.Adapter {
   client = null;
   stateManager = null;
+  /**
+   * Factories for the HTTP client + state manager — default to the real
+   * constructors. Test seams (fleet pattern, see homewizard `makeClient`):
+   * unit tests replace these with fakes to exercise the poll orchestration
+   * (error classification, dedup, auth backoff, details cadence) without
+   * real network or js-controller.
+   *
+   * @param url Hub base URL
+   * @param username Login username
+   * @param password Login password
+   * @param timeoutMs Per-request HTTP timeout (ms)
+   */
+  makeClient = (url, username, password, timeoutMs) => new import_beszel_client.BeszelClient(
+    url,
+    username,
+    password,
+    timeoutMs,
+    {
+      debug: (m) => this.log.debug(m),
+      warn: (m) => this.log.warn(m)
+    },
+    this.delay.bind(this)
+  );
+  makeStateManager = () => new import_state_manager.StateManager(this);
   pollTimer = void 0;
   isPolling = false;
   lastSystemCount = 0;
@@ -59,6 +93,7 @@ class BeszelAdapter extends utils.Adapter {
    * `checkConnection` settles.
    */
   testClients = /* @__PURE__ */ new Set();
+  /** @param options Adapter options */
   constructor(options = {}) {
     super({
       ...options,
@@ -89,18 +124,8 @@ class BeszelAdapter extends utils.Adapter {
       }
       const timeoutMs = (0, import_coerce.coerceTimeoutMs)(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
-      this.client = new import_beszel_client.BeszelClient(
-        config.url,
-        config.username,
-        config.password,
-        timeoutMs,
-        {
-          debug: (m) => this.log.debug(m),
-          warn: (m) => this.log.warn(m)
-        },
-        this.delay.bind(this)
-      );
-      this.stateManager = new import_state_manager.StateManager(this);
+      this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
+      this.stateManager = this.makeStateManager();
       await this.stateManager.migrateLegacyStates();
       const existingNames = await this.stateManager.getExistingSystemNames();
       await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
@@ -252,6 +277,23 @@ class BeszelAdapter extends utils.Adapter {
       );
       if (systems.length > 0 || this.lastSystemCount === 0) {
         await this.stateManager.cleanupSystems(systems.map((s) => s.name));
+        const activeNames = new Set(systems.map((s) => s.name));
+        for (const name of [...this.failedSystems]) {
+          if (!activeNames.has(name)) {
+            this.failedSystems.delete(name);
+          }
+        }
+        const activeIds = new Set(systems.map((s) => s.id));
+        for (const id of [...this.detailsAttempted]) {
+          if (!activeIds.has(id)) {
+            this.detailsAttempted.delete(id);
+          }
+        }
+        for (const id of [...this.systemDetails.keys()]) {
+          if (!activeIds.has(id)) {
+            this.systemDetails.delete(id);
+          }
+        }
       }
       this.lastSystemCount = systems.length;
       this.authFailCount = 0;
@@ -299,4 +341,8 @@ if (require.main !== module) {
 } else {
   (() => new BeszelAdapter())();
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  BeszelAdapter
+});
 //# sourceMappingURL=main.js.map

@@ -47,6 +47,24 @@ export class StateManager {
   private readonly resolvedSafeNames = new Map<string, string>();
 
   /**
+   * v0.7.2: per dynamic group (`<sysId>.<group>` → set of child segments seen
+   * in the last poll). Used by {@link pruneDynamicChildren} to delete states
+   * of disappeared members (renamed interface, removed GPU/sensor/filesystem,
+   * stopped container) without a DB round-trip per poll — the object view is
+   * queried only once per group after adapter start (reconciles zombies from
+   * previous runs), afterwards the in-memory diff does the work.
+   */
+  private readonly dynamicChildren = new Map<string, Set<string>>();
+
+  /**
+   * v0.7.2: last-written device-object signature per sysId (`id|host|name`).
+   * `updateSystem` used to extendObject the device on EVERY poll — one write
+   * + objectChange event per system per minute for data that practically
+   * never changes. Now the write happens only when the signature differs.
+   */
+  private readonly deviceWritten = new Map<string, string>();
+
+  /**
    * @param adapter The ioBroker adapter instance
    */
   constructor(adapter: utils.AdapterInstance) {
@@ -215,6 +233,19 @@ export class StateManager {
    * the System category (uptime / system-info / services) has no single base,
    * so its three independent metrics are not gated.
    */
+  /**
+   * v0.7.2: dynamic-group toggles that write into a scalar channel without
+   * appearing in `metricDefs` (their states fan out per item in
+   * `updateDynamicStats`). Merged into the derived per-channel toggle sets
+   * when `cleanupMetrics` decides whether a channel is completely empty.
+   * Exported for unit-tests via the class (invariant lock against jsonConfig).
+   */
+  private static readonly DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = {
+    cpu: ["metrics_cpuCores"],
+    network: ["metrics_networkInterfaces"],
+    temperature: ["metrics_temperatureDetails"],
+  };
+
   private static readonly METRIC_DEPENDENCIES = {
     metrics_loadAvg: "metrics_cpu",
     metrics_cpuBreakdown: "metrics_cpu",
@@ -836,21 +867,28 @@ export class StateManager {
     // useful when collisions cause SM5 suffix-disambiguation.
     this.adapter.log.debug(`updateSystem state-tree: '${system.name}' → safeName='${safeName}'`);
 
-    // Create/update device object with online indicator
-    await this.adapter.extendObjectAsync(
-      sysId,
-      {
-        type: "device",
-        common: {
-          name: system.name,
-          statusStates: {
-            onlineId: `${this.adapter.namespace}.${sysId}.info.online`,
+    // Create/update device object with online indicator. v0.7.2: only write
+    // when id/host/name actually changed — extendObject on every poll meant
+    // one object write + objectChange event per system per minute for data
+    // that practically never changes.
+    const deviceSig = `${system.id} ${system.host} ${system.name}`;
+    if (this.deviceWritten.get(sysId) !== deviceSig) {
+      await this.adapter.extendObjectAsync(
+        sysId,
+        {
+          type: "device",
+          common: {
+            name: system.name,
+            statusStates: {
+              onlineId: `${this.adapter.namespace}.${sysId}.info.online`,
+            },
           },
+          native: { id: system.id, host: system.host },
         },
-        native: { id: system.id, host: system.host },
-      },
-      { preserve: { common: ["name"] } },
-    );
+        { preserve: { common: ["name"] } },
+      );
+      this.deviceWritten.set(sysId, deviceSig);
+    }
 
     // Info channel (always created)
     await this.ensureChannel(`${sysId}.info`, tName("channelInfo"));
@@ -923,6 +961,19 @@ export class StateManager {
         this.createdIds.delete(id);
       }
     }
+    // v0.7.2: the dynamic-group and device-signature caches must follow the
+    // same lifecycle — a removed system that is re-added later must go
+    // through the full reconcile/write path again.
+    for (const key of [...this.dynamicChildren.keys()]) {
+      if (key === exact || key.startsWith(dot)) {
+        this.dynamicChildren.delete(key);
+      }
+    }
+    for (const key of [...this.deviceWritten.keys()]) {
+      if (key === exact || key.startsWith(dot)) {
+        this.deviceWritten.delete(key);
+      }
+    }
   }
 
   /**
@@ -959,41 +1010,31 @@ export class StateManager {
       }),
     );
 
-    // Delete empty channels when all metrics in a group are disabled
-    const noCpu =
-      !config.metrics_cpu &&
-      !config.metrics_loadAvg &&
-      !config.metrics_cpuBreakdown &&
-      !config.metrics_cpuCores &&
-      !config.metrics_cpuPeak;
-    if (noCpu) {
-      await this.deleteChannelIfExists(`${sysId}.cpu`);
+    // Delete empty channels when all metrics in a group are disabled.
+    // v0.7.2: the per-channel toggle lists are DERIVED from the registry
+    // (plus the dynamic-group toggles that also write into the channel)
+    // instead of hand-maintained boolean chains — a new metric def can no
+    // longer drift out of its channel's emptiness condition.
+    const channelToggles = new Map<string, Set<keyof AdapterConfig>>();
+    for (const def of this.metricDefs()) {
+      if (def.channel === "info") {
+        continue; // the info channel always exists (online/status) — never deleted
+      }
+      const set = channelToggles.get(def.channel) ?? new Set<keyof AdapterConfig>();
+      set.add(def.toggle);
+      channelToggles.set(def.channel, set);
     }
-
-    const noMemory =
-      !config.metrics_memory && !config.metrics_memoryDetails && !config.metrics_swap && !config.metrics_memoryPeak;
-    if (noMemory) {
-      await this.deleteChannelIfExists(`${sysId}.memory`);
+    for (const [channel, extras] of Object.entries(StateManager.DYNAMIC_CHANNEL_TOGGLES)) {
+      const set = channelToggles.get(channel) ?? new Set<keyof AdapterConfig>();
+      for (const t of extras) {
+        set.add(t);
+      }
+      channelToggles.set(channel, set);
     }
-
-    const noDisk =
-      !config.metrics_disk && !config.metrics_diskSpeed && !config.metrics_diskIo && !config.metrics_diskPeak;
-    if (noDisk) {
-      await this.deleteChannelIfExists(`${sysId}.disk`);
-    }
-
-    const noNetwork = !config.metrics_network && !config.metrics_networkInterfaces && !config.metrics_networkPeak;
-    if (noNetwork) {
-      await this.deleteChannelIfExists(`${sysId}.network`);
-    }
-
-    const noTemp = !config.metrics_temperature && !config.metrics_temperatureDetails;
-    if (noTemp) {
-      await this.deleteChannelIfExists(`${sysId}.temperature`);
-    }
-
-    if (!config.metrics_battery) {
-      await this.deleteChannelIfExists(`${sysId}.battery`);
+    for (const [channel, toggles] of channelToggles) {
+      if ([...toggles].every(t => !config[t])) {
+        await this.deleteChannelIfExists(`${sysId}.${channel}`);
+      }
     }
 
     // Sub-channels
@@ -1008,6 +1049,31 @@ export class StateManager {
     }
     if (!config.metrics_gpu) {
       await this.deleteChannelIfExists(`${sysId}.gpu`);
+    }
+    // v0.7.2: gpuDetails off (GPU category still on) used to leave the
+    // power_package state + engines channel of every GPU behind forever —
+    // the only detail toggle without a cleanup branch. The per-GPU ids are
+    // dynamic, so enumerate the existing GPU channels first.
+    if (config.metrics_gpu && !config.metrics_gpuDetails) {
+      const view = await this.adapter.getObjectViewAsync("system", "channel", {
+        startkey: `${this.adapter.namespace}.${sysId}.gpu.`,
+        endkey: `${this.adapter.namespace}.${sysId}.gpu.\u9999`,
+      });
+      for (const row of view?.rows ?? []) {
+        const id = row.id.slice(this.adapter.namespace.length + 1);
+        const child = id.slice(`${sysId}.gpu.`.length);
+        // Direct GPU channels only (`gpu.<id>`), not the engines channels.
+        if (!child || child.includes(".")) {
+          continue;
+        }
+        const ppId = `${sysId}.gpu.${child}.power_package`;
+        const ppObj = await this.adapter.getObjectAsync(ppId);
+        if (ppObj) {
+          await this.adapter.delObjectAsync(ppId);
+          this.createdIds.delete(ppId);
+        }
+        await this.deleteChannelIfExists(`${sysId}.gpu.${child}.engines`);
+      }
     }
     if (!config.metrics_extraFs) {
       await this.deleteChannelIfExists(`${sysId}.filesystems`);
@@ -1111,33 +1177,48 @@ export class StateManager {
     if (config.metrics_temperatureDetails && stats.t) {
       await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
       await this.ensureChannel(`${sysId}.temperature.sensors`, tName("channelSensors"));
+      const activeSensors = new Set<string>();
       for (const [sensor, temp] of Object.entries(stats.t)) {
+        const safeSensor = this.sanitize(sensor);
+        if (!safeSensor) {
+          continue;
+        }
+        activeSensors.add(safeSensor);
         await this.createAndSetState(
-          `${sysId}.temperature.sensors.${this.sanitize(sensor)}`,
+          `${sysId}.temperature.sensors.${safeSensor}`,
           this.numCommon(sensor, "°C", "value.temperature"),
           temp,
         );
       }
+      // v0.7.2: a renamed/removed sensor (kernel update, hardware change) used
+      // to leave a frozen state behind forever.
+      await this.pruneDynamicChildren(`${sysId}.temperature.sensors`, activeSensors, "state");
     }
 
     // Per-core CPU usage (v0.6.0). Core labels are positional (CPU0..), shown as-is.
     if (config.metrics_cpuCores && stats.cpus && stats.cpus.length > 0) {
       await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
       await this.ensureChannel(`${sysId}.cpu.cores`, tName("channelCores"));
+      const activeCores = new Set<string>();
       for (let i = 0; i < stats.cpus.length; i++) {
+        activeCores.add(`core${i}`);
         await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), stats.cpus[i]);
       }
+      // v0.7.2: prune core states beyond the current count (VM resized down).
+      await this.pruneDynamicChildren(`${sysId}.cpu.cores`, activeCores, "state");
     }
 
     // Per-network-interface (v0.6.0). ni: name -> [up, down, total up, total down] bytes.
     if (config.metrics_networkInterfaces && stats.ni && Object.keys(stats.ni).length > 0) {
       await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
       await this.ensureChannel(`${sysId}.network.interfaces`, tName("channelInterfaces"));
+      const activeIfaces = new Set<string>();
       for (const [iface, vals] of Object.entries(stats.ni)) {
         const safeId = this.sanitize(iface);
         if (!safeId) {
           continue;
         }
+        activeIfaces.add(safeId);
         // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
         await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, iface);
         await this.createAndSetState(
@@ -1161,13 +1242,21 @@ export class StateManager {
           vals[3] ?? null,
         );
       }
+      // v0.7.2: a renamed interface (predictable-names migration, USB NIC
+      // swap) used to leave its old channel behind with frozen counters.
+      await this.pruneDynamicChildren(`${sysId}.network.interfaces`, activeIfaces, "channel");
     }
 
     // GPU — gpuData.n is the raw vendor name; we keep it as a plain string.
     if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
       await this.ensureChannel(`${sysId}.gpu`, tName("channelGpu"));
+      const activeGpus = new Set<string>();
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
         const safeId = this.sanitize(gpuId);
+        if (!safeId) {
+          continue;
+        }
+        activeGpus.add(safeId);
         await this.ensureChannel(`${sysId}.gpu.${safeId}`, gpuData.n ?? gpuId);
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
@@ -1196,6 +1285,7 @@ export class StateManager {
             this.numCommon(tName("gpuPowerPackage"), "W"),
             gpuData.pp ?? null,
           );
+          const activeEngines = new Set<string>();
           if (gpuData.e && Object.keys(gpuData.e).length > 0) {
             await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, tName("channelEngines"));
             for (const [engine, value] of Object.entries(gpuData.e)) {
@@ -1207,18 +1297,29 @@ export class StateManager {
                   this.percentCommon(engine),
                   value,
                 );
+                activeEngines.add(safeEngine);
               }
             }
           }
+          // v0.7.2: engines the driver stopped reporting get pruned.
+          await this.pruneDynamicChildren(`${sysId}.gpu.${safeId}.engines`, activeEngines, "state");
         }
       }
+      // v0.7.2: a GPU that disappeared from the host (eGPU unplugged, VM
+      // passthrough change) used to keep its whole channel forever.
+      await this.pruneDynamicChildren(`${sysId}.gpu`, activeGpus, "channel");
     }
 
     // Extra filesystems — fsName is the raw mount path, kept as plain string.
     if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
       await this.ensureChannel(`${sysId}.filesystems`, tName("channelFilesystems"));
+      const activeFs = new Set<string>();
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
         const safeId = this.sanitize(fsName);
+        if (!safeId) {
+          continue;
+        }
+        activeFs.add(safeId);
         await this.ensureChannel(`${sysId}.filesystems.${safeId}`, fsName);
 
         const total = fsData.d ?? null;
@@ -1257,6 +1358,9 @@ export class StateManager {
           fsData.w ?? null,
         );
       }
+      // v0.7.2: an unmounted/renamed extra filesystem used to keep its
+      // channel with frozen values forever.
+      await this.pruneDynamicChildren(`${sysId}.filesystems`, activeFs, "channel");
     }
   }
 
@@ -1267,6 +1371,7 @@ export class StateManager {
     // and prune BEFORE the early-return — otherwise a system that drops to zero
     // containers would keep its old container state-trees forever (only stale
     // *systems* were cleaned up before, never stale containers within a system).
+    // v0.7.2: shares the generalised pruner (view-reconcile once, then in-memory).
     const activeIds = new Set<string>();
     for (const container of sysContainers) {
       const cId = this.sanitize(container.name);
@@ -1274,7 +1379,7 @@ export class StateManager {
         activeIds.add(cId);
       }
     }
-    await this.cleanupStaleContainers(sysId, activeIds);
+    await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
 
     if (sysContainers.length === 0) {
       return;
@@ -1332,44 +1437,57 @@ export class StateManager {
   }
 
   /**
-   * F1: remove container channels under a system that are no longer reported
-   * by Beszel (container stopped/removed/renamed on the host). Looks up the
-   * direct children of `<sysId>.containers` and deletes any whose sanitized id
-   * is not in `activeIds`.
+   * v0.7.2 (generalised F1): remove children of a dynamic group that are no
+   * longer reported by Beszel — stopped container, removed GPU, renamed
+   * network interface or sensor, unmounted filesystem, shrunk core count.
+   * Before this only containers were pruned; every other dynamic group left
+   * zombie states with frozen values behind forever.
    *
-   * @param sysId State prefix (`systems.<safeName>`)
-   * @param activeIds Sanitized ids of the containers currently present
+   * Cost model: the object view is queried only on the FIRST call per group
+   * after adapter start (reconciles leftovers from previous runs). After
+   * that the in-memory set diff detects disappearances with zero DB reads.
+   *
+   * @param base Group prefix (e.g. `systems.<safeName>.containers`)
+   * @param activeIds Sanitized direct-child segments currently present
+   * @param childType Object type of the direct children (`channel` or `state`)
    */
-  private async cleanupStaleContainers(sysId: string, activeIds: Set<string>): Promise<void> {
-    const base = `${sysId}.containers`;
-    const view = await this.adapter.getObjectViewAsync("system", "channel", {
-      startkey: `${this.adapter.namespace}.${base}.`,
-      endkey: `${this.adapter.namespace}.${base}.香`,
-    });
-    if (!view?.rows) {
-      return;
-    }
-    const stale = new Set<string>();
-    for (const row of view.rows) {
-      const id = row.id.startsWith(`${this.adapter.namespace}.`)
-        ? row.id.slice(this.adapter.namespace.length + 1)
-        : row.id;
-      if (!id.startsWith(`${base}.`)) {
-        continue;
+  private async pruneDynamicChildren(
+    base: string,
+    activeIds: Set<string>,
+    childType: "channel" | "state",
+  ): Promise<void> {
+    let known = this.dynamicChildren.get(base);
+    if (!known) {
+      // First poll for this group since adapter start: reconcile against the
+      // DB once so zombies from previous runs (or older versions) get pruned.
+      known = new Set<string>();
+      const view = await this.adapter.getObjectViewAsync("system", childType, {
+        startkey: `${this.adapter.namespace}.${base}.`,
+        endkey: `${this.adapter.namespace}.${base}.\u9999`,
+      });
+      for (const row of view?.rows ?? []) {
+        const id = row.id.startsWith(`${this.adapter.namespace}.`)
+          ? row.id.slice(this.adapter.namespace.length + 1)
+          : row.id;
+        if (!id.startsWith(`${base}.`)) {
+          continue;
+        }
+        // Only the direct child segment (`<base>.<cId>`), not deeper ids.
+        const cId = id.slice(base.length + 1).split(".")[0];
+        if (cId) {
+          known.add(cId);
+        }
       }
-      // Only the direct child segment (`<base>.<cId>`), not deeper state ids.
-      const cId = id.slice(base.length + 1).split(".")[0];
-      if (cId && !activeIds.has(cId)) {
-        stale.add(cId);
-      }
     }
+    const stale = [...known].filter(cId => !activeIds.has(cId));
     await Promise.all(
-      [...stale].map(async cId => {
-        this.adapter.log.debug(`Removing stale container: ${base}.${cId}`);
+      stale.map(async cId => {
+        this.adapter.log.debug(`Removing stale ${childType} ${base}.${cId} (no longer reported)`);
         await this.adapter.delObjectAsync(`${base}.${cId}`, { recursive: true });
         this.dropCacheUnder(`${base}.${cId}`);
       }),
     );
+    this.dynamicChildren.set(base, new Set(activeIds));
   }
 
   private async ensureChannel(id: string, name: LocalizedName): Promise<void> {

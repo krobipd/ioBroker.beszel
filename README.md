@@ -213,6 +213,12 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- Much lighter polling: the adapter no longer pages through hours of stats history on every poll and only rewrites device objects when something actually changed
+- Disappeared sensors, network interfaces, GPUs, filesystems and CPU cores are now cleaned up automatically instead of keeping frozen values forever
+- Turning off "GPU details" now removes the package-power and engine states it created
+
 ### 0.7.1 (2026-06-09)
 
 - Improved compact-mode behavior: beszel no longer registers global process error handlers that could interfere with other adapters running in the same process.
