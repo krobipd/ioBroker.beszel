@@ -213,7 +213,7 @@ beszel.0.
 ---
 
 ## Changelog
-### 0.7.2 (2026-06-12)
+### 0.7.2 (2026-06-12) — stable
 
 - Much lighter polling: the adapter no longer pages through hours of stats history on every poll and only rewrites device objects when something actually changed
 - Disappeared sensors, network interfaces, GPUs, filesystems and CPU cores are now cleaned up automatically instead of keeping frozen values forever
