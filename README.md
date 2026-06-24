@@ -34,7 +34,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 ## Requirements
 
 - **Node.js >= 22**
-- **ioBroker js-controller >= 7.1.2**
+- **ioBroker js-controller >= 7.2.2**
 - **ioBroker Admin >= 7.8.23**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
 
@@ -213,6 +213,14 @@ beszel.0.
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+
+- A brief empty response from the Hub no longer deletes your devices or containers — for example right after a restart — so monitored systems and their history stay intact.
+- Server hardware and OS details now recover on their own after a short network problem, instead of staying empty until the adapter is restarted.
+- Two systems, filesystems, network interfaces or containers whose names shorten to the same id no longer overwrite each other's values.
+- A malformed or oversized response from the Hub can no longer exhaust memory and crash the adapter.
+- The adapter now warns when the Hub is reached over an unencrypted http connection to another machine, so you can switch to https.
+
 ### 0.7.2 (2026-06-12) — stable
 
 - Much lighter polling: the adapter no longer pages through hours of stats history on every poll and only rewrites device objects when something actually changed

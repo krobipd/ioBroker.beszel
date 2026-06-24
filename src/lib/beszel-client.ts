@@ -37,6 +37,14 @@ const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
 
 /**
+ * SEC-5: defensive cap on a single HTTP response body. A page of 200 PocketBase
+ * records is well under 16 MiB; a larger response implies a compromised / MITM /
+ * buggy Hub and is aborted before buffering it can OOM the adapter — the
+ * per-request timeout only bounds socket inactivity, not total bytes.
+ */
+const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+/**
  * HTTP client for the Beszel PocketBase REST API.
  * Uses only Node.js built-in http/https — no extra dependencies.
  */
@@ -407,11 +415,22 @@ export class BeszelClient {
 
       const req = transport.request(options, res => {
         const chunks: Buffer[] = [];
+        let received = 0;
         res.on("error", err => {
           cleanup();
           reject(err);
         });
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("data", (chunk: Buffer) => {
+          received += chunk.length;
+          if (received > MAX_RESPONSE_BYTES) {
+            // SEC-5: abort an oversized response before buffering it can OOM the
+            // adapter (the per-request timeout bounds inactivity, not total bytes).
+            // req.destroy(err) surfaces through req.on("error") below → reject.
+            req.destroy(new Error(`Response from ${path} exceeded ${MAX_RESPONSE_BYTES} bytes`));
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on("end", () => {
           cleanup();
           const raw = Buffer.concat(chunks).toString("utf8");

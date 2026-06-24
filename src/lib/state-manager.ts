@@ -1,5 +1,5 @@
 import type * as utils from "@iobroker/adapter-core";
-import { errText } from "./coerce";
+import { errText, sanitizeForLog } from "./coerce";
 import { tName } from "./i18n";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
@@ -121,6 +121,30 @@ export class StateManager {
   }
 
   /**
+   * SEC-6: resolve one dynamic-group child id segment, disambiguating collisions
+   * the same way `prepareForPoll` does for systems. The first member with a given
+   * sanitized base keeps it; a later member that sanitizes to the SAME base (e.g.
+   * `/mnt/data` and `/mnt-data` both → `mnt_data`, or two names sharing the first
+   * 50 chars) gets a stable `__<hash>` suffix so they never overwrite each other's
+   * states. Returns "" when the name is unusable (caller skips it).
+   *
+   * @param rawName Raw member name from the Hub.
+   * @param stableKey Stable unique key for the suffix (record id, or the raw name).
+   * @param seen Sanitized bases already used in this group's pass (mutated).
+   */
+  private resolveChildId(rawName: string, stableKey: string, seen: Set<string>): string {
+    const base = this.sanitize(rawName);
+    if (!base) {
+      return "";
+    }
+    if (seen.has(base)) {
+      return this.sanitizeWithSuffix(rawName, stableKey);
+    }
+    seen.add(base);
+    return base;
+  }
+
+  /**
    * v0.4.3 (SM5): pre-compute the safeName for every system in this poll,
    * disambiguating collisions. Sorted by id for determinism. The first
    * occurrence keeps the bare safeName (back-compat); later collisions get
@@ -150,7 +174,7 @@ export class StateManager {
       }
     }
     for (const [safe, dupes] of collisions) {
-      const names = dupes.map(s => `${s.name}(${s.id.slice(0, 8)})`).join(", ");
+      const names = dupes.map(s => `${sanitizeForLog(s.name)}(${s.id.slice(0, 8)})`).join(", ");
       this.adapter.log.warn(
         `Multiple systems sanitize to '${safe}' (${names}) — adding hash suffix to disambiguate. Consider renaming on the Hub.`,
       );
@@ -843,12 +867,16 @@ export class StateManager {
    * @param stats Latest stats for this system, or undefined if unavailable
    * @param containers Container records belonging to this system
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
+   * @param skipContainerPrune F2: when true, do not prune container channels this poll
+   *   (the poll loop sets this on the first empty getContainers() result to debounce a
+   *   transient empty response — a second consecutive empty confirms and prunes).
    */
   public async updateSystem(
     system: BeszelSystem,
     stats: SystemStats | undefined,
     containers: BeszelContainer[],
     rawConfig: AdapterConfig,
+    skipContainerPrune = false,
   ): Promise<void> {
     // Detail toggles inherit their category's base toggle (off category → off
     // detail). Applied once here so applyMetrics + updateDynamicStats + the
@@ -857,7 +885,7 @@ export class StateManager {
     const safeName = this.resolvedSafeName(system);
     if (safeName.length === 0) {
       this.adapter.log.warn(
-        `Skipping system with unusable name: ${typeof system.name === "string" ? system.name : JSON.stringify(system.name)}`,
+        `Skipping system with unusable name: ${sanitizeForLog(typeof system.name === "string" ? system.name : JSON.stringify(system.name))}`,
       );
       return;
     }
@@ -865,7 +893,7 @@ export class StateManager {
     // v0.4.4 (G1): trace the state-tree entry (after safeName resolution but
     // before any extendObjectAsync). Shows the name → safeName mapping —
     // useful when collisions cause SM5 suffix-disambiguation.
-    this.adapter.log.debug(`updateSystem state-tree: '${system.name}' → safeName='${safeName}'`);
+    this.adapter.log.debug(`updateSystem state-tree: '${sanitizeForLog(system.name)}' → safeName='${safeName}'`);
 
     // Create/update device object with online indicator. v0.7.2: only write
     // when id/host/name actually changed — extendObject on every poll meant
@@ -915,7 +943,7 @@ export class StateManager {
 
     // Containers
     if (config.metrics_containers) {
-      await this.updateContainers(sysId, system.id, containers);
+      await this.updateContainers(sysId, system.id, containers, skipContainerPrune);
     }
   }
 
@@ -1178,15 +1206,16 @@ export class StateManager {
       await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
       await this.ensureChannel(`${sysId}.temperature.sensors`, tName("channelSensors"));
       const activeSensors = new Set<string>();
+      const seenSensors = new Set<string>();
       for (const [sensor, temp] of Object.entries(stats.t)) {
-        const safeSensor = this.sanitize(sensor);
+        const safeSensor = this.resolveChildId(sensor, sensor, seenSensors);
         if (!safeSensor) {
           continue;
         }
         activeSensors.add(safeSensor);
         await this.createAndSetState(
           `${sysId}.temperature.sensors.${safeSensor}`,
-          this.numCommon(sensor, "°C", "value.temperature"),
+          this.numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
           temp,
         );
       }
@@ -1213,14 +1242,15 @@ export class StateManager {
       await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
       await this.ensureChannel(`${sysId}.network.interfaces`, tName("channelInterfaces"));
       const activeIfaces = new Set<string>();
+      const seenIfaces = new Set<string>();
       for (const [iface, vals] of Object.entries(stats.ni)) {
-        const safeId = this.sanitize(iface);
+        const safeId = this.resolveChildId(iface, iface, seenIfaces);
         if (!safeId) {
           continue;
         }
         activeIfaces.add(safeId);
         // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
-        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, iface);
+        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
         await this.createAndSetState(
           `${sysId}.network.interfaces.${safeId}.up`,
           this.numCommon(tName("ifaceUp"), "B/s"),
@@ -1251,13 +1281,14 @@ export class StateManager {
     if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
       await this.ensureChannel(`${sysId}.gpu`, tName("channelGpu"));
       const activeGpus = new Set<string>();
+      const seenGpus = new Set<string>();
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
-        const safeId = this.sanitize(gpuId);
+        const safeId = this.resolveChildId(gpuId, gpuId, seenGpus);
         if (!safeId) {
           continue;
         }
         activeGpus.add(safeId);
-        await this.ensureChannel(`${sysId}.gpu.${safeId}`, gpuData.n ?? gpuId);
+        await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeForLog(gpuData.n ?? gpuId));
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
           this.percentCommon(tName("gpuUsage")),
@@ -1286,15 +1317,16 @@ export class StateManager {
             gpuData.pp ?? null,
           );
           const activeEngines = new Set<string>();
+          const seenEngines = new Set<string>();
           if (gpuData.e && Object.keys(gpuData.e).length > 0) {
             await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, tName("channelEngines"));
             for (const [engine, value] of Object.entries(gpuData.e)) {
-              const safeEngine = this.sanitize(engine);
+              const safeEngine = this.resolveChildId(engine, engine, seenEngines);
               if (safeEngine) {
                 // Engine name is vendor-defined → kept as-is.
                 await this.createAndSetState(
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                  this.percentCommon(engine),
+                  this.percentCommon(sanitizeForLog(engine)),
                   value,
                 );
                 activeEngines.add(safeEngine);
@@ -1314,13 +1346,14 @@ export class StateManager {
     if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
       await this.ensureChannel(`${sysId}.filesystems`, tName("channelFilesystems"));
       const activeFs = new Set<string>();
+      const seenFs = new Set<string>();
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
-        const safeId = this.sanitize(fsName);
+        const safeId = this.resolveChildId(fsName, fsName, seenFs);
         if (!safeId) {
           continue;
         }
         activeFs.add(safeId);
-        await this.ensureChannel(`${sysId}.filesystems.${safeId}`, fsName);
+        await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeForLog(fsName));
 
         const total = fsData.d ?? null;
         const used = fsData.du ?? null;
@@ -1364,22 +1397,40 @@ export class StateManager {
     }
   }
 
-  private async updateContainers(sysId: string, systemId: string, allContainers: BeszelContainer[]): Promise<void> {
+  private async updateContainers(
+    sysId: string,
+    systemId: string,
+    allContainers: BeszelContainer[],
+    skipPrune = false,
+  ): Promise<void> {
     const sysContainers = allContainers.filter(c => c.system === systemId);
+
+    // SEC-6: resolve each container's id segment once (keyed by record id),
+    // disambiguating any collision so the prune set and the create loop use the
+    // SAME id and two same-sanitizing names never overwrite each other.
+    const seenContainers = new Set<string>();
+    const resolvedIds = new Map<string, string>();
+    for (const container of sysContainers) {
+      resolvedIds.set(container.id, this.resolveChildId(container.name, container.id, seenContainers));
+    }
 
     // F1: prune containers that disappeared from the host. Build the active set
     // and prune BEFORE the early-return — otherwise a system that drops to zero
     // containers would keep its old container state-trees forever (only stale
     // *systems* were cleaned up before, never stale containers within a system).
     // v0.7.2: shares the generalised pruner (view-reconcile once, then in-memory).
+    // F2: skip the prune on a debounced empty container fetch — a single transient
+    // empty getContainers() result must not wipe valid container channels; only a
+    // second consecutive empty result (skipPrune=false) confirms removal and prunes.
     const activeIds = new Set<string>();
-    for (const container of sysContainers) {
-      const cId = this.sanitize(container.name);
+    for (const cId of resolvedIds.values()) {
       if (cId) {
         activeIds.add(cId);
       }
     }
-    await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
+    if (!skipPrune) {
+      await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
+    }
 
     if (sysContainers.length === 0) {
       return;
@@ -1390,12 +1441,12 @@ export class StateManager {
     const healthLabels = ["none", "starting", "healthy", "unhealthy"];
 
     for (const container of sysContainers) {
-      const cId = this.sanitize(container.name);
+      const cId = resolvedIds.get(container.id) ?? "";
       if (cId.length === 0) {
         continue;
       }
       // container.name is user-defined (Docker container name) → keep as-is.
-      await this.ensureChannel(`${sysId}.containers.${cId}`, container.name);
+      await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeForLog(container.name));
       await this.createAndSetState(
         `${sysId}.containers.${cId}.status`,
         this.textCommon(tName("status")),

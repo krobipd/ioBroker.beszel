@@ -36,6 +36,17 @@ async function dispatchMessage(obj, deps) {
   try {
     switch (obj.command) {
       case "checkConnection": {
+        const from = typeof obj.from === "string" ? obj.from : "";
+        if (from && !from.startsWith("system.adapter.admin.") && !from.startsWith("system.adapter.web.")) {
+          deps.log.warn(`checkConnection rejected from '${from}' \u2014 only the admin/web config UI may run it`);
+          deps.sendTo(
+            obj.from,
+            obj.command,
+            { success: false, message: "checkConnection is only available from the admin UI" },
+            obj.callback
+          );
+          return;
+        }
         const msg = (_a = (0, import_coerce.coerceObject)(obj.message)) != null ? _a : {};
         const config = msg;
         const url = typeof config.url === "string" ? config.url : "";

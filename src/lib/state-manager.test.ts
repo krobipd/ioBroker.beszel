@@ -2182,4 +2182,63 @@ describe("StateManager", () => {
       expect(deviceCall![2]).to.deep.equal({ preserve: { common: ["name"] } });
     });
   });
+
+  // -----------------------------------------------------------------------
+  // SEC-6 — dynamic-group id collision disambiguation
+  // -----------------------------------------------------------------------
+
+  describe("SEC-6: dynamic-group id collision", () => {
+    it("disambiguates two members whose names sanitize to the same id (no overwrite)", async () => {
+      const stats = { ...testStats, efs: { "/mnt/data": { d: 100, du: 10 }, "/mnt-data": { d: 200, du: 20 } } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      const prefix = "systems.my_server.filesystems.";
+      const fsIds = new Set(
+        [...adapter.objects.keys()].filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length).split(".")[0]),
+      );
+      // "/mnt/data" → "mnt_data" (first, bare); "/mnt-data" → "mnt_data__<hash>"
+      expect(fsIds.has("mnt_data")).to.equal(true);
+      expect([...fsIds].some(id => /^mnt_data__[0-9a-f]{6}$/.test(id))).to.equal(true);
+      expect(fsIds.size).to.equal(2); // both members present — neither overwrote the other
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // SEC-5 — oversized member display name is capped (common.name)
+  // -----------------------------------------------------------------------
+
+  describe("SEC-5: oversized member display name", () => {
+    it("caps a huge filesystem display name in common.name", async () => {
+      const longName = `/${"a".repeat(5000)}`;
+      const stats = { ...testStats, efs: { [longName]: { d: 100, du: 10 } } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      const safeId = manager.sanitize(longName);
+      const obj = adapter.objects.get(`systems.my_server.filesystems.${safeId}`);
+      const name = obj?.common.name as string;
+      expect(name.length).to.be.lessThanOrEqual(201); // 200 + ellipsis, not 5001
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // F2 — updateSystem honours skipContainerPrune (debounced empty fetch)
+  // -----------------------------------------------------------------------
+
+  describe("F2: updateSystem skipContainerPrune", () => {
+    const two: BeszelContainer[] = [
+      { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 1, image: "n" },
+      { id: "c2", system: "sys001", name: "postgres", status: "running", health: 2, cpu: 1, memory: 1, image: "pg" },
+    ];
+
+    it("keeps container channels when skipContainerPrune=true, prunes them when false", async () => {
+      await manager.updateSystem(testSystem, testStats, two, allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.true;
+
+      // postgres gone, but this poll is a debounced empty fetch (skip=true) → keep it
+      await manager.updateSystem(testSystem, testStats, two.slice(0, 1), allMetricsConfig(), true);
+      expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.true;
+
+      // a confirming poll (skip=false) prunes the now-absent container
+      await manager.updateSystem(testSystem, testStats, two.slice(0, 1), allMetricsConfig(), false);
+      expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.false;
+    });
+  });
 });

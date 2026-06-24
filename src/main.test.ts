@@ -68,6 +68,7 @@ function internalOf(adapter: BeszelAdapter): {
   stateManager: FakeStateMgr | null;
   isPolling: boolean;
   lastSystemCount: number;
+  lastContainersEmpty: boolean;
   lastErrorCode: string;
   authFailCount: number;
   failedSystems: Set<string>;
@@ -212,6 +213,18 @@ describe("BeszelAdapter onReady", () => {
     stateMgr.migrateLegacyStates.mockRejectedValue(new Error("db down"));
     await i.onReady();
     expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("onReady failed: db down"));
+  });
+
+  it("SEC-3b: warns when the Hub URL is plain http to a remote host", async () => {
+    const { adapter } = await setupReady(); // default url = http://192.168.1.5:8090 (remote http)
+    expect(internalOf(adapter).log.warn).toHaveBeenCalledWith(expect.stringContaining("cleartext"));
+  });
+
+  it("SEC-3b: does NOT warn for https or loopback http", async () => {
+    const https = await setupReady({ url: "https://192.168.1.5:8090" });
+    expect(internalOf(https.adapter).log.warn).not.toHaveBeenCalledWith(expect.stringContaining("cleartext"));
+    const loopback = await setupReady({ url: "http://localhost:8090" });
+    expect(internalOf(loopback.adapter).log.warn).not.toHaveBeenCalledWith(expect.stringContaining("cleartext"));
   });
 });
 
@@ -406,6 +419,19 @@ describe("BeszelAdapter poll — error classification routing", () => {
     await i.poll(); // steady state — no repeated restore info
     expect(i.log.info).not.toHaveBeenCalledWith("Connection restored");
   });
+
+  it("SEC-1: a generic poll error keeps Hub content out of the error-level log", async () => {
+    const { adapter, client } = await setupReady();
+    const i = internalOf(adapter);
+    // an HTTP_ERROR carries a Hub response-body snippet in its message.
+    client.getSystems.mockRejectedValue(errnoError("HTTP 500: secret-hub-body", "HTTP_ERROR"));
+    await i.poll();
+    // error-level line (captured by opt-in Sentry) carries only the error class.
+    expect(i.log.error).toHaveBeenCalledWith("Poll failed (HTTP_ERROR)");
+    expect(i.log.error).not.toHaveBeenCalledWith(expect.stringContaining("secret-hub-body"));
+    // the full detail is still available at debug for diagnostics.
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("secret-hub-body"));
+  });
 });
 
 describe("BeszelAdapter poll — empty-systems guard", () => {
@@ -420,14 +446,69 @@ describe("BeszelAdapter poll — empty-systems guard", () => {
     expect(stateMgr.cleanupSystems).not.toHaveBeenCalled();
   });
 
-  it("does clean up when the install never had systems (lastSystemCount 0)", async () => {
+  it("does NOT clean up on an empty result even on the first poll after restart (F1)", async () => {
     const { adapter, client, stateMgr } = await setupReady();
     const i = internalOf(adapter);
     client.getSystems.mockResolvedValue([]);
     stateMgr.cleanupSystems.mockClear();
-    i.lastSystemCount = 0;
+    i.lastSystemCount = 0; // fresh instance, e.g. right after a restart
     await i.poll();
-    expect(stateMgr.cleanupSystems).toHaveBeenCalledWith([]);
+    // F1: an empty (transient / startup) systems response must NEVER wipe the
+    // existing device trees — cleanupSystems runs only on a non-empty result.
+    // A genuinely empty install has nothing to clean up anyway.
+    expect(stateMgr.cleanupSystems).not.toHaveBeenCalled();
+  });
+});
+
+describe("BeszelAdapter poll — F2 container-prune debounce", () => {
+  const oneContainer = [
+    { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 1, image: "n" },
+  ];
+
+  it("skips the prune on the FIRST empty container fetch, prunes on the SECOND (debounce)", async () => {
+    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getSystems.mockResolvedValue([makeSystem()]);
+    client.getContainers.mockResolvedValue([]);
+    i.lastContainersEmpty = false; // previous poll had containers
+
+    stateMgr.updateSystem.mockClear();
+    await i.poll(); // 1st empty → skipContainerPrune = true (a transient glitch must not wipe)
+    expect(stateMgr.updateSystem).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      true,
+    );
+
+    stateMgr.updateSystem.mockClear();
+    await i.poll(); // 2nd consecutive empty → confirmed removal → prune
+    expect(stateMgr.updateSystem).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      false,
+    );
+  });
+
+  it("prunes immediately when the container fetch is non-empty (skip = false)", async () => {
+    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getSystems.mockResolvedValue([makeSystem()]);
+    client.getContainers.mockResolvedValue(oneContainer as never);
+    i.lastContainersEmpty = false;
+
+    stateMgr.updateSystem.mockClear();
+    await i.poll();
+    expect(stateMgr.updateSystem).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      false,
+    );
   });
 });
 
@@ -465,12 +546,25 @@ describe("BeszelAdapter poll — system_details cadence (F2)", () => {
     client.getSystemDetails.mockRejectedValue(errnoError("404", "HTTP_ERROR"));
 
     await i.onReady(); // first poll hits the 404
-    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("system_details fetch failed (non-fatal)"));
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("system_details fetch failed (non-fatal"));
     expect(stateMgr.updateSystem).toHaveBeenCalled(); // poll continued
     expect(i.setStateAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
 
     await i.poll();
     expect(client.getSystemDetails).toHaveBeenCalledTimes(1); // 404'd Hub → no hammering
+  });
+
+  it("F3: a TRANSIENT details fetch error is NOT marked attempted and is retried next poll", async () => {
+    const { adapter, client } = setup({ metrics_agentVersion: true });
+    const i = internalOf(adapter);
+    client.getSystemDetails.mockRejectedValue(errnoError("conn refused", "ECONNREFUSED"));
+
+    await i.onReady(); // first poll: a NETWORK failure must not suppress the fetch
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(1);
+    expect(i.detailsAttempted.size).to.equal(0); // not marked → will retry
+
+    await i.poll(); // retries because nothing was marked attempted
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(2);
   });
 
   it("never fetches details when System info is disabled", async () => {

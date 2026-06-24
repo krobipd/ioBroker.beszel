@@ -101,6 +101,29 @@ class StateManager {
     return (h >>> 0).toString(16).padStart(8, "0").slice(0, 6);
   }
   /**
+   * SEC-6: resolve one dynamic-group child id segment, disambiguating collisions
+   * the same way `prepareForPoll` does for systems. The first member with a given
+   * sanitized base keeps it; a later member that sanitizes to the SAME base (e.g.
+   * `/mnt/data` and `/mnt-data` both → `mnt_data`, or two names sharing the first
+   * 50 chars) gets a stable `__<hash>` suffix so they never overwrite each other's
+   * states. Returns "" when the name is unusable (caller skips it).
+   *
+   * @param rawName Raw member name from the Hub.
+   * @param stableKey Stable unique key for the suffix (record id, or the raw name).
+   * @param seen Sanitized bases already used in this group's pass (mutated).
+   */
+  resolveChildId(rawName, stableKey, seen) {
+    const base = this.sanitize(rawName);
+    if (!base) {
+      return "";
+    }
+    if (seen.has(base)) {
+      return this.sanitizeWithSuffix(rawName, stableKey);
+    }
+    seen.add(base);
+    return base;
+  }
+  /**
    * v0.4.3 (SM5): pre-compute the safeName for every system in this poll,
    * disambiguating collisions. Sorted by id for determinism. The first
    * occurrence keeps the bare safeName (back-compat); later collisions get
@@ -131,7 +154,7 @@ class StateManager {
       }
     }
     for (const [safe, dupes] of collisions) {
-      const names = dupes.map((s) => `${s.name}(${s.id.slice(0, 8)})`).join(", ");
+      const names = dupes.map((s) => `${(0, import_coerce.sanitizeForLog)(s.name)}(${s.id.slice(0, 8)})`).join(", ");
       this.adapter.log.warn(
         `Multiple systems sanitize to '${safe}' (${names}) \u2014 adding hash suffix to disambiguate. Consider renaming on the Hub.`
       );
@@ -955,18 +978,21 @@ class StateManager {
    * @param stats Latest stats for this system, or undefined if unavailable
    * @param containers Container records belonging to this system
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
+   * @param skipContainerPrune F2: when true, do not prune container channels this poll
+   *   (the poll loop sets this on the first empty getContainers() result to debounce a
+   *   transient empty response — a second consecutive empty confirms and prunes).
    */
-  async updateSystem(system, stats, containers, rawConfig) {
+  async updateSystem(system, stats, containers, rawConfig, skipContainerPrune = false) {
     const config = this.effectiveConfig(rawConfig);
     const safeName = this.resolvedSafeName(system);
     if (safeName.length === 0) {
       this.adapter.log.warn(
-        `Skipping system with unusable name: ${typeof system.name === "string" ? system.name : JSON.stringify(system.name)}`
+        `Skipping system with unusable name: ${(0, import_coerce.sanitizeForLog)(typeof system.name === "string" ? system.name : JSON.stringify(system.name))}`
       );
       return;
     }
     const sysId = `systems.${safeName}`;
-    this.adapter.log.debug(`updateSystem state-tree: '${system.name}' \u2192 safeName='${safeName}'`);
+    this.adapter.log.debug(`updateSystem state-tree: '${(0, import_coerce.sanitizeForLog)(system.name)}' \u2192 safeName='${safeName}'`);
     const deviceSig = `${system.id}\0${system.host}\0${system.name}`;
     if (this.deviceWritten.get(sysId) !== deviceSig) {
       await this.adapter.extendObjectAsync(
@@ -997,7 +1023,7 @@ class StateManager {
       await this.updateDynamicStats(sysId, stats, config);
     }
     if (config.metrics_containers) {
-      await this.updateContainers(sysId, system.id, containers);
+      await this.updateContainers(sysId, system.id, containers, skipContainerPrune);
     }
   }
   /**
@@ -1211,15 +1237,16 @@ class StateManager {
       await this.ensureChannel(`${sysId}.temperature`, (0, import_i18n.tName)("channelTemperature"));
       await this.ensureChannel(`${sysId}.temperature.sensors`, (0, import_i18n.tName)("channelSensors"));
       const activeSensors = /* @__PURE__ */ new Set();
+      const seenSensors = /* @__PURE__ */ new Set();
       for (const [sensor, temp] of Object.entries(stats.t)) {
-        const safeSensor = this.sanitize(sensor);
+        const safeSensor = this.resolveChildId(sensor, sensor, seenSensors);
         if (!safeSensor) {
           continue;
         }
         activeSensors.add(safeSensor);
         await this.createAndSetState(
           `${sysId}.temperature.sensors.${safeSensor}`,
-          this.numCommon(sensor, "\xB0C", "value.temperature"),
+          this.numCommon((0, import_coerce.sanitizeForLog)(sensor), "\xB0C", "value.temperature"),
           temp
         );
       }
@@ -1239,13 +1266,14 @@ class StateManager {
       await this.ensureChannel(`${sysId}.network`, (0, import_i18n.tName)("channelNetwork"));
       await this.ensureChannel(`${sysId}.network.interfaces`, (0, import_i18n.tName)("channelInterfaces"));
       const activeIfaces = /* @__PURE__ */ new Set();
+      const seenIfaces = /* @__PURE__ */ new Set();
       for (const [iface, vals] of Object.entries(stats.ni)) {
-        const safeId = this.sanitize(iface);
+        const safeId = this.resolveChildId(iface, iface, seenIfaces);
         if (!safeId) {
           continue;
         }
         activeIfaces.add(safeId);
-        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, iface);
+        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, (0, import_coerce.sanitizeForLog)(iface));
         await this.createAndSetState(
           `${sysId}.network.interfaces.${safeId}.up`,
           this.numCommon((0, import_i18n.tName)("ifaceUp"), "B/s"),
@@ -1272,13 +1300,14 @@ class StateManager {
     if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
       await this.ensureChannel(`${sysId}.gpu`, (0, import_i18n.tName)("channelGpu"));
       const activeGpus = /* @__PURE__ */ new Set();
+      const seenGpus = /* @__PURE__ */ new Set();
       for (const [gpuId, gpuData] of Object.entries(stats.g)) {
-        const safeId = this.sanitize(gpuId);
+        const safeId = this.resolveChildId(gpuId, gpuId, seenGpus);
         if (!safeId) {
           continue;
         }
         activeGpus.add(safeId);
-        await this.ensureChannel(`${sysId}.gpu.${safeId}`, (_e = gpuData.n) != null ? _e : gpuId);
+        await this.ensureChannel(`${sysId}.gpu.${safeId}`, (0, import_coerce.sanitizeForLog)((_e = gpuData.n) != null ? _e : gpuId));
         await this.createAndSetState(
           `${sysId}.gpu.${safeId}.usage`,
           this.percentCommon((0, import_i18n.tName)("gpuUsage")),
@@ -1306,14 +1335,15 @@ class StateManager {
             (_j = gpuData.pp) != null ? _j : null
           );
           const activeEngines = /* @__PURE__ */ new Set();
+          const seenEngines = /* @__PURE__ */ new Set();
           if (gpuData.e && Object.keys(gpuData.e).length > 0) {
             await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, (0, import_i18n.tName)("channelEngines"));
             for (const [engine, value] of Object.entries(gpuData.e)) {
-              const safeEngine = this.sanitize(engine);
+              const safeEngine = this.resolveChildId(engine, engine, seenEngines);
               if (safeEngine) {
                 await this.createAndSetState(
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                  this.percentCommon(engine),
+                  this.percentCommon((0, import_coerce.sanitizeForLog)(engine)),
                   value
                 );
                 activeEngines.add(safeEngine);
@@ -1328,13 +1358,14 @@ class StateManager {
     if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
       await this.ensureChannel(`${sysId}.filesystems`, (0, import_i18n.tName)("channelFilesystems"));
       const activeFs = /* @__PURE__ */ new Set();
+      const seenFs = /* @__PURE__ */ new Set();
       for (const [fsName, fsData] of Object.entries(stats.efs)) {
-        const safeId = this.sanitize(fsName);
+        const safeId = this.resolveChildId(fsName, fsName, seenFs);
         if (!safeId) {
           continue;
         }
         activeFs.add(safeId);
-        await this.ensureChannel(`${sysId}.filesystems.${safeId}`, fsName);
+        await this.ensureChannel(`${sysId}.filesystems.${safeId}`, (0, import_coerce.sanitizeForLog)(fsName));
         const total = (_k = fsData.d) != null ? _k : null;
         const used = (_l = fsData.du) != null ? _l : null;
         const percent = total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
@@ -1367,28 +1398,34 @@ class StateManager {
       await this.pruneDynamicChildren(`${sysId}.filesystems`, activeFs, "channel");
     }
   }
-  async updateContainers(sysId, systemId, allContainers) {
-    var _a;
+  async updateContainers(sysId, systemId, allContainers, skipPrune = false) {
+    var _a, _b;
     const sysContainers = allContainers.filter((c) => c.system === systemId);
-    const activeIds = /* @__PURE__ */ new Set();
+    const seenContainers = /* @__PURE__ */ new Set();
+    const resolvedIds = /* @__PURE__ */ new Map();
     for (const container of sysContainers) {
-      const cId = this.sanitize(container.name);
+      resolvedIds.set(container.id, this.resolveChildId(container.name, container.id, seenContainers));
+    }
+    const activeIds = /* @__PURE__ */ new Set();
+    for (const cId of resolvedIds.values()) {
       if (cId) {
         activeIds.add(cId);
       }
     }
-    await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
+    if (!skipPrune) {
+      await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
+    }
     if (sysContainers.length === 0) {
       return;
     }
     await this.ensureChannel(`${sysId}.containers`, (0, import_i18n.tName)("channelContainers"));
     const healthLabels = ["none", "starting", "healthy", "unhealthy"];
     for (const container of sysContainers) {
-      const cId = this.sanitize(container.name);
+      const cId = (_a = resolvedIds.get(container.id)) != null ? _a : "";
       if (cId.length === 0) {
         continue;
       }
-      await this.ensureChannel(`${sysId}.containers.${cId}`, container.name);
+      await this.ensureChannel(`${sysId}.containers.${cId}`, (0, import_coerce.sanitizeForLog)(container.name));
       await this.createAndSetState(
         `${sysId}.containers.${cId}.status`,
         this.textCommon((0, import_i18n.tName)("status")),
@@ -1398,7 +1435,7 @@ class StateManager {
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
         this.textCommon((0, import_i18n.tName)("containerHealth")),
-        (_a = healthLabels[healthIdx]) != null ? _a : "unknown"
+        (_b = healthLabels[healthIdx]) != null ? _b : "unknown"
       );
       await this.createAndSetState(
         `${sysId}.containers.${cId}.cpu`,

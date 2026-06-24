@@ -90,6 +90,24 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
   try {
     switch (obj.command) {
       case "checkConnection": {
+        // SEC-3a: checkConnection issues an outbound request to a caller-supplied
+        // host — restrict it to the config UIs (admin/web) so an arbitrary script
+        // (e.g. system.adapter.javascript.*) cannot use it as an SSRF / port-scan
+        // oracle. Fail-safe by construction: a MISSING `from` is allowed (the
+        // admin button must always work); only a PRESENT, non-UI origin is
+        // rejected, and the reject is logged at warn so an unexpected-but-legit
+        // origin is visible and recoverable — never a silent broken button.
+        const from = typeof obj.from === "string" ? obj.from : "";
+        if (from && !from.startsWith("system.adapter.admin.") && !from.startsWith("system.adapter.web.")) {
+          deps.log.warn(`checkConnection rejected from '${from}' — only the admin/web config UI may run it`);
+          deps.sendTo(
+            obj.from,
+            obj.command,
+            { success: false, message: "checkConnection is only available from the admin UI" },
+            obj.callback,
+          );
+          return;
+        }
         // v0.5.0 (S3): obj.message is typed `unknown` in @iobroker/types ≥7.1
         // — a script calling `sendTo("beszel", "checkConnection", null)` used
         // to throw on `.url` access. Coerce to a plain object first; missing

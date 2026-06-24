@@ -16,6 +16,8 @@ import {
   coerceSystemStatsRecord,
   coerceTimeoutMs,
   errText,
+  isPlaintextRemoteUrl,
+  sanitizeForLog,
   shouldFetchSystemDetails,
   validateHubUrl,
 } from "./coerce";
@@ -859,6 +861,59 @@ describe("coerce", () => {
       expect(coerceTimeoutMs(NaN)).to.equal(15_000);
       expect(coerceTimeoutMs(undefined)).to.equal(15_000);
       expect(coerceTimeoutMs("not a number")).to.equal(15_000);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // sanitizeForLog (SEC-8)
+  // -----------------------------------------------------------------------
+
+  describe("sanitizeForLog (SEC-8)", () => {
+    it("collapses CR/LF/Tab into a single space (no log forging)", () => {
+      expect(sanitizeForLog("a\nb\r\nc\td")).to.equal("a b c d");
+    });
+
+    it("leaves normal names unchanged", () => {
+      expect(sanitizeForLog("Core 0")).to.equal("Core 0");
+      expect(sanitizeForLog("coretemp_package0")).to.equal("coretemp_package0");
+    });
+
+    it("caps an oversized name and marks the truncation", () => {
+      const out = sanitizeForLog("x".repeat(5000));
+      expect(out).to.have.lengthOf(201); // 200 chars + ellipsis
+      expect(out.endsWith("…")).to.equal(true);
+    });
+
+    it("stringifies non-string input", () => {
+      expect(sanitizeForLog(42)).to.equal("42");
+      expect(sanitizeForLog(null)).to.equal("null");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // isPlaintextRemoteUrl (SEC-3b)
+  // -----------------------------------------------------------------------
+
+  describe("isPlaintextRemoteUrl (SEC-3b)", () => {
+    it("true for plain http to a remote host", () => {
+      expect(isPlaintextRemoteUrl("http://192.168.1.100:8090")).to.be.true;
+      expect(isPlaintextRemoteUrl("http://beszel.lan")).to.be.true;
+    });
+
+    it("false for https", () => {
+      expect(isPlaintextRemoteUrl("https://192.168.1.100:8090")).to.be.false;
+    });
+
+    it("false for http to a loopback host", () => {
+      expect(isPlaintextRemoteUrl("http://localhost:8090")).to.be.false;
+      expect(isPlaintextRemoteUrl("http://127.0.0.1:8090")).to.be.false;
+      expect(isPlaintextRemoteUrl("http://[::1]:8090")).to.be.false;
+    });
+
+    it("false for non-string / malformed input", () => {
+      expect(isPlaintextRemoteUrl(null)).to.be.false;
+      expect(isPlaintextRemoteUrl(undefined)).to.be.false;
+      expect(isPlaintextRemoteUrl("not a url")).to.be.false;
     });
   });
 });

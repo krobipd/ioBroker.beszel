@@ -35,6 +35,8 @@ __export(coerce_exports, {
   coerceSystemStatsRecord: () => coerceSystemStatsRecord,
   coerceTimeoutMs: () => coerceTimeoutMs,
   errText: () => errText,
+  isPlaintextRemoteUrl: () => isPlaintextRemoteUrl,
+  sanitizeForLog: () => sanitizeForLog,
   shouldFetchSystemDetails: () => shouldFetchSystemDetails,
   validateHubUrl: () => validateHubUrl
 });
@@ -78,6 +80,11 @@ function errText(err) {
   } catch {
     return Object.prototype.toString.call(err);
   }
+}
+function sanitizeForLog(value, maxLength = 200) {
+  const s = typeof value === "string" ? value : String(value);
+  const oneLine = s.replace(/[\r\n\t]+/g, " ");
+  return oneLine.length > maxLength ? `${oneLine.slice(0, maxLength)}\u2026` : oneLine;
 }
 function coerceObject(value) {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
@@ -462,6 +469,21 @@ function validateHubUrl(url) {
     return "URL is malformed";
   }
 }
+function isPlaintextRemoteUrl(url) {
+  if (typeof url !== "string") {
+    return false;
+  }
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "http:") {
+      return false;
+    }
+    const host = u.hostname.toLowerCase();
+    return host !== "localhost" && host !== "127.0.0.1" && host !== "::1" && host !== "[::1]";
+  } catch {
+    return false;
+  }
+}
 function coercePollInterval(raw) {
   const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
   if (!Number.isFinite(n)) {
@@ -531,6 +553,8 @@ function coerceAuthResponse(value) {
   coerceSystemStatsRecord,
   coerceTimeoutMs,
   errText,
+  isPlaintextRemoteUrl,
+  sanitizeForLog,
   shouldFetchSystemDetails,
   validateHubUrl
 });

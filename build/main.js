@@ -68,6 +68,13 @@ class BeszelAdapter extends utils.Adapter {
   pollTimer = void 0;
   isPolling = false;
   lastSystemCount = 0;
+  /**
+   * F2: was the previous poll's container fetch empty? Used to debounce the
+   * container prune — a single empty getContainers() response (transient Hub
+   * glitch) must not wipe every container channel; only a second consecutive
+   * empty result prunes. A non-empty response prunes removed containers at once.
+   */
+  lastContainersEmpty = false;
   lastErrorCode = "";
   authFailCount = 0;
   failedSystems = /* @__PURE__ */ new Set();
@@ -121,6 +128,11 @@ class BeszelAdapter extends utils.Adapter {
       if (urlError) {
         this.log.error(`Beszel Hub URL is invalid \u2014 ${urlError}. Adapter will not start.`);
         return;
+      }
+      if ((0, import_coerce.isPlaintextRemoteUrl)(config.url)) {
+        this.log.warn(
+          "Beszel Hub URL uses plain http to a remote host \u2014 credentials and token travel the network in cleartext. Use https if the Hub is reachable beyond this machine."
+        );
       }
       const timeoutMs = (0, import_coerce.coerceTimeoutMs)(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
@@ -232,6 +244,8 @@ class BeszelAdapter extends utils.Adapter {
         config.metrics_containers ? this.client.getContainers() : Promise.resolve([]),
         this.client.getLatestStats()
       ]);
+      const containersFetchEmpty = config.metrics_containers && containers.length === 0;
+      const skipContainerPrune = containersFetchEmpty && !this.lastContainersEmpty;
       await this.setStateAsync("info.connection", { val: true, ack: true });
       if (config.metrics_agentVersion) {
         const needFetch = (0, import_coerce.shouldFetchSystemDetails)(
@@ -239,14 +253,21 @@ class BeszelAdapter extends utils.Adapter {
           this.detailsAttempted
         );
         if (needFetch) {
+          let markAttempted = true;
           try {
             this.systemDetails = await this.client.getSystemDetails();
             this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
           } catch (err) {
-            this.log.debug(`system_details fetch failed (non-fatal): ${(0, import_coerce.errText)(err)}`);
+            const code = this.classifyError(err);
+            markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
+            this.log.debug(
+              `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${(0, import_coerce.errText)(err)}`
+            );
           }
-          for (const s of systems) {
-            this.detailsAttempted.add(s.id);
+          if (markAttempted) {
+            for (const s of systems) {
+              this.detailsAttempted.add(s.id);
+            }
           }
         }
         for (const system of systems) {
@@ -261,11 +282,13 @@ class BeszelAdapter extends utils.Adapter {
         systems.map(async (system) => {
           try {
             const stats = statsMap.get(system.id);
-            this.log.debug(`updateSystem: '${system.name}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`);
-            await this.stateManager.updateSystem(system, stats, containers, config);
+            this.log.debug(
+              `updateSystem: '${(0, import_coerce.sanitizeForLog)(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`
+            );
+            await this.stateManager.updateSystem(system, stats, containers, config, skipContainerPrune);
             this.failedSystems.delete(system.name);
           } catch (err) {
-            const msg = `Failed to update system '${system.name}': ${(0, import_coerce.errText)(err)}`;
+            const msg = `Failed to update system '${(0, import_coerce.sanitizeForLog)(system.name)}': ${(0, import_coerce.errText)(err)}`;
             if (this.failedSystems.has(system.name)) {
               this.log.debug(msg);
             } else {
@@ -275,7 +298,7 @@ class BeszelAdapter extends utils.Adapter {
           }
         })
       );
-      if (systems.length > 0 || this.lastSystemCount === 0) {
+      if (systems.length > 0) {
         await this.stateManager.cleanupSystems(systems.map((s) => s.name));
         const activeNames = new Set(systems.map((s) => s.name));
         for (const name of [...this.failedSystems]) {
@@ -296,6 +319,7 @@ class BeszelAdapter extends utils.Adapter {
         }
       }
       this.lastSystemCount = systems.length;
+      this.lastContainersEmpty = containersFetchEmpty;
       this.authFailCount = 0;
       if (this.lastErrorCode) {
         this.log.info("Connection restored");
@@ -328,7 +352,8 @@ class BeszelAdapter extends utils.Adapter {
       } else if (errorCode === "NETWORK") {
         this.log.warn("Cannot reach Beszel Hub \u2014 will keep retrying");
       } else {
-        this.log.error(`Poll failed: ${errMsg}`);
+        this.log.error(`Poll failed (${errorCode})`);
+        this.log.debug(`Poll failed: ${errMsg}`);
       }
       await this.setStateAsync("info.connection", { val: false, ack: true });
     } finally {

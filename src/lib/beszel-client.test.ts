@@ -1286,4 +1286,26 @@ describe("BeszelClient", () => {
       }
     }, 5000);
   });
+
+  // -----------------------------------------------------------------------
+  // SEC-5 — oversized response guard
+  // -----------------------------------------------------------------------
+
+  describe("SEC-5: oversized response guard", () => {
+    it("aborts a response that exceeds the size cap instead of buffering it (OOM guard)", async () => {
+      // 16.5 MiB body — over the 16 MiB cap. A normal 200-record page is far smaller.
+      const huge = "x".repeat(16 * 1024 * 1024 + 512 * 1024);
+      mock = createMockServer({ systemsHandler: () => ({ status: 200, body: huge }) });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      let threw = false;
+      try {
+        await client.getSystems();
+      } catch (err) {
+        threw = true;
+        expect((err as Error).message).to.match(/exceeded/i);
+      }
+      expect(threw).to.equal(true);
+    }, 10000);
+  });
 });

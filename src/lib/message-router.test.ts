@@ -51,7 +51,9 @@ function makeHarness(checkConnectionResult?: { success: boolean; message: string
 function buildMessage(overrides: Partial<ioBroker.Message>): ioBroker.Message {
   return {
     command: "checkConnection",
-    from: "system.adapter.test.0",
+    // SEC-3a: checkConnection is gated to the admin/web config UI; the default
+    // sender mimics the real admin "Test Connection" button origin.
+    from: "system.adapter.admin.0",
     callback: { id: 1, message: "x", time: 0, ack: false } as ioBroker.MessageCallbackInfo,
     message: undefined,
     ...overrides,
@@ -234,6 +236,49 @@ describe("dispatchMessage", () => {
 
       expect(h.registered).to.have.lengthOf(0);
       expect(h.completed).to.have.lengthOf(0);
+    });
+  });
+
+  describe("origin gate (SEC-3a)", () => {
+    it("rejects checkConnection from a non-UI origin (e.g. a script) without making the request", async () => {
+      const h = makeHarness({ success: true, message: "ok" });
+      await dispatchMessage(
+        buildMessage({
+          from: "system.adapter.javascript.0",
+          message: { url: "http://h", username: "u", password: "p" },
+        }),
+        h.deps,
+      );
+      // SSRF guard: no outbound test-client is ever created for a script origin.
+      expect(h.createdClients).to.have.lengthOf(0);
+      expect(h.sends).to.have.lengthOf(1);
+      expect((h.sends[0].response as { success: boolean }).success).to.equal(false);
+      // the reject is visible at warn (so an unexpected-but-legit origin is recoverable).
+      expect(h.logs.some(l => l.level === "warn" && l.msg.includes("rejected"))).to.equal(true);
+    });
+
+    it("allows checkConnection when the origin is missing (fail-safe — button must work)", async () => {
+      const h = makeHarness({ success: true, message: "ok" });
+      await dispatchMessage(
+        buildMessage({
+          from: undefined as unknown as ioBroker.Message["from"],
+          message: { url: "http://h", username: "u", password: "p" },
+        }),
+        h.deps,
+      );
+      expect(h.createdClients).to.have.lengthOf(1);
+    });
+
+    it("allows checkConnection from the web config UI", async () => {
+      const h = makeHarness({ success: true, message: "ok" });
+      await dispatchMessage(
+        buildMessage({
+          from: "system.adapter.web.0",
+          message: { url: "http://h", username: "u", password: "p" },
+        }),
+        h.deps,
+      );
+      expect(h.createdClients).to.have.lengthOf(1);
     });
   });
 });

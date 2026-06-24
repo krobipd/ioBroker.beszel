@@ -39,6 +39,7 @@ const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1e3;
 const DEFAULT_TIMEOUT_MS = 15e3;
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
+const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 class BeszelClient {
   baseUrl;
   username;
@@ -337,11 +338,19 @@ class BeszelClient {
       };
       const req = transport.request(options, (res) => {
         const chunks = [];
+        let received = 0;
         res.on("error", (err) => {
           cleanup();
           reject(err);
         });
-        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("data", (chunk) => {
+          received += chunk.length;
+          if (received > MAX_RESPONSE_BYTES) {
+            req.destroy(new Error(`Response from ${path} exceeded ${MAX_RESPONSE_BYTES} bytes`));
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on("end", () => {
           var _a3, _b, _c, _d;
           cleanup();

@@ -2,7 +2,15 @@ import * as utils from "@iobroker/adapter-core";
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { BeszelClient } from "./lib/beszel-client";
-import { coercePollInterval, coerceTimeoutMs, errText, shouldFetchSystemDetails, validateHubUrl } from "./lib/coerce";
+import {
+  coercePollInterval,
+  coerceTimeoutMs,
+  errText,
+  isPlaintextRemoteUrl,
+  sanitizeForLog,
+  shouldFetchSystemDetails,
+  validateHubUrl,
+} from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig, SystemDetails } from "./lib/types";
@@ -48,6 +56,13 @@ export class BeszelAdapter extends utils.Adapter {
   private pollTimer: ioBroker.Interval | undefined = undefined;
   private isPolling = false;
   private lastSystemCount = 0;
+  /**
+   * F2: was the previous poll's container fetch empty? Used to debounce the
+   * container prune — a single empty getContainers() response (transient Hub
+   * glitch) must not wipe every container channel; only a second consecutive
+   * empty result prunes. A non-empty response prunes removed containers at once.
+   */
+  private lastContainersEmpty = false;
   private lastErrorCode = "";
   private authFailCount = 0;
   private failedSystems = new Set<string>();
@@ -107,6 +122,13 @@ export class BeszelAdapter extends utils.Adapter {
       if (urlError) {
         this.log.error(`Beszel Hub URL is invalid — ${urlError}. Adapter will not start.`);
         return;
+      }
+      // SEC-3b: warn (do not block) when the Hub is reached over plain http on a
+      // remote host — login + token then cross the network in cleartext.
+      if (isPlaintextRemoteUrl(config.url)) {
+        this.log.warn(
+          "Beszel Hub URL uses plain http to a remote host — credentials and token travel the network in cleartext. Use https if the Hub is reachable beyond this machine.",
+        );
       }
 
       const timeoutMs = coerceTimeoutMs(config.requestTimeout);
@@ -257,6 +279,13 @@ export class BeszelAdapter extends utils.Adapter {
         this.client.getLatestStats(),
       ]);
 
+      // F2: debounce container pruning. A single empty getContainers() result
+      // (a transient Hub glitch) must not wipe every container channel — only a
+      // second consecutive empty result prunes; a non-empty result prunes
+      // removed containers at once. Only relevant while containers are polled.
+      const containersFetchEmpty = config.metrics_containers && containers.length === 0;
+      const skipContainerPrune = containersFetchEmpty && !this.lastContainersEmpty;
+
       // Update connection state
       await this.setStateAsync("info.connection", { val: true, ack: true });
 
@@ -278,14 +307,25 @@ export class BeszelAdapter extends utils.Adapter {
           this.detailsAttempted,
         );
         if (needFetch) {
+          let markAttempted = true;
           try {
             this.systemDetails = await this.client.getSystemDetails();
             this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
           } catch (err) {
-            this.log.debug(`system_details fetch failed (non-fatal): ${errText(err)}`);
+            // F3: only a DEFINITIVE failure (e.g. a 404 on an older Hub without
+            // the collection) marks the systems attempted so we stop refetching.
+            // A transient NETWORK/TIMEOUT failure must be retried next poll instead
+            // of suppressing hardware info until the next adapter restart.
+            const code = this.classifyError(err);
+            markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
+            this.log.debug(
+              `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${errText(err)}`,
+            );
           }
-          for (const s of systems) {
-            this.detailsAttempted.add(s.id);
+          if (markAttempted) {
+            for (const s of systems) {
+              this.detailsAttempted.add(s.id);
+            }
           }
         }
         for (const system of systems) {
@@ -310,11 +350,13 @@ export class BeszelAdapter extends utils.Adapter {
             // v0.4.4 (F1): per-system entry. ~6 systems × 1440 polls/day at
             // default 60s interval = ~8640 lines/day — acceptable at debug.
             // Line stays short (name + truncated id + hasStats only).
-            this.log.debug(`updateSystem: '${system.name}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`);
-            await this.stateManager!.updateSystem(system, stats, containers, config);
+            this.log.debug(
+              `updateSystem: '${sanitizeForLog(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`,
+            );
+            await this.stateManager!.updateSystem(system, stats, containers, config, skipContainerPrune);
             this.failedSystems.delete(system.name);
           } catch (err) {
-            const msg = `Failed to update system '${system.name}': ${errText(err)}`;
+            const msg = `Failed to update system '${sanitizeForLog(system.name)}': ${errText(err)}`;
             if (this.failedSystems.has(system.name)) {
               this.log.debug(msg);
             } else {
@@ -325,9 +367,11 @@ export class BeszelAdapter extends utils.Adapter {
         }),
       );
 
-      // Cleanup stale systems — but only if we actually got results.
-      // An empty list during a transient API issue must NOT wipe all devices.
-      if (systems.length > 0 || this.lastSystemCount === 0) {
+      // Cleanup stale systems — but ONLY on a non-empty result. An empty list
+      // (transient API issue, or a Hub momentarily reporting zero systems right
+      // after a restart) must NEVER wipe the device trees. A genuinely empty
+      // install has nothing to clean up anyway. (F1)
+      if (systems.length > 0) {
         await this.stateManager.cleanupSystems(systems.map(s => s.name));
         // v0.7.2: prune the per-system bookkeeping along with the states —
         // otherwise the maps grow forever across add/remove cycles, and a
@@ -354,6 +398,7 @@ export class BeszelAdapter extends utils.Adapter {
       }
 
       this.lastSystemCount = systems.length;
+      this.lastContainersEmpty = containersFetchEmpty;
       this.authFailCount = 0;
 
       // Clear error state on success
@@ -390,7 +435,11 @@ export class BeszelAdapter extends utils.Adapter {
       } else if (errorCode === "NETWORK") {
         this.log.warn("Cannot reach Beszel Hub — will keep retrying");
       } else {
-        this.log.error(`Poll failed: ${errMsg}`);
+        // SEC-1: the dynamic message can carry a Hub response snippet / URL —
+        // keep it at debug; the error-level line (captured by opt-in Sentry)
+        // carries only the error class, no Hub-supplied content.
+        this.log.error(`Poll failed (${errorCode})`);
+        this.log.debug(`Poll failed: ${errMsg}`);
       }
 
       await this.setStateAsync("info.connection", { val: false, ack: true });
