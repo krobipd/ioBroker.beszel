@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.7.2",
+    "version": "0.8.0",
     "news": {
-      "NEXT": {
+      "0.8.0": {
         "en": "A brief empty response from the Hub no longer deletes your monitored devices or containers, for example right after a restart.",
         "de": "Eine kurz leere Antwort des Hubs löscht nicht mehr deine überwachten Geräte oder Container, zum Beispiel direkt nach einem Neustart.",
         "ru": "Кратковременный пустой ответ хаба больше не удаляет ваши отслеживаемые устройства или контейнеры, например сразу после перезапуска.",

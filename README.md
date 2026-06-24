@@ -213,7 +213,7 @@ beszel.0.
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.8.0 (2026-06-24)
 
 - A brief empty response from the Hub no longer deletes your devices or containers — for example right after a restart — so monitored systems and their history stay intact.
 - Server hardware and OS details now recover on their own after a short network problem, instead of staying empty until the adapter is restarted.
@@ -246,11 +246,6 @@ beszel.0.
 - An expired session is now refreshed automatically during a poll, so a single token timeout no longer skips a data update.
 - Fixed GPU memory unit: now correctly shown in MB (was wrongly labeled GB). Existing GPU users: delete the old `gpu.*` states once and restart to get the new unit.
 - Fixed battery charging indicator: now only true while actually charging (previously also true while discharging or full).
-
-### 0.5.12 (2026-05-23)
-
-- Reduced unnecessary state-change events by skipping writes when the value has not changed.
-- Fixed duplicate error messages that could appear when running in compact mode.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
