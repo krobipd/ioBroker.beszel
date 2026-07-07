@@ -8,8 +8,6 @@
     "label_pollInterval": "Abfrageintervall (s)",
     "help_pollInterval": "Wie oft Daten vom Beszel Hub abgerufen werden (10–300 Sekunden)",
     "btn_checkConnection": "Verbindung testen",
-    "msg_connectionOk": "Verbindung erfolgreich",
-    "msg_connectionFailed": "Verbindung fehlgeschlagen",
     "header_system": "System",
     "header_cpu": "CPU",
     "header_memory": "Arbeitsspeicher",

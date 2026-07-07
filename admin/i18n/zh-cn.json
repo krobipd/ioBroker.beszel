@@ -8,8 +8,6 @@
     "label_pollInterval": "轮询间隔（秒）",
     "help_pollInterval": "从 Beszel Hub 获取数据的频率（10–300 秒）",
     "btn_checkConnection": "测试连接",
-    "msg_connectionOk": "连接成功",
-    "msg_connectionFailed": "连接失败",
     "header_system": "系统",
     "header_cpu": "CPU",
     "header_memory": "内存",

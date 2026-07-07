@@ -8,8 +8,6 @@
     "label_pollInterval": "Pollinginterval (s)",
     "help_pollInterval": "Hoe vaak gegevens ophalen van Beszel Hub (10–300 seconden)",
     "btn_checkConnection": "Verbinding testen",
-    "msg_connectionOk": "Verbinding geslaagd",
-    "msg_connectionFailed": "Verbinding mislukt",
     "header_system": "Systeem",
     "header_cpu": "CPU",
     "header_memory": "Geheugen",

@@ -8,8 +8,6 @@
     "label_pollInterval": "Інтервал опитування (с)",
     "help_pollInterval": "Як часто отримувати дані від Beszel Hub (10–300 секунд)",
     "btn_checkConnection": "Перевірити підключення",
-    "msg_connectionOk": "Підключення успішне",
-    "msg_connectionFailed": "Помилка підключення",
     "header_system": "Система",
     "header_cpu": "ЦПП",
     "header_memory": "Пам'ять",

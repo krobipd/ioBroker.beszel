@@ -103,7 +103,7 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
           deps.sendTo(
             obj.from,
             obj.command,
-            { success: false, message: "checkConnection is only available from the admin UI" },
+            { error: "checkConnection is only available from the admin UI" },
             obj.callback,
           );
           return;
@@ -121,15 +121,7 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         if (!url || !username || !password) {
           // v0.4.4 (H2): trace missing-config before sendTo.
           deps.log.debug("checkConnection: missing url/username/password in message");
-          deps.sendTo(
-            obj.from,
-            obj.command,
-            {
-              success: false,
-              message: "URL, username and password are required",
-            },
-            obj.callback,
-          );
+          deps.sendTo(obj.from, obj.command, { error: "URL, username and password are required" }, obj.callback);
           return;
         }
 
@@ -142,7 +134,16 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
           const result = await testClient.checkConnection();
           // v0.4.4 (H3): trace checkConnection result.
           deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
-          deps.sendTo(obj.from, obj.command, result, obj.callback);
+          // H1: the admin ConfigSendto component reads ONLY response.error/result —
+          // never success/message. Map the internal {success,message} to that
+          // contract so a FAILED test shows the real error instead of a
+          // false-positive "Ok" (fleet fix, see reference_jsonconfig_sendto_connection_test).
+          deps.sendTo(
+            obj.from,
+            obj.command,
+            result.success ? { result: result.message } : { error: result.message },
+            obj.callback,
+          );
         } finally {
           deps.onTestClientDone?.(testClient);
         }
@@ -158,8 +159,8 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
     }
   } catch (err) {
     // v0.4.4 (H5): trace catch so the debug log shows what failed.
-    // The sendTo back to the caller is preserved unchanged.
+    // H1: {error} contract so the admin surfaces the failure (not a false "Ok").
     deps.log.debug(`onMessage: '${obj.command}' failed: ${errText(err)}`);
-    deps.sendTo(obj.from, obj.command, { success: false, message: errText(err) }, obj.callback);
+    deps.sendTo(obj.from, obj.command, { error: errText(err) }, obj.callback);
   }
 }

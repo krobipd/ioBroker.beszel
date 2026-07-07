@@ -8,8 +8,6 @@
     "label_pollInterval": "Interwał odpytywania (s)",
     "help_pollInterval": "Jak często pobierać dane z Beszel Hub (10–300 sekund)",
     "btn_checkConnection": "Testuj połączenie",
-    "msg_connectionOk": "Połączenie udane",
-    "msg_connectionFailed": "Połączenie nieudane",
     "header_system": "System",
     "header_cpu": "CPU",
     "header_memory": "Pamięć",

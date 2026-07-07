@@ -42,7 +42,7 @@ async function dispatchMessage(obj, deps) {
           deps.sendTo(
             obj.from,
             obj.command,
-            { success: false, message: "checkConnection is only available from the admin UI" },
+            { error: "checkConnection is only available from the admin UI" },
             obj.callback
           );
           return;
@@ -54,15 +54,7 @@ async function dispatchMessage(obj, deps) {
         const password = typeof config.password === "string" ? config.password : "";
         if (!url || !username || !password) {
           deps.log.debug("checkConnection: missing url/username/password in message");
-          deps.sendTo(
-            obj.from,
-            obj.command,
-            {
-              success: false,
-              message: "URL, username and password are required"
-            },
-            obj.callback
-          );
+          deps.sendTo(obj.from, obj.command, { error: "URL, username and password are required" }, obj.callback);
           return;
         }
         const testClient = deps.createTestClient(url, username, password);
@@ -70,7 +62,12 @@ async function dispatchMessage(obj, deps) {
         try {
           const result = await testClient.checkConnection();
           deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
-          deps.sendTo(obj.from, obj.command, result, obj.callback);
+          deps.sendTo(
+            obj.from,
+            obj.command,
+            result.success ? { result: result.message } : { error: result.message },
+            obj.callback
+          );
         } finally {
           (_c = deps.onTestClientDone) == null ? void 0 : _c.call(deps, testClient);
         }
@@ -82,7 +79,7 @@ async function dispatchMessage(obj, deps) {
     }
   } catch (err) {
     deps.log.debug(`onMessage: '${obj.command}' failed: ${(0, import_coerce.errText)(err)}`);
-    deps.sendTo(obj.from, obj.command, { success: false, message: (0, import_coerce.errText)(err) }, obj.callback);
+    deps.sendTo(obj.from, obj.command, { error: (0, import_coerce.errText)(err) }, obj.callback);
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

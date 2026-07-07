@@ -115,10 +115,7 @@ describe("dispatchMessage", () => {
       );
 
       expect(h.sends).to.have.lengthOf(1);
-      expect(h.sends[0].response).to.deep.equal({
-        success: false,
-        message: "URL, username and password are required",
-      });
+      expect(h.sends[0].response).to.deep.equal({ error: "URL, username and password are required" });
       expect(h.createdClients).to.have.lengthOf(0);
     });
 
@@ -134,7 +131,25 @@ describe("dispatchMessage", () => {
 
       expect(h.createdClients).to.deep.equal([{ url: "http://h", username: "u", password: "p" }]);
       expect(h.sends).to.have.lengthOf(1);
-      expect(h.sends[0].response).to.deep.equal({ success: true, message: "Connected successfully" });
+      // H1: success maps to the { result } contract the admin ConfigSendto reads.
+      expect(h.sends[0].response).to.deep.equal({ result: "Connected successfully" });
+    });
+
+    it("H1: a FAILED connection maps to { error } — never a false-positive success", async () => {
+      const h = makeHarness({ success: false, message: "Authentication failed — check username and password" });
+      await dispatchMessage(
+        buildMessage({
+          command: "checkConnection",
+          message: { url: "http://h", username: "u", password: "wrong" },
+        }),
+        h.deps,
+      );
+
+      expect(h.sends).to.have.lengthOf(1);
+      // The admin reads ONLY response.error/result. A failure MUST carry `error`
+      // (not success/message) or ConfigSendto falls through to a green "Ok".
+      expect(h.sends[0].response).to.deep.equal({ error: "Authentication failed — check username and password" });
+      expect(h.sends[0].response).to.not.have.property("success");
     });
   });
 
@@ -144,10 +159,7 @@ describe("dispatchMessage", () => {
       await dispatchMessage(buildMessage({ message: null as unknown as ioBroker.Message["message"] }), h.deps);
 
       expect(h.sends).to.have.lengthOf(1);
-      expect(h.sends[0].response).to.deep.equal({
-        success: false,
-        message: "URL, username and password are required",
-      });
+      expect(h.sends[0].response).to.deep.equal({ error: "URL, username and password are required" });
       expect(h.createdClients).to.have.lengthOf(0);
     });
 
@@ -156,7 +168,7 @@ describe("dispatchMessage", () => {
       await dispatchMessage(buildMessage({ message: "junk" as unknown as ioBroker.Message["message"] }), h.deps);
 
       expect(h.sends).to.have.lengthOf(1);
-      expect(h.sends[0].response).to.have.property("success", false);
+      expect(h.sends[0].response).to.have.property("error");
       expect(h.createdClients).to.have.lengthOf(0);
     });
 
@@ -165,7 +177,7 @@ describe("dispatchMessage", () => {
       await dispatchMessage(buildMessage({ message: [] as unknown as ioBroker.Message["message"] }), h.deps);
 
       expect(h.sends).to.have.lengthOf(1);
-      expect(h.sends[0].response).to.have.property("success", false);
+      expect(h.sends[0].response).to.have.property("error");
     });
   });
 
@@ -219,9 +231,9 @@ describe("dispatchMessage", () => {
       expect(registered).to.have.lengthOf(1);
       expect(completed).to.have.lengthOf(1);
       expect(registered[0]).to.equal(completed[0]);
-      // Outer catch sends the failure response.
+      // Outer catch sends the failure response via the { error } contract.
       expect(sends).to.have.lengthOf(1);
-      expect((sends[0].response as { success: boolean }).success).to.equal(false);
+      expect(sends[0].response).to.have.property("error");
     });
 
     it("missing-config path does NOT register a test-client (none was created)", async () => {
@@ -252,7 +264,7 @@ describe("dispatchMessage", () => {
       // SSRF guard: no outbound test-client is ever created for a script origin.
       expect(h.createdClients).to.have.lengthOf(0);
       expect(h.sends).to.have.lengthOf(1);
-      expect((h.sends[0].response as { success: boolean }).success).to.equal(false);
+      expect(h.sends[0].response).to.have.property("error");
       // the reject is visible at warn (so an unexpected-but-legit origin is recoverable).
       expect(h.logs.some(l => l.level === "warn" && l.msg.includes("rejected"))).to.equal(true);
     });

@@ -8,8 +8,6 @@
     "label_pollInterval": "Intervalle d'interrogation (s)",
     "help_pollInterval": "Fréquence de récupération des données depuis Beszel Hub (10–300 secondes)",
     "btn_checkConnection": "Tester la connexion",
-    "msg_connectionOk": "Connexion réussie",
-    "msg_connectionFailed": "Échec de la connexion",
     "header_system": "Système",
     "header_cpu": "CPU",
     "header_memory": "Mémoire",

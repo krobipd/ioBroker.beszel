@@ -8,8 +8,6 @@
     "label_pollInterval": "Intervalo de sondeo (s)",
     "help_pollInterval": "Con qué frecuencia obtener datos del Beszel Hub (10–300 segundos)",
     "btn_checkConnection": "Probar conexión",
-    "msg_connectionOk": "Conexión exitosa",
-    "msg_connectionFailed": "Error de conexión",
     "header_system": "Sistema",
     "header_cpu": "CPU",
     "header_memory": "Memoria",

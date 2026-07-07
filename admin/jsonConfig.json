@@ -65,10 +65,6 @@
           "command": "checkConnection",
           "jsonData": "{\"url\": \"${data.url}\", \"username\": \"${data.username}\", \"password\": \"${data.password}\"}",
           "label": "btn_checkConnection",
-          "result": {
-            "okText": "msg_connectionOk",
-            "errorText": "msg_connectionFailed"
-          },
           "xs": 12,
           "sm": 12,
           "md": 4,
