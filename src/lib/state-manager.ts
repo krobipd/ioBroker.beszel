@@ -1295,28 +1295,24 @@ export class StateManager {
     // creates it when the average (metrics_temperature) is enabled, but the
     // details can be on with the average off.
     if (config.metrics_temperatureDetails) {
-      const entries = stats.t ? Object.entries(stats.t) : [];
-      const activeSensors = new Set<string>();
-      if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.temperature`, this.channelName("temperature"));
-        await this.ensureChannel(`${sysId}.temperature.sensors`, this.channelName("sensors"));
-        const seenSensors = new Set<string>();
-        for (const [sensor, temp] of entries) {
-          const safeSensor = this.resolveChildId(sensor, sensor, seenSensors);
-          if (!safeSensor) {
-            continue;
-          }
-          activeSensors.add(safeSensor);
+      // v0.7.2 + H2: sensors are pruned even when every one vanished (debounced
+      // 2 polls so a transient empty response doesn't wipe them).
+      await this.syncDynamicGroup(
+        `${sysId}.temperature.sensors`,
+        stats.t ? Object.entries(stats.t) : [],
+        "state",
+        async () => {
+          await this.ensureChannel(`${sysId}.temperature`, this.channelName("temperature"));
+          await this.ensureChannel(`${sysId}.temperature.sensors`, this.channelName("sensors"));
+        },
+        async (safeSensor, sensor, temp) => {
           await this.createAndSetState(
             `${sysId}.temperature.sensors.${safeSensor}`,
             this.numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
             temp,
           );
-        }
-      }
-      // v0.7.2 + H2: prune renamed/removed sensors — runs even when every sensor
-      // vanished (debounced 2 polls so a transient empty response doesn't wipe them).
-      await this.pruneGroup(`${sysId}.temperature.sensors`, activeSensors, "state", entries.length === 0);
+        },
+      );
     }
 
     // Per-core CPU usage (v0.6.0). Core labels are positional (CPU0..), shown as-is.
@@ -1343,18 +1339,16 @@ export class StateManager {
     // US7: normalized to MB/s (speeds) + GB (totals) so per-interface matches the
     // MiB-based aggregate network.sent/recv scale instead of showing raw bytes.
     if (config.metrics_networkInterfaces) {
-      const entries = stats.ni ? Object.entries(stats.ni) : [];
-      const activeIfaces = new Set<string>();
-      if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.network`, this.channelName("network"));
-        await this.ensureChannel(`${sysId}.network.interfaces`, this.channelName("interfaces"));
-        const seenIfaces = new Set<string>();
-        for (const [iface, vals] of entries) {
-          const safeId = this.resolveChildId(iface, iface, seenIfaces);
-          if (!safeId) {
-            continue;
-          }
-          activeIfaces.add(safeId);
+      // v0.7.2 + H2: renamed/removed interfaces are pruned on drop-to-zero too (debounced).
+      await this.syncDynamicGroup(
+        `${sysId}.network.interfaces`,
+        stats.ni ? Object.entries(stats.ni) : [],
+        "channel",
+        async () => {
+          await this.ensureChannel(`${sysId}.network`, this.channelName("network"));
+          await this.ensureChannel(`${sysId}.network.interfaces`, this.channelName("interfaces"));
+        },
+        async (safeId, iface, vals) => {
           // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
           await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
           await this.createAndSetState(
@@ -1377,25 +1371,22 @@ export class StateManager {
             this.numCommon(tName("ifaceTotalDown"), "GB"),
             this.bytesToGib(vals[3]),
           );
-        }
-      }
-      // v0.7.2 + H2: prune renamed/removed interfaces — runs on drop-to-zero too (debounced).
-      await this.pruneGroup(`${sysId}.network.interfaces`, activeIfaces, "channel", entries.length === 0);
+        },
+      );
     }
 
     // GPU — gpuData.n is the raw vendor name; we keep it as a plain string.
+    // v0.7.2 + H2: a GPU that disappeared from the host (eGPU unplugged, VM
+    // passthrough change) used to keep its whole channel forever. Debounced.
     if (config.metrics_gpu) {
-      const entries = stats.g ? Object.entries(stats.g) : [];
-      const activeGpus = new Set<string>();
-      if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.gpu`, this.channelName("gpu"));
-        const seenGpus = new Set<string>();
-        for (const [gpuId, gpuData] of entries) {
-          const safeId = this.resolveChildId(gpuId, gpuId, seenGpus);
-          if (!safeId) {
-            continue;
-          }
-          activeGpus.add(safeId);
+      await this.syncDynamicGroup(
+        `${sysId}.gpu`,
+        stats.g ? Object.entries(stats.g) : [],
+        "channel",
+        async () => {
+          await this.ensureChannel(`${sysId}.gpu`, this.channelName("gpu"));
+        },
+        async (safeId, gpuId, gpuData) => {
           await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeForLog(gpuData.n ?? gpuId));
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
@@ -1417,54 +1408,47 @@ export class StateManager {
             this.numCommon(tName("gpuPower"), "W", "value.power"),
             gpuData.p ?? null,
           );
-          // GPU details (v0.6.0): package power + per-engine usage.
+          // GPU details (v0.6.0): package power + per-engine usage. Engines the
+          // driver stopped reporting get pruned (debounced) — nested group.
           if (config.metrics_gpuDetails) {
             await this.createAndSetState(
               `${sysId}.gpu.${safeId}.power_package`,
               this.numCommon(tName("gpuPowerPackage"), "W", "value.power"),
               gpuData.pp ?? null,
             );
-            const engineEntries = gpuData.e ? Object.entries(gpuData.e) : [];
-            const activeEngines = new Set<string>();
-            if (engineEntries.length > 0) {
-              await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, this.channelName("engines"));
-              const seenEngines = new Set<string>();
-              for (const [engine, value] of engineEntries) {
-                const safeEngine = this.resolveChildId(engine, engine, seenEngines);
-                if (safeEngine) {
-                  // Engine name is vendor-defined → kept as-is.
-                  await this.createAndSetState(
-                    `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                    this.percentCommon(sanitizeForLog(engine)),
-                    this.clampPercent(value),
-                  );
-                  activeEngines.add(safeEngine);
-                }
-              }
-            }
-            // v0.7.2 + H2: engines the driver stopped reporting get pruned (debounced).
-            await this.pruneGroup(`${sysId}.gpu.${safeId}.engines`, activeEngines, "state", engineEntries.length === 0);
+            await this.syncDynamicGroup(
+              `${sysId}.gpu.${safeId}.engines`,
+              gpuData.e ? Object.entries(gpuData.e) : [],
+              "state",
+              async () => {
+                await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, this.channelName("engines"));
+              },
+              async (safeEngine, engine, value) => {
+                // Engine name is vendor-defined → kept as-is.
+                await this.createAndSetState(
+                  `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
+                  this.percentCommon(sanitizeForLog(engine)),
+                  this.clampPercent(value),
+                );
+              },
+            );
           }
-        }
-      }
-      // v0.7.2 + H2: a GPU that disappeared from the host (eGPU unplugged, VM
-      // passthrough change) used to keep its whole channel forever. Debounced.
-      await this.pruneGroup(`${sysId}.gpu`, activeGpus, "channel", entries.length === 0);
+        },
+      );
     }
 
     // Extra filesystems — fsName is the raw mount path, kept as plain string.
+    // v0.7.2 + H2: an unmounted/renamed extra filesystem used to keep its
+    // channel with frozen values forever. Debounced for the drop-to-zero case.
     if (config.metrics_extraFs) {
-      const entries = stats.efs ? Object.entries(stats.efs) : [];
-      const activeFs = new Set<string>();
-      if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.filesystems`, this.channelName("filesystems"));
-        const seenFs = new Set<string>();
-        for (const [fsName, fsData] of entries) {
-          const safeId = this.resolveChildId(fsName, fsName, seenFs);
-          if (!safeId) {
-            continue;
-          }
-          activeFs.add(safeId);
+      await this.syncDynamicGroup(
+        `${sysId}.filesystems`,
+        stats.efs ? Object.entries(stats.efs) : [],
+        "channel",
+        async () => {
+          await this.ensureChannel(`${sysId}.filesystems`, this.channelName("filesystems"));
+        },
+        async (safeId, fsName, fsData) => {
           await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeForLog(fsName));
 
           const total = fsData.d ?? null;
@@ -1502,11 +1486,8 @@ export class StateManager {
             this.numCommon(tName("writeSpeed"), "MB/s"),
             fsData.w ?? null,
           );
-        }
-      }
-      // v0.7.2 + H2: an unmounted/renamed extra filesystem used to keep its
-      // channel with frozen values forever. Debounced for the drop-to-zero case.
-      await this.pruneGroup(`${sysId}.filesystems`, activeFs, "channel", entries.length === 0);
+        },
+      );
     }
   }
 
@@ -1590,6 +1571,44 @@ export class StateManager {
         );
       }
     }
+  }
+
+  /**
+   * D3: run one dynamic group's lifecycle — the scaffold shared by the sensor /
+   * interface / GPU / filesystem / engine groups. Ensures the parent channel(s),
+   * iterates the entries with SEC-6 collision-safe child-id resolution, tracks
+   * the active ids, and prunes disappeared members (drop-to-zero debounced).
+   * Only the parent-ensure and per-item work vary, so they are callbacks. The
+   * per-core group stays hand-written: its children are positional (`core0`..),
+   * not an `Object.entries` map, so it does not fit this shape.
+   *
+   * @param base Group prefix (e.g. `systems.<safeName>.gpu`).
+   * @param entries The group's `[rawId, data]` pairs (empty array when absent).
+   * @param childType Object type of the direct children (`channel` or `state`).
+   * @param ensureParents Creates the parent channel(s); run once before the loop.
+   * @param perItem Creates the child channel/states for one collision-safe id.
+   */
+  private async syncDynamicGroup<T>(
+    base: string,
+    entries: [string, T][],
+    childType: "channel" | "state",
+    ensureParents: () => Promise<void>,
+    perItem: (safeId: string, rawId: string, data: T) => Promise<void>,
+  ): Promise<void> {
+    const active = new Set<string>();
+    if (entries.length > 0) {
+      await ensureParents();
+      const seen = new Set<string>();
+      for (const [rawId, data] of entries) {
+        const safeId = this.resolveChildId(rawId, rawId, seen);
+        if (!safeId) {
+          continue;
+        }
+        active.add(safeId);
+        await perItem(safeId, rawId, data);
+      }
+    }
+    await this.pruneGroup(base, active, childType, entries.length === 0);
   }
 
   /**
