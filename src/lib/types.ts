@@ -340,9 +340,4 @@ export interface AuthResponse {
  * uses ETIMEDOUT so classification no longer depends on a message substring (N6).
  */
 export type BeszelErrorCode =
-  | "UNAUTHORIZED"
-  | "FORBIDDEN"
-  | "RATE_LIMITED"
-  | "HTTP_ERROR"
-  | "INVALID_AUTH_RESPONSE"
-  | "ETIMEDOUT";
+  "UNAUTHORIZED" | "FORBIDDEN" | "RATE_LIMITED" | "HTTP_ERROR" | "INVALID_AUTH_RESPONSE" | "ETIMEDOUT";
