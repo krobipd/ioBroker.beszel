@@ -159,6 +159,8 @@
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
   "systemsAllUp": "All systems online",
-  "help_username": "The email/login you use for the Beszel web UI (PocketBase authenticates by email).",
-  "help_password": "The password for that Beszel login."
+  "help_username": "用于 Beszel 网页界面的邮箱/登录名（PocketBase 通过邮箱进行身份验证）。",
+  "help_password": "该 Beszel 登录的密码。",
+  "connectionStatus": "连接状态",
+  "channelSystems": "受监控的系统"
 }

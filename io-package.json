@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "news": {
+      "0.9.0": {
+        "en": "The connection test now correctly reports a failure when your login is wrong, and states for a sensor, disk or interface that disappears are removed instead of frozen at their last value.",
+        "de": "Der Verbindungstest meldet jetzt korrekt einen Fehler, wenn die Anmeldung falsch ist, und Datenpunkte eines verschwundenen Sensors, einer Platte oder Schnittstelle werden entfernt statt eingefroren.",
+        "ru": "Проверка подключения теперь правильно сообщает об ошибке при неверном входе, а состояния исчезнувшего датчика, диска или интерфейса удаляются, а не остаются замороженными.",
+        "pt": "O teste de ligação comunica agora corretamente uma falha quando o início de sessão está errado, e os estados de um sensor, disco ou interface que desaparece são removidos em vez de congelados.",
+        "nl": "De verbindingstest meldt nu correct een fout bij verkeerde inloggegevens, en toestanden van een verdwenen sensor, schijf of interface worden verwijderd in plaats van bevroren.",
+        "fr": "Le test de connexion signale désormais correctement un échec quand l'identifiant est faux, et les états d'un capteur, disque ou interface disparu sont supprimés au lieu d'être figés.",
+        "it": "Il test di connessione ora segnala correttamente un errore quando le credenziali sono errate, e gli stati di un sensore, disco o interfaccia scomparso vengono rimossi invece di rimanere congelati.",
+        "es": "La prueba de conexión ahora informa correctamente de un fallo cuando el acceso es incorrecto, y los estados de un sensor, disco o interfaz que desaparece se eliminan en lugar de congelarse.",
+        "pl": "Test połączenia poprawnie zgłasza teraz błąd przy złym logowaniu, a stany znikniętego czujnika, dysku lub interfejsu są usuwane zamiast zamrażane na starej wartości.",
+        "uk": "Перевірка з'єднання тепер правильно повідомляє про помилку при невірному вході, а стани зниклого датчика, диска або інтерфейсу видаляються, а не залишаються замороженими.",
+        "zh-cn": "登录信息错误时，连接测试现在能正确报告失败；消失的传感器、磁盘或接口的状态会被移除，而不是冻结在最后的数值。"
+      },
       "0.8.0": {
         "en": "A brief empty response from the Hub no longer deletes your monitored devices or containers, for example right after a restart.",
         "de": "Eine kurz leere Antwort des Hubs löscht nicht mehr deine überwachten Geräte oder Container, zum Beispiel direkt nach einem Neustart.",
@@ -80,19 +93,6 @@
         "pl": "Zmniejszono niepotrzebne zdarzenia zmiany stanu. Naprawiono zduplikowane komunikaty o błędach w trybie kompaktowym.",
         "uk": "Зменшено непотрібні події зміни стану. Виправлено дублювання повідомлень про помилки у компактному режимі.",
         "zh-cn": "减少了不必要的状态变更事件。修复了紧凑模式下重复的错误消息。"
-      },
-      "0.5.11": {
-        "en": "Changelog rewritten in user-centric style across all versions.",
-        "de": "Changelog in benutzerzentriertem Stil über alle Versionen umgeschrieben.",
-        "ru": "Журнал изменений переписан в стиле, ориентированном на пользователя, для всех версий.",
-        "pt": "Registo de alterações reescrito em estilo centrado no utilizador em todas as versões.",
-        "nl": "Changelog herschreven in gebruikersgerichte stijl voor alle versies.",
-        "fr": "Journal des modifications réécrit dans un style centré sur l'utilisateur pour toutes les versions.",
-        "it": "Registro modifiche riscritto in stile incentrato sull'utente per tutte le versioni.",
-        "es": "Registro de cambios reescrito en estilo centrado en el usuario para todas las versiones.",
-        "pl": "Dziennik zmian przepisany w stylu zorientowanym na użytkownika we wszystkich wersjach.",
-        "uk": "Журнал змін переписано у стилі, орієнтованому на користувача, для всіх версій.",
-        "zh-cn": "所有版本的更新日志已改写为面向用户的风格。"
       }
     },
     "plugins": {
@@ -126,8 +126,16 @@
       "uk": "Підключається до Beszel Hub та надає метрики сервера як стани ioBroker",
       "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
     },
-    "authors": ["krobi <krobi@power-dreams.com>"],
-    "keywords": ["beszel", "monitoring", "server", "metrics", "hardware"],
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
+    ],
+    "keywords": [
+      "beszel",
+      "monitoring",
+      "server",
+      "metrics",
+      "hardware"
+    ],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -229,8 +237,15 @@
       "native": {}
     }
   ],
-  "encryptedNative": ["username", "password"],
-  "protectedNative": ["username", "password", "url"],
+  "encryptedNative": [
+    "username",
+    "password"
+  ],
+  "protectedNative": [
+    "username",
+    "password",
+    "url"
+  ],
   "native": {
     "url": "",
     "username": "",

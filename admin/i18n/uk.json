@@ -159,6 +159,8 @@
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
   "systemsAllUp": "All systems online",
-  "help_username": "The email/login you use for the Beszel web UI (PocketBase authenticates by email).",
-  "help_password": "The password for that Beszel login."
+  "help_username": "Електронна пошта/логін, який ви використовуєте для веб-інтерфейсу Beszel (PocketBase автентифікує за email).",
+  "help_password": "Пароль для цього входу в Beszel.",
+  "connectionStatus": "Стан з'єднання",
+  "channelSystems": "Відстежувані системи"
 }

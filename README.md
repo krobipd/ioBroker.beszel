@@ -213,6 +213,16 @@ beszel.0.
 ---
 
 ## Changelog
+### 0.9.0 (2026-07-07)
+
+- The "Test connection" button now correctly reports a failure when the URL, username or password is wrong — it previously showed a green "Ok" even for bad credentials.
+- States for a sensor, GPU, filesystem or network interface that disappears from a system are now removed instead of freezing at their last value forever.
+- Battery, GPU-power and status states now carry proper roles so VIS widgets and the type detector recognize them correctly; existing states are upgraded on the next start.
+- New fleet-overview states (systems total, systems online, all-systems-online) for building a multi-server dashboard at a glance.
+- Per-interface network speeds are now shown in MB/s (and totals in GB), matching the overall network values instead of raw bytes.
+- A user account without permission to read containers no longer freezes all other system states — container data is skipped with a warning instead.
+- The connection settings are reordered and gained help texts explaining that the "Username" is your Beszel web login, plus a hint that polling faster than 60s brings no fresher data.
+
 ### 0.8.0 (2026-06-24)
 
 - A brief empty response from the Hub no longer deletes your devices or containers — for example right after a restart — so monitored systems and their history stay intact.
@@ -234,18 +244,6 @@ beszel.0.
 ### 0.7.0 (2026-06-07)
 
 - Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.
-
-### 0.6.0 (2026-06-02)
-
-- New optional metrics, all off by default: CPU usage per core, peak values, disk I/O load, and traffic per network interface.
-- New "System info" option adds hardware and OS details per server: hostname, CPU model, cores/threads, operating system, kernel and architecture.
-- Temperature now also reports the single hottest sensor, in addition to the average of the three hottest.
-- Containers now report their combined network throughput.
-- GPU details option adds package power and per-engine usage.
-- Every option now shows a short help text explaining which values it creates; detail options stay greyed out until their category is enabled.
-- An expired session is now refreshed automatically during a poll, so a single token timeout no longer skips a data update.
-- Fixed GPU memory unit: now correctly shown in MB (was wrongly labeled GB). Existing GPU users: delete the old `gpu.*` states once and restart to get the new unit.
-- Fixed battery charging indicator: now only true while actually charging (previously also true while discharging or full).
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
