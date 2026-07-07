@@ -9,8 +9,9 @@ import {
   coerceSystemDetailsRecord,
   coerceSystemStatsRecord,
   errText,
+  sanitizeForLog,
 } from "./coerce";
-import type { BeszelContainer, BeszelSystem, SystemDetails, SystemStats } from "./types";
+import type { BeszelContainer, BeszelErrorCode, BeszelSystem, SystemDetails, SystemStats } from "./types";
 
 const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1000; // 23 hours
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -272,7 +273,7 @@ export class BeszelClient {
       // a generic INVALID_AUTH_RESPONSE without anchor for what was missing.
       this.log?.debug("authenticate: response missing valid token (drift), throwing INVALID_AUTH_RESPONSE");
       const err = new Error("Auth response missing valid token");
-      (err as NodeJS.ErrnoException).code = "INVALID_AUTH_RESPONSE";
+      (err as NodeJS.ErrnoException).code = "INVALID_AUTH_RESPONSE" satisfies BeszelErrorCode;
       throw err;
     }
     this.token = auth.token;
@@ -435,15 +436,20 @@ export class BeszelClient {
           cleanup();
           const raw = Buffer.concat(chunks).toString("utf8");
           if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-            const err = new Error(`HTTP ${res.statusCode ?? "?"}: ${raw.slice(0, 200)}`) as NodeJS.ErrnoException & {
+            // L4/SEC-8: the Hub-controlled body can carry CR/LF — run it through
+            // sanitizeForLog so a hostile/MITM Hub cannot forge extra log lines via
+            // the error message (which propagates to the poll's debug log).
+            const err = new Error(
+              `HTTP ${res.statusCode ?? "?"}: ${sanitizeForLog(raw.slice(0, 200))}`,
+            ) as NodeJS.ErrnoException & {
               retryAfter?: number;
             };
             // v0.4.3 (B3+B4'): distinct error classes — 401 reauth, 429 backoff,
-            // 403 perms hint, anything else generic.
+            // 403 perms hint, anything else generic. F4: the codes are typed.
             if (res.statusCode === 401) {
-              err.code = "UNAUTHORIZED";
+              err.code = "UNAUTHORIZED" satisfies BeszelErrorCode;
             } else if (res.statusCode === 429) {
-              err.code = "RATE_LIMITED";
+              err.code = "RATE_LIMITED" satisfies BeszelErrorCode;
               const ra = res.headers["retry-after"];
               if (typeof ra === "string") {
                 const n = parseInt(ra, 10);
@@ -452,14 +458,14 @@ export class BeszelClient {
                 }
               }
             } else if (res.statusCode === 403) {
-              err.code = "FORBIDDEN";
+              err.code = "FORBIDDEN" satisfies BeszelErrorCode;
             } else {
-              err.code = "HTTP_ERROR";
+              err.code = "HTTP_ERROR" satisfies BeszelErrorCode;
             }
             // v0.4.4 (A3): trace 4xx/5xx with status + error-code + body-snippet.
-            // Covers A4 (429) too via err.code=RATE_LIMITED + retryAfter visible
-            // in the err object's stringification context.
-            this.log?.debug(`HTTP ${method} ${path} → ${res.statusCode} ${err.code} (body=${raw.slice(0, 200)})`);
+            this.log?.debug(
+              `HTTP ${method} ${path} → ${res.statusCode} ${err.code} (body=${sanitizeForLog(raw.slice(0, 200))})`,
+            );
             reject(err);
             return;
           }
@@ -470,7 +476,7 @@ export class BeszelClient {
             resolve(parsed);
           } catch {
             // v0.4.4 (A8): trace JSON parse-fail with body-snippet.
-            this.log?.debug(`HTTP JSON parse fail ${path}: ${raw.slice(0, 200)}`);
+            this.log?.debug(`HTTP JSON parse fail ${path}: ${sanitizeForLog(raw.slice(0, 200))}`);
             reject(new Error(`Invalid JSON response from ${path}`));
           }
         });
@@ -487,7 +493,12 @@ export class BeszelClient {
         cleanup();
         // v0.4.4 (A5): trace timeout with elapsed.
         this.log?.debug(`HTTP timeout ${method} ${path} (${Date.now() - startedAt}ms)`);
-        reject(new Error(`Request to ${path} timed out`));
+        // N6: tag the timeout with ETIMEDOUT so classifyError doesn't depend on a
+        // message substring — a reworded message would silently degrade TIMEOUT to
+        // UNKNOWN and break the F3 system_details retry.
+        const timeoutErr = new Error(`Request to ${path} timed out`) as NodeJS.ErrnoException;
+        timeoutErr.code = "ETIMEDOUT" satisfies BeszelErrorCode;
+        reject(timeoutErr);
       });
 
       req.on("error", err => {

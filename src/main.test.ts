@@ -159,7 +159,9 @@ describe("BeszelAdapter classifyError", () => {
     ["EHOSTUNREACH", errnoError("host", "EHOSTUNREACH"), "NETWORK"],
     ["EAI_AGAIN", errnoError("dns-temp", "EAI_AGAIN"), "NETWORK"],
     ["ETIMEDOUT", errnoError("slow", "ETIMEDOUT"), "TIMEOUT"],
-    ["timed out in message", new Error("Request to /api timed out"), "TIMEOUT"],
+    // N6: the client's own timeout now carries ETIMEDOUT (see above); a bare
+    // "timed out" message with no code is no longer special-cased → UNKNOWN.
+    ["timed-out message without a code", new Error("Request to /api timed out"), "UNKNOWN"],
     ["other errno code", errnoError("denied", "EACCES"), "EACCES"],
     ["Error without code", new Error("weird"), "UNKNOWN"],
     ["non-Error value", "boom", "UNKNOWN"],

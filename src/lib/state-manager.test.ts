@@ -2334,4 +2334,52 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
     });
   });
+
+  // -----------------------------------------------------------------------
+  // F1 — every dynamic group has a startup cleanup path (regression lock)
+  // -----------------------------------------------------------------------
+
+  describe("F1: each dynamic group is pruned when its toggle is turned off at startup", () => {
+    // Locks the hand-coded cleanupMetrics branches against drift — the v0.7.2
+    // gpuDetails bug was exactly a missing cleanup branch. Adding a new dynamic
+    // group means adding a row here AND the matching cleanupMetrics branch.
+    const groups: Array<{ toggle: keyof AdapterConfig; channel: string; stats: Partial<SystemStats> }> = [
+      { toggle: "metrics_cpuCores", channel: "cpu.cores", stats: { cpus: [10, 20] } },
+      { toggle: "metrics_networkInterfaces", channel: "network.interfaces", stats: { ni: { eth0: [1, 2, 3, 4] } } },
+      { toggle: "metrics_temperatureDetails", channel: "temperature.sensors", stats: { t: { cpu_pkg: 50 } } },
+      { toggle: "metrics_gpu", channel: "gpu", stats: { g: { gpu0: { n: "GPU", u: 10 } } } },
+      { toggle: "metrics_extraFs", channel: "filesystems", stats: { efs: { "/mnt": { d: 100, du: 50 } } } },
+      { toggle: "metrics_containers", channel: "containers", stats: {} },
+    ];
+
+    for (const g of groups) {
+      it(`removes '${g.channel}' when ${g.toggle} is off`, async () => {
+        const containers: BeszelContainer[] =
+          g.toggle === "metrics_containers"
+            ? [
+                {
+                  id: "c1",
+                  system: testSystem.id,
+                  name: "nginx",
+                  status: "running",
+                  health: 2,
+                  cpu: 1,
+                  memory: 1,
+                  image: "n",
+                },
+              ]
+            : [];
+        await manager.updateSystem(
+          testSystem,
+          { ...testStats, ...g.stats },
+          containers,
+          allMetricsConfig({ [g.toggle]: true } as Partial<AdapterConfig>),
+        );
+        expect(adapter.objects.has(`systems.my_server.${g.channel}`), `${g.channel} should be created`).to.be.true;
+
+        await manager.cleanupMetrics("my_server", allMetricsConfig({ [g.toggle]: false } as Partial<AdapterConfig>));
+        expect(adapter.objects.has(`systems.my_server.${g.channel}`), `${g.channel} should be cleaned up`).to.be.false;
+      });
+    }
+  });
 });

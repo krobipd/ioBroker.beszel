@@ -341,3 +341,18 @@ export interface AuthResponse {
   /** Auth token — sent as the bare `Authorization` header value (Beszel/PocketBase uses no "Bearer " prefix). */
   token: string;
 }
+
+/**
+ * Error codes the BeszelClient tags onto thrown errors via `err.code`. main.ts's
+ * `classifyError` reads exactly these (plus Node's own network codes like
+ * ENOTFOUND). Shared so the producer (client) and consumer (main) can't drift on
+ * a bare string literal — a typo is now a compile error (F4). The timeout path
+ * uses ETIMEDOUT so classification no longer depends on a message substring (N6).
+ */
+export type BeszelErrorCode =
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "RATE_LIMITED"
+  | "HTTP_ERROR"
+  | "INVALID_AUTH_RESPONSE"
+  | "ETIMEDOUT";

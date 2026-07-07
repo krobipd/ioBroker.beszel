@@ -240,7 +240,9 @@ export class BeszelAdapter extends utils.Adapter {
     ) {
       return "NETWORK";
     }
-    if (code === "ETIMEDOUT" || err.message.includes("timed out")) {
+    // N6: the client tags its own timeout with ETIMEDOUT (like the OS socket
+    // timeout), so classification no longer sniffs the error message.
+    if (code === "ETIMEDOUT") {
       return "TIMEOUT";
     }
     return code || "UNKNOWN";
