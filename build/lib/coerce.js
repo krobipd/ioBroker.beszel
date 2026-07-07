@@ -283,43 +283,23 @@ function coerceFsStats(value) {
     return {};
   }
   const out = {};
-  const d = coerceFiniteNumber(obj.d);
-  if (d !== null) {
-    out.d = d;
-  }
-  const du = coerceFiniteNumber(obj.du);
-  if (du !== null) {
-    out.du = du;
-  }
-  const r = coerceFiniteNumber(obj.r);
-  if (r !== null) {
-    out.r = r;
-  }
-  const w = coerceFiniteNumber(obj.w);
-  if (w !== null) {
-    out.w = w;
+  const NUMBER_FIELDS = ["d", "du", "r", "w"];
+  for (const k of NUMBER_FIELDS) {
+    const n = coerceFiniteNumber(obj[k]);
+    if (n !== null) {
+      out[k] = n;
+    }
   }
   return out;
 }
-function coerceGpuMap(value) {
+function coerceMapOf(value, itemCoercer) {
   const obj = coerceObject(value);
   if (!obj) {
     return void 0;
   }
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
-    out[k] = coerceGPUData(v);
-  }
-  return out;
-}
-function coerceFsMap(value) {
-  const obj = coerceObject(value);
-  if (!obj) {
-    return void 0;
-  }
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
-    out[k] = coerceFsStats(v);
+    out[k] = itemCoercer(v);
   }
   return out;
 }
@@ -366,11 +346,11 @@ function coerceSystemStats(value) {
   if (la) {
     s.la = [la[0], la[1], la[2]];
   }
-  const g = coerceGpuMap(obj.g);
+  const g = coerceMapOf(obj.g, coerceGPUData);
   if (g) {
     s.g = g;
   }
-  const efs = coerceFsMap(obj.efs);
+  const efs = coerceMapOf(obj.efs, coerceFsStats);
   if (efs) {
     s.efs = efs;
   }
@@ -406,7 +386,6 @@ function coerceSystemStats(value) {
   return s;
 }
 function coerceSystemStatsRecord(value) {
-  var _a, _b;
   const obj = coerceObject(value);
   if (!obj) {
     return null;
@@ -417,11 +396,8 @@ function coerceSystemStatsRecord(value) {
     return null;
   }
   return {
-    id,
     system,
-    type: (_a = coerceString(obj.type)) != null ? _a : "",
-    stats: coerceSystemStats(obj.stats),
-    updated: (_b = coerceString(obj.updated)) != null ? _b : ""
+    stats: coerceSystemStats(obj.stats)
   };
 }
 function coerceContainer(value) {
@@ -484,28 +460,24 @@ function isPlaintextRemoteUrl(url) {
     return false;
   }
 }
-function coercePollInterval(raw) {
+function parseConfigNumber(raw, fallback) {
   const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
-  if (!Number.isFinite(n)) {
-    return 60;
-  }
-  return Math.max(10, Math.min(300, Math.floor(n)));
+  return Number.isFinite(n) ? n : fallback;
+}
+function coercePollInterval(raw) {
+  return Math.max(10, Math.min(300, Math.floor(parseConfigNumber(raw, 60))));
 }
 function shouldFetchSystemDetails(systemIds, attempted) {
   return systemIds.some((id) => !attempted.has(id));
 }
 function coerceTimeoutMs(raw) {
-  const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
-  if (!Number.isFinite(n)) {
-    return 15e3;
-  }
-  return Math.max(5, Math.min(120, Math.floor(n))) * 1e3;
+  return Math.max(5, Math.min(120, Math.floor(parseConfigNumber(raw, 15)))) * 1e3;
 }
 function coercePocketBaseList(value, itemCoercer) {
-  var _a, _b, _c, _d, _e;
+  var _a, _b;
   const obj = coerceObject(value);
   if (!obj) {
-    return { page: 0, perPage: 0, totalItems: 0, totalPages: 0, items: [] };
+    return { totalPages: 0, items: [] };
   }
   const rawItems = (_a = coerceArray(obj.items)) != null ? _a : [];
   const items = [];
@@ -516,10 +488,7 @@ function coercePocketBaseList(value, itemCoercer) {
     }
   }
   return {
-    page: (_b = coerceFiniteNumber(obj.page)) != null ? _b : 0,
-    perPage: (_c = coerceFiniteNumber(obj.perPage)) != null ? _c : 0,
-    totalItems: (_d = coerceFiniteNumber(obj.totalItems)) != null ? _d : 0,
-    totalPages: (_e = coerceFiniteNumber(obj.totalPages)) != null ? _e : 0,
+    totalPages: (_b = coerceFiniteNumber(obj.totalPages)) != null ? _b : 0,
     items
   };
 }

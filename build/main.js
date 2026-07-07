@@ -68,14 +68,11 @@ class BeszelAdapter extends utils.Adapter {
   pollTimer = void 0;
   isPolling = false;
   lastSystemCount = 0;
-  /**
-   * F2: was the previous poll's container fetch empty? Used to debounce the
-   * container prune — a single empty getContainers() response (transient Hub
-   * glitch) must not wipe every container channel; only a second consecutive
-   * empty result prunes. A non-empty response prunes removed containers at once.
-   */
-  lastContainersEmpty = false;
   lastErrorCode = "";
+  /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
+  containersUnavailable = false;
+  /** DP4: whether the fleet-rollup state objects have been created this run. */
+  rollupCreated = false;
   authFailCount = 0;
   failedSystems = /* @__PURE__ */ new Set();
   /**
@@ -117,7 +114,7 @@ class BeszelAdapter extends utils.Adapter {
       this.log.debug(
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`
       );
-      await this.setStateAsync("info.connection", { val: false, ack: true });
+      await this.setStateChangedAsync("info.connection", { val: false, ack: true });
       if (!config.url || !config.username || !config.password) {
         this.log.error(
           "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once."
@@ -221,13 +218,93 @@ class BeszelAdapter extends utils.Adapter {
     if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ECONNRESET" || code === "ENETUNREACH" || code === "EHOSTUNREACH" || code === "EAI_AGAIN") {
       return "NETWORK";
     }
-    if (code === "ETIMEDOUT" || err.message.includes("timed out")) {
+    if (code === "ETIMEDOUT") {
       return "TIMEOUT";
     }
     return code || "UNKNOWN";
   }
+  /**
+   * L3: fetch containers without letting a failure poison the whole poll. A 403
+   * (the configured user lacks permission for the `containers` collection) or a
+   * transient error used to reject the poll's `Promise.all` and freeze EVERY
+   * system's states. Now it degrades to an empty list (like the non-fatal
+   * system_details fetch), warning once then tracing.
+   *
+   * @param config Adapter configuration (containers only fetched when enabled).
+   */
+  async fetchContainersSafe(config) {
+    if (!config.metrics_containers || !this.client) {
+      return [];
+    }
+    try {
+      const containers = await this.client.getContainers();
+      if (this.containersUnavailable) {
+        this.log.info("Container data is available again");
+        this.containersUnavailable = false;
+      }
+      return containers;
+    } catch (err) {
+      const code = this.classifyError(err);
+      const msg = `Container fetch failed (non-fatal, ${code}) \u2014 other metrics still update. Check the configured user's permission for the containers collection.`;
+      if (this.containersUnavailable) {
+        this.log.debug(msg);
+      } else {
+        this.log.warn(msg);
+        this.containersUnavailable = true;
+      }
+      return [];
+    }
+  }
+  /**
+   * DP4: write the fleet-level rollup states (total / online / all-up) so a
+   * dashboard can show "N of M up" without enumerating every system. Creates the
+   * objects lazily on the first write.
+   *
+   * @param total Number of systems in the current poll.
+   * @param online Number of those reporting status "up".
+   */
+  async writeRollup(total, online) {
+    if (!this.rollupCreated) {
+      await this.setObjectNotExistsAsync("info.systemsTotal", {
+        type: "state",
+        common: {
+          name: import_adapter_core.I18n.getTranslatedObject("systemsTotal"),
+          type: "number",
+          role: "value",
+          read: true,
+          write: false
+        },
+        native: {}
+      });
+      await this.setObjectNotExistsAsync("info.systemsOnline", {
+        type: "state",
+        common: {
+          name: import_adapter_core.I18n.getTranslatedObject("systemsOnline"),
+          type: "number",
+          role: "value",
+          read: true,
+          write: false
+        },
+        native: {}
+      });
+      await this.setObjectNotExistsAsync("info.systemsAllUp", {
+        type: "state",
+        common: {
+          name: import_adapter_core.I18n.getTranslatedObject("systemsAllUp"),
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false
+        },
+        native: {}
+      });
+      this.rollupCreated = true;
+    }
+    await this.setStateChangedAsync("info.systemsTotal", { val: total, ack: true });
+    await this.setStateChangedAsync("info.systemsOnline", { val: online, ack: true });
+    await this.setStateChangedAsync("info.systemsAllUp", { val: total > 0 && online === total, ack: true });
+  }
   async poll() {
-    var _a;
     if (this.isPolling) {
       this.log.debug("Skipping poll \u2014 previous poll still running");
       return;
@@ -241,42 +318,11 @@ class BeszelAdapter extends utils.Adapter {
       const config = this.config;
       const [systems, containers, statsMap] = await Promise.all([
         this.client.getSystems(),
-        config.metrics_containers ? this.client.getContainers() : Promise.resolve([]),
+        this.fetchContainersSafe(config),
         this.client.getLatestStats()
       ]);
-      const containersFetchEmpty = config.metrics_containers && containers.length === 0;
-      const skipContainerPrune = containersFetchEmpty && !this.lastContainersEmpty;
-      await this.setStateAsync("info.connection", { val: true, ack: true });
-      if (config.metrics_agentVersion) {
-        const needFetch = (0, import_coerce.shouldFetchSystemDetails)(
-          systems.map((s) => s.id),
-          this.detailsAttempted
-        );
-        if (needFetch) {
-          let markAttempted = true;
-          try {
-            this.systemDetails = await this.client.getSystemDetails();
-            this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
-          } catch (err) {
-            const code = this.classifyError(err);
-            markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
-            this.log.debug(
-              `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${(0, import_coerce.errText)(err)}`
-            );
-          }
-          if (markAttempted) {
-            for (const s of systems) {
-              this.detailsAttempted.add(s.id);
-            }
-          }
-        }
-        for (const system of systems) {
-          const d = this.systemDetails.get(system.id);
-          if (d) {
-            system.details = d;
-          }
-        }
-      }
+      await this.setStateChangedAsync("info.connection", { val: true, ack: true });
+      await this.fetchAndAttachDetails(systems, config);
       this.stateManager.prepareForPoll(systems);
       await Promise.all(
         systems.map(async (system) => {
@@ -285,28 +331,27 @@ class BeszelAdapter extends utils.Adapter {
             this.log.debug(
               `updateSystem: '${(0, import_coerce.sanitizeForLog)(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`
             );
-            await this.stateManager.updateSystem(system, stats, containers, config, skipContainerPrune);
-            this.failedSystems.delete(system.name);
+            await this.stateManager.updateSystem(system, stats, containers, config);
+            this.failedSystems.delete(system.id);
           } catch (err) {
             const msg = `Failed to update system '${(0, import_coerce.sanitizeForLog)(system.name)}': ${(0, import_coerce.errText)(err)}`;
-            if (this.failedSystems.has(system.name)) {
+            if (this.failedSystems.has(system.id)) {
               this.log.debug(msg);
             } else {
               this.log.warn(msg);
-              this.failedSystems.add(system.name);
+              this.failedSystems.add(system.id);
             }
           }
         })
       );
       if (systems.length > 0) {
         await this.stateManager.cleanupSystems(systems.map((s) => s.name));
-        const activeNames = new Set(systems.map((s) => s.name));
-        for (const name of [...this.failedSystems]) {
-          if (!activeNames.has(name)) {
-            this.failedSystems.delete(name);
+        const activeIds = new Set(systems.map((s) => s.id));
+        for (const id of [...this.failedSystems]) {
+          if (!activeIds.has(id)) {
+            this.failedSystems.delete(id);
           }
         }
-        const activeIds = new Set(systems.map((s) => s.id));
         for (const id of [...this.detailsAttempted]) {
           if (!activeIds.has(id)) {
             this.detailsAttempted.delete(id);
@@ -317,9 +362,9 @@ class BeszelAdapter extends utils.Adapter {
             this.systemDetails.delete(id);
           }
         }
+        await this.writeRollup(systems.length, systems.filter((s) => s.status === "up").length);
       }
       this.lastSystemCount = systems.length;
-      this.lastContainersEmpty = containersFetchEmpty;
       this.authFailCount = 0;
       if (this.lastErrorCode) {
         this.log.info("Connection restored");
@@ -327,38 +372,95 @@ class BeszelAdapter extends utils.Adapter {
       }
       this.log.debug(`Polled ${systems.length} systems successfully`);
     } catch (err) {
-      const errMsg = (0, import_coerce.errText)(err);
-      const errorCode = this.classifyError(err);
-      const isRepeat = errorCode === this.lastErrorCode;
-      this.lastErrorCode = errorCode;
-      if (errorCode === "UNAUTHORIZED") {
-        (_a = this.client) == null ? void 0 : _a.invalidateToken();
-        this.authFailCount++;
-        if (this.authFailCount <= 3) {
-          this.log.error("Authentication failed \u2014 check username and password");
-        } else if (this.authFailCount === 4) {
-          this.log.error("Authentication keeps failing \u2014 suppressing further auth errors");
-        } else {
-          this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
-        }
-      } else if (isRepeat) {
-        this.log.debug(`Poll failed (ongoing): ${errMsg}`);
-      } else if (errorCode === "FORBIDDEN") {
-        this.log.error(
-          `Beszel Hub returned 403 Forbidden \u2014 the configured user has no permission for these collections. Check the user role on the Hub admin UI.`
-        );
-      } else if (errorCode === "RATE_LIMITED") {
-        this.log.warn("Beszel Hub rate-limited the request \u2014 slowing down. Consider increasing the poll interval.");
-      } else if (errorCode === "NETWORK") {
-        this.log.warn("Cannot reach Beszel Hub \u2014 will keep retrying");
-      } else {
-        this.log.error(`Poll failed (${errorCode})`);
-        this.log.debug(`Poll failed: ${errMsg}`);
-      }
-      await this.setStateAsync("info.connection", { val: false, ack: true });
+      this.handlePollError(err);
     } finally {
       this.isPolling = false;
     }
+  }
+  /**
+   * F2/F3: fetch the static `system_details` collection (hardware/OS) and attach
+   * it to the current systems. No-op unless "System info" is enabled. Only
+   * fetched when a system id we've never attempted appears (first poll or a new
+   * system) — the data is static, so re-fetching each poll would be waste. A
+   * failed fetch is non-fatal (details stay absent → no hardware states); a
+   * transient NETWORK/TIMEOUT is retried next poll rather than marked attempted.
+   *
+   * @param systems Systems from the current poll (mutated: `.details` attached).
+   * @param config Adapter configuration.
+   */
+  async fetchAndAttachDetails(systems, config) {
+    if (!config.metrics_agentVersion) {
+      return;
+    }
+    const needFetch = (0, import_coerce.shouldFetchSystemDetails)(
+      systems.map((s) => s.id),
+      this.detailsAttempted
+    );
+    if (needFetch) {
+      let markAttempted = true;
+      try {
+        this.systemDetails = await this.client.getSystemDetails();
+        this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
+      } catch (err) {
+        const code = this.classifyError(err);
+        markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
+        this.log.debug(
+          `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${(0, import_coerce.errText)(err)}`
+        );
+      }
+      if (markAttempted) {
+        for (const s of systems) {
+          this.detailsAttempted.add(s.id);
+        }
+      }
+    }
+    for (const system of systems) {
+      const d = this.systemDetails.get(system.id);
+      if (d) {
+        system.details = d;
+      }
+    }
+  }
+  /**
+   * N5: classify a failed poll and log it at the right level (dedup repeats to
+   * debug, hint FORBIDDEN/RATE_LIMITED, escalate then suppress repeated auth
+   * failures) and mark the connection state offline. Extracted from `poll` so
+   * the happy path reads top-to-bottom.
+   *
+   * @param err The error thrown by the poll body.
+   */
+  handlePollError(err) {
+    var _a;
+    const errMsg = (0, import_coerce.errText)(err);
+    const errorCode = this.classifyError(err);
+    const isRepeat = errorCode === this.lastErrorCode;
+    this.lastErrorCode = errorCode;
+    if (errorCode === "UNAUTHORIZED") {
+      (_a = this.client) == null ? void 0 : _a.invalidateToken();
+      this.authFailCount++;
+      if (this.authFailCount <= 3) {
+        this.log.error("Authentication failed \u2014 check username and password");
+      } else if (this.authFailCount === 4) {
+        this.log.error("Authentication keeps failing \u2014 suppressing further auth errors");
+      } else {
+        this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
+      }
+    } else if (isRepeat) {
+      this.log.debug(`Poll failed (ongoing): ${errMsg}`);
+    } else if (errorCode === "FORBIDDEN") {
+      this.log.error(
+        `Beszel Hub returned 403 Forbidden \u2014 the configured user has no permission for these collections. Check the user role on the Hub admin UI.`
+      );
+    } else if (errorCode === "RATE_LIMITED") {
+      this.log.warn("Beszel Hub rate-limited the request \u2014 slowing down. Consider increasing the poll interval.");
+    } else if (errorCode === "NETWORK") {
+      this.log.warn("Cannot reach Beszel Hub \u2014 will keep retrying");
+    } else {
+      this.log.error(`Poll failed (${errorCode})`);
+      this.log.debug(`Poll failed: ${errMsg}`);
+    }
+    void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
+    });
   }
 }
 if (require.main !== module) {

@@ -7,6 +7,7 @@ vi.mock("@iobroker/adapter-core", () => ({
   },
 }));
 
+import { METRIC_DEPENDENCIES } from "./metric-registry";
 import { StateManager } from "./state-manager";
 import type { AdapterConfig, BeszelSystem, BeszelContainer, SystemStats } from "./types";
 
@@ -2268,7 +2269,7 @@ describe("StateManager", () => {
     const jsonConfig = JSON.parse(readFileSync(join(__dirname, "../../admin/jsonConfig.json"), "utf8")) as unknown;
     const fields = new Map<string, JsonConfigField>();
     collectFields(jsonConfig, fields);
-    const deps = (StateManager as unknown as { METRIC_DEPENDENCIES: Record<string, string> }).METRIC_DEPENDENCIES;
+    const deps = METRIC_DEPENDENCIES as Record<string, string>;
 
     it("every dependency in code is greyed out in the admin UI (and on the right base)", () => {
       expect(Object.keys(deps).length).to.be.greaterThan(0);

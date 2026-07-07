@@ -276,23 +276,27 @@ class BeszelClient {
     return out;
   }
   async request(method, path, body, token) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     try {
       return await this.requestOnce(method, path, body, token);
     } catch (err) {
       const e = err;
       if (e.code === "UNAUTHORIZED" && token !== null) {
-        (_a = this.log) == null ? void 0 : _a.debug(`request: 401 on ${path} \u2014 re-authenticating and retrying once`);
-        this.invalidateToken();
-        await this.ensureToken();
+        if (this.token === token) {
+          (_a = this.log) == null ? void 0 : _a.debug(`request: 401 on ${path} \u2014 re-authenticating and retrying once`);
+          this.invalidateToken();
+          await this.ensureToken();
+        } else {
+          (_b = this.log) == null ? void 0 : _b.debug(`request: 401 on ${path} \u2014 token already refreshed concurrently, retrying`);
+        }
         return this.requestOnce(method, path, body, this.token);
       }
       if (e.code !== "RATE_LIMITED") {
         throw err;
       }
-      const retrySec = (_b = e.retryAfter) != null ? _b : 1;
+      const retrySec = (_c = e.retryAfter) != null ? _c : 1;
       const retryMs = Math.min(Math.max(1, retrySec), 30) * 1e3;
-      (_c = this.log) == null ? void 0 : _c.debug(`request: 429 retry for ${path}, waiting ${retryMs}ms`);
+      (_d = this.log) == null ? void 0 : _d.debug(`request: 429 retry for ${path}, waiting ${retryMs}ms`);
       await this.delay(retryMs);
       return this.requestOnce(method, path, body, token);
     }
@@ -356,7 +360,9 @@ class BeszelClient {
           cleanup();
           const raw = Buffer.concat(chunks).toString("utf8");
           if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-            const err = new Error(`HTTP ${(_a3 = res.statusCode) != null ? _a3 : "?"}: ${raw.slice(0, 200)}`);
+            const err = new Error(
+              `HTTP ${(_a3 = res.statusCode) != null ? _a3 : "?"}: ${(0, import_coerce.sanitizeForLog)(raw.slice(0, 200))}`
+            );
             if (res.statusCode === 401) {
               err.code = "UNAUTHORIZED";
             } else if (res.statusCode === 429) {
@@ -373,7 +379,9 @@ class BeszelClient {
             } else {
               err.code = "HTTP_ERROR";
             }
-            (_b = this.log) == null ? void 0 : _b.debug(`HTTP ${method} ${path} \u2192 ${res.statusCode} ${err.code} (body=${raw.slice(0, 200)})`);
+            (_b = this.log) == null ? void 0 : _b.debug(
+              `HTTP ${method} ${path} \u2192 ${res.statusCode} ${err.code} (body=${(0, import_coerce.sanitizeForLog)(raw.slice(0, 200))})`
+            );
             reject(err);
             return;
           }
@@ -382,7 +390,7 @@ class BeszelClient {
             (_c = this.log) == null ? void 0 : _c.debug(`HTTP ${method} ${path} \u2192 ${res.statusCode} (${Date.now() - startedAt}ms, ${raw.length}B)`);
             resolve(parsed);
           } catch {
-            (_d = this.log) == null ? void 0 : _d.debug(`HTTP JSON parse fail ${path}: ${raw.slice(0, 200)}`);
+            (_d = this.log) == null ? void 0 : _d.debug(`HTTP JSON parse fail ${path}: ${(0, import_coerce.sanitizeForLog)(raw.slice(0, 200))}`);
             reject(new Error(`Invalid JSON response from ${path}`));
           }
         });
@@ -395,7 +403,9 @@ class BeszelClient {
         req.destroy();
         cleanup();
         (_a3 = this.log) == null ? void 0 : _a3.debug(`HTTP timeout ${method} ${path} (${Date.now() - startedAt}ms)`);
-        reject(new Error(`Request to ${path} timed out`));
+        const timeoutErr = new Error(`Request to ${path} timed out`);
+        timeoutErr.code = "ETIMEDOUT";
+        reject(timeoutErr);
       });
       req.on("error", (err) => {
         var _a3;

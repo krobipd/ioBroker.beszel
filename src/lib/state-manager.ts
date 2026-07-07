@@ -1,32 +1,22 @@
 import type * as utils from "@iobroker/adapter-core";
 import { errText, sanitizeForLog } from "./coerce";
 import { tName } from "./i18n";
+import {
+  buildMetricDefs,
+  commonFor,
+  percentCommon,
+  numCommon,
+  textCommon,
+  boolCommon,
+  clampPercent,
+  channelName,
+  bytesToMib,
+  bytesToGib,
+  DYNAMIC_CHANNEL_TOGGLES,
+  METRIC_DEPENDENCIES,
+} from "./metric-registry";
+import type { LocalizedName, MetricDef } from "./metric-registry";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
-
-/**
- * Cast helper: ioBroker's `common.name` accepts string or translation object,
- * but the bundled `@types/iobroker` declarations vary by version, so we cast
- * once here and use `LocalizedName` everywhere.
- */
-type LocalizedName = ioBroker.StringOrTranslated;
-
-/**
- * One toggled scalar metric. Shared by the create-path (`applyMetrics`) and
- * the cleanup-path (`cleanupMetrics`) so the toggle → state-id mapping has a
- * single source of truth (K1). `available` gates creation on data shape
- * (default: always); `extract` returns the value or null.
- */
-interface MetricDef {
-  toggle: keyof AdapterConfig;
-  channel: string;
-  id: string;
-  nameKey: string;
-  kind: "percent" | "num" | "text" | "bool";
-  unit?: string;
-  role?: string;
-  available?: (stats: SystemStats | undefined, system: BeszelSystem) => boolean;
-  extract: (system: BeszelSystem, stats: SystemStats | undefined) => ioBroker.StateValue;
-}
 
 /**
  * Manages creation, update and cleanup of ioBroker objects and states for Beszel systems.
@@ -242,81 +232,6 @@ export class StateManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Beszel battery charge-state value that means "actively charging"
-   * (agent/battery/battery.go enum: 0=unknown 1=empty 2=full 3=charging
-   * 4=discharging 5=idle). Used to map `bat[1]` to the `charging` boolean.
-   */
-  private static readonly BATTERY_STATE_CHARGING = 3;
-
-  /**
-   * N7: i18n key for every channel — the scalar metric channels (driven by
-   * `metricDefs().channel` in applyMetrics) and the dynamic-group parents /
-   * sub-channels ensured in updateDynamicStats. Single source so a channel's
-   * display name is never spelled inline in two places.
-   */
-  private static readonly CHANNEL_NAME_KEY: Record<string, string> = {
-    info: "channelInfo",
-    cpu: "channelCpu",
-    memory: "channelMemory",
-    disk: "channelDisk",
-    network: "channelNetwork",
-    temperature: "channelTemperature",
-    battery: "channelBattery",
-    // dynamic-group parents + sub-channels
-    cores: "channelCores",
-    sensors: "channelSensors",
-    interfaces: "channelInterfaces",
-    gpu: "channelGpu",
-    engines: "channelEngines",
-    filesystems: "channelFilesystems",
-    containers: "channelContainers",
-  };
-
-  /**
-   * v0.6.0: each detail/peak toggle depends on its category's base toggle —
-   * when the category is off, the detail is off too. This mirrors the admin
-   * grey-out (`disabled` in jsonConfig) in the DATA logic, so a sub-metric
-   * never creates states while its category is disabled (krobi: "Kategorie aus
-   * → Unterkategorie automatisch mit aus"). Must stay in sync with the
-   * `disabled` conditions in admin/jsonConfig.json. Every non-base metric in a
-   * category gates on the category's base/usage metric — including the
-   * default-on co-metrics `loadAvg` (→ CPU) and `diskSpeed` (→ Disk): krobi
-   * wants a category to switch off completely, no "logischer Ausreißer". Only
-   * the System category (uptime / system-info / services) has no single base,
-   * so its three independent metrics are not gated.
-   */
-  /**
-   * v0.7.2: dynamic-group toggles that write into a scalar channel without
-   * appearing in `metricDefs` (their states fan out per item in
-   * `updateDynamicStats`). Merged into the derived per-channel toggle sets
-   * when `cleanupMetrics` decides whether a channel is completely empty.
-   * Exported for unit-tests via the class (invariant lock against jsonConfig).
-   */
-  private static readonly DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = {
-    cpu: ["metrics_cpuCores"],
-    network: ["metrics_networkInterfaces"],
-    temperature: ["metrics_temperatureDetails"],
-  };
-
-  private static readonly METRIC_DEPENDENCIES = {
-    metrics_loadAvg: "metrics_cpu",
-    metrics_cpuBreakdown: "metrics_cpu",
-    metrics_cpuCores: "metrics_cpu",
-    metrics_cpuPeak: "metrics_cpu",
-    metrics_memoryDetails: "metrics_memory",
-    metrics_swap: "metrics_memory",
-    metrics_memoryPeak: "metrics_memory",
-    metrics_diskSpeed: "metrics_disk",
-    metrics_extraFs: "metrics_disk",
-    metrics_diskIo: "metrics_disk",
-    metrics_diskPeak: "metrics_disk",
-    metrics_networkInterfaces: "metrics_network",
-    metrics_networkPeak: "metrics_network",
-    metrics_temperatureDetails: "metrics_temperature",
-    metrics_gpuDetails: "metrics_gpu",
-  } satisfies Partial<Record<keyof AdapterConfig, keyof AdapterConfig>>;
-
-  /**
    * Return a config copy where every detail/peak toggle whose category base is
    * disabled is forced to `false` (see `METRIC_DEPENDENCIES`). Applied at the
    * top of `updateSystem` and `cleanupMetrics` so both create- and cleanup-path
@@ -327,10 +242,8 @@ export class StateManager {
    */
   private effectiveConfig(config: AdapterConfig): AdapterConfig {
     const out = { ...config };
-    for (const detail of Object.keys(
-      StateManager.METRIC_DEPENDENCIES,
-    ) as (keyof typeof StateManager.METRIC_DEPENDENCIES)[]) {
-      const base = StateManager.METRIC_DEPENDENCIES[detail];
+    for (const detail of Object.keys(METRIC_DEPENDENCIES) as (keyof typeof METRIC_DEPENDENCIES)[]) {
+      const base = METRIC_DEPENDENCIES[detail];
       if (!config[base]) {
         out[detail] = false;
       }
@@ -357,526 +270,7 @@ export class StateManager {
    * re-`tName`d) on every applyMetrics/cleanupMetrics call.
    */
   private metricDefs(): MetricDef[] {
-    return (this.metricDefsCache ??= this.buildMetricDefs());
-  }
-
-  private buildMetricDefs(): MetricDef[] {
-    const hasStats = (s: SystemStats | undefined): boolean => !!s;
-    const la = (system: BeszelSystem, stats: SystemStats | undefined): [number, number, number] | undefined =>
-      stats?.la ?? system.info.la;
-    // N4: the per-core (cpub) and disk-I/O (dios) availability guards were copied
-    // verbatim across their metric defs — hoist to one predicate each.
-    const hasCpub = (s: SystemStats | undefined): boolean => !!s?.cpub && s.cpub.length >= 5;
-    const hasDio = (s: SystemStats | undefined, n: number): boolean => !!s?.dios && s.dios.length >= n;
-    return [
-      // info (no stats required)
-      {
-        toggle: "metrics_uptime",
-        channel: "info",
-        id: "info.uptime",
-        nameKey: "uptime",
-        kind: "num",
-        unit: "s",
-        extract: s => s.info.u ?? null,
-      },
-      {
-        toggle: "metrics_uptime",
-        channel: "info",
-        id: "info.uptime_text",
-        nameKey: "uptimeFormatted",
-        kind: "text",
-        extract: s => (s.info.u != null ? this.formatUptime(s.info.u) : null),
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.agent_version",
-        nameKey: "agentVersion",
-        kind: "text",
-        extract: s => s.info.v ?? null,
-      },
-      // F2: static hardware/OS info from the system_details collection (attached
-      // to system.details by the poll loop). Each field gated on its own presence
-      // so a partially-populated agent yields no empty states; all share the
-      // "System info" toggle (metrics_agentVersion) and the existing info channel.
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.hostname",
-        nameKey: "hostname",
-        kind: "text",
-        available: (_st, s) => s.details?.hostname != null,
-        extract: s => s.details?.hostname ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.os",
-        nameKey: "os",
-        kind: "text",
-        available: (_st, s) => s.details?.os != null,
-        extract: s => this.osLabel(s.details?.os),
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.os_name",
-        nameKey: "osName",
-        kind: "text",
-        available: (_st, s) => s.details?.os_name != null,
-        extract: s => s.details?.os_name ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.kernel",
-        nameKey: "kernel",
-        kind: "text",
-        available: (_st, s) => s.details?.kernel != null,
-        extract: s => s.details?.kernel ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.cpu_model",
-        nameKey: "cpuModel",
-        kind: "text",
-        available: (_st, s) => s.details?.cpu != null,
-        extract: s => s.details?.cpu ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.arch",
-        nameKey: "arch",
-        kind: "text",
-        available: (_st, s) => s.details?.arch != null,
-        extract: s => s.details?.arch ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.cores",
-        nameKey: "cores",
-        kind: "num",
-        available: (_st, s) => s.details?.cores != null,
-        extract: s => s.details?.cores ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.threads",
-        nameKey: "threads",
-        kind: "num",
-        available: (_st, s) => s.details?.threads != null,
-        extract: s => s.details?.threads ?? null,
-      },
-      {
-        toggle: "metrics_agentVersion",
-        channel: "info",
-        id: "info.podman",
-        nameKey: "podman",
-        kind: "bool",
-        available: (_st, s) => s.details?.podman != null,
-        extract: s => s.details?.podman ?? null,
-      },
-      {
-        toggle: "metrics_services",
-        channel: "info",
-        id: "info.services_total",
-        nameKey: "servicesTotal",
-        kind: "num",
-        available: (_st, s) => s.info.sv != null,
-        extract: s => s.info.sv?.[0] ?? null,
-      },
-      {
-        toggle: "metrics_services",
-        channel: "info",
-        id: "info.services_failed",
-        nameKey: "servicesFailed",
-        kind: "num",
-        available: (_st, s) => s.info.sv != null,
-        extract: s => s.info.sv?.[1] ?? null,
-      },
-      // load average — always created if toggled (stats.la or info.la fallback)
-      {
-        toggle: "metrics_loadAvg",
-        channel: "cpu",
-        id: "cpu.load_1m",
-        nameKey: "load1m",
-        kind: "num",
-        extract: (s, st) => la(s, st)?.[0] ?? null,
-      },
-      {
-        toggle: "metrics_loadAvg",
-        channel: "cpu",
-        id: "cpu.load_5m",
-        nameKey: "load5m",
-        kind: "num",
-        extract: (s, st) => la(s, st)?.[1] ?? null,
-      },
-      {
-        toggle: "metrics_loadAvg",
-        channel: "cpu",
-        id: "cpu.load_15m",
-        nameKey: "load15m",
-        kind: "num",
-        extract: (s, st) => la(s, st)?.[2] ?? null,
-      },
-      // stats-gated scalar metrics
-      {
-        toggle: "metrics_cpu",
-        channel: "cpu",
-        id: "cpu.usage",
-        nameKey: "cpuUsage",
-        kind: "percent",
-        available: hasStats,
-        extract: (_s, st) => st?.cpu ?? null,
-      },
-      {
-        toggle: "metrics_cpuBreakdown",
-        channel: "cpu",
-        id: "cpu.user",
-        nameKey: "cpuUser",
-        kind: "percent",
-        available: hasCpub,
-        extract: (_s, st) => st?.cpub?.[0] ?? null,
-      },
-      {
-        toggle: "metrics_cpuBreakdown",
-        channel: "cpu",
-        id: "cpu.system",
-        nameKey: "cpuSystem",
-        kind: "percent",
-        available: hasCpub,
-        extract: (_s, st) => st?.cpub?.[1] ?? null,
-      },
-      {
-        toggle: "metrics_cpuBreakdown",
-        channel: "cpu",
-        id: "cpu.iowait",
-        nameKey: "cpuIowait",
-        kind: "percent",
-        available: hasCpub,
-        extract: (_s, st) => st?.cpub?.[2] ?? null,
-      },
-      {
-        toggle: "metrics_cpuBreakdown",
-        channel: "cpu",
-        id: "cpu.steal",
-        nameKey: "cpuSteal",
-        kind: "percent",
-        available: hasCpub,
-        extract: (_s, st) => st?.cpub?.[3] ?? null,
-      },
-      {
-        toggle: "metrics_cpuBreakdown",
-        channel: "cpu",
-        id: "cpu.idle",
-        nameKey: "cpuIdle",
-        kind: "percent",
-        available: hasCpub,
-        extract: (_s, st) => st?.cpub?.[4] ?? null,
-      },
-      {
-        toggle: "metrics_memory",
-        channel: "memory",
-        id: "memory.percent",
-        nameKey: "memoryPercent",
-        kind: "percent",
-        available: hasStats,
-        extract: (_s, st) => st?.mp ?? null,
-      },
-      {
-        toggle: "metrics_memory",
-        channel: "memory",
-        id: "memory.used",
-        nameKey: "memoryUsed",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.mu ?? null,
-      },
-      {
-        toggle: "metrics_memory",
-        channel: "memory",
-        id: "memory.total",
-        nameKey: "memoryTotal",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.m ?? null,
-      },
-      {
-        toggle: "metrics_memoryDetails",
-        channel: "memory",
-        id: "memory.buffers",
-        nameKey: "memoryBuffers",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.mb ?? null,
-      },
-      {
-        toggle: "metrics_memoryDetails",
-        channel: "memory",
-        id: "memory.zfs_arc",
-        nameKey: "memoryZfsArc",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.mz ?? null,
-      },
-      {
-        toggle: "metrics_swap",
-        channel: "memory",
-        id: "memory.swap_used",
-        nameKey: "swapUsed",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.su ?? null,
-      },
-      {
-        toggle: "metrics_swap",
-        channel: "memory",
-        id: "memory.swap_total",
-        nameKey: "swapTotal",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.s ?? null,
-      },
-      {
-        toggle: "metrics_disk",
-        channel: "disk",
-        id: "disk.percent",
-        nameKey: "diskPercent",
-        kind: "percent",
-        available: hasStats,
-        extract: (_s, st) => st?.dp ?? null,
-      },
-      {
-        toggle: "metrics_disk",
-        channel: "disk",
-        id: "disk.used",
-        nameKey: "diskUsed",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.du ?? null,
-      },
-      {
-        toggle: "metrics_disk",
-        channel: "disk",
-        id: "disk.total",
-        nameKey: "diskTotal",
-        kind: "num",
-        unit: "GB",
-        available: hasStats,
-        extract: (_s, st) => st?.d ?? null,
-      },
-      {
-        toggle: "metrics_diskSpeed",
-        channel: "disk",
-        id: "disk.read",
-        nameKey: "diskRead",
-        kind: "num",
-        unit: "MB/s",
-        available: hasStats,
-        extract: (_s, st) => st?.dr ?? null,
-      },
-      {
-        toggle: "metrics_diskSpeed",
-        channel: "disk",
-        id: "disk.write",
-        nameKey: "diskWrite",
-        kind: "num",
-        unit: "MB/s",
-        available: hasStats,
-        extract: (_s, st) => st?.dw ?? null,
-      },
-      {
-        toggle: "metrics_network",
-        channel: "network",
-        id: "network.sent",
-        nameKey: "networkSent",
-        kind: "num",
-        unit: "MB/s",
-        available: hasStats,
-        extract: (_s, st) => st?.ns ?? null,
-      },
-      {
-        toggle: "metrics_network",
-        channel: "network",
-        id: "network.recv",
-        nameKey: "networkReceived",
-        kind: "num",
-        unit: "MB/s",
-        available: hasStats,
-        extract: (_s, st) => st?.nr ?? null,
-      },
-      {
-        toggle: "metrics_temperature",
-        channel: "temperature",
-        id: "temperature.average",
-        nameKey: "temperatureAvg",
-        kind: "num",
-        unit: "°C",
-        role: "value.temperature",
-        available: hasStats,
-        extract: (_s, st) => this.computeTopAvgTemp(st?.t),
-      },
-      {
-        toggle: "metrics_temperature",
-        channel: "temperature",
-        id: "temperature.max",
-        nameKey: "temperatureMax",
-        kind: "num",
-        unit: "°C",
-        role: "value.temperature",
-        available: hasStats,
-        extract: (_s, st) => this.computeMaxTemp(st?.t),
-      },
-      {
-        toggle: "metrics_battery",
-        channel: "battery",
-        id: "battery.percent",
-        nameKey: "batteryPercent",
-        kind: "percent",
-        role: "value.battery",
-        available: hasStats,
-        extract: (s, st) => (st?.bat ?? s.info.bat)?.[0] ?? null,
-      },
-      {
-        toggle: "metrics_battery",
-        channel: "battery",
-        id: "battery.charging",
-        nameKey: "batteryCharging",
-        kind: "bool",
-        available: hasStats,
-        extract: (s, st) => {
-          const b = st?.bat ?? s.info.bat;
-          if (!b) {
-            return null;
-          }
-          // bat[1] is a charge-STATE enum, not a boolean — verified against
-          // agent/battery/battery.go: 0=unknown, 1=empty, 2=full, 3=charging,
-          // 4=discharging, 5=idle. Only state 3 means actively charging; the
-          // old `> 0` wrongly reported charging while discharging/full/idle.
-          return b[1] === StateManager.BATTERY_STATE_CHARGING;
-        },
-      },
-      // --- v0.6.0 peaks + detail (available-gated on the field being present,
-      // so an older Beszel that doesn't send it gets no empty state) ---
-      {
-        toggle: "metrics_cpuPeak",
-        channel: "cpu",
-        id: "cpu.peak",
-        nameKey: "cpuPeak",
-        kind: "percent",
-        available: st => st?.cpum != null,
-        extract: (_s, st) => st?.cpum ?? null,
-      },
-      {
-        toggle: "metrics_memoryPeak",
-        channel: "memory",
-        id: "memory.peak",
-        nameKey: "memoryPeak",
-        kind: "num",
-        unit: "GB",
-        available: st => st?.mm != null,
-        extract: (_s, st) => st?.mm ?? null,
-      },
-      {
-        toggle: "metrics_diskPeak",
-        channel: "disk",
-        id: "disk.read_peak",
-        nameKey: "diskReadPeak",
-        kind: "num",
-        unit: "MB/s",
-        available: st => st?.drm != null,
-        extract: (_s, st) => st?.drm ?? null,
-      },
-      {
-        toggle: "metrics_diskPeak",
-        channel: "disk",
-        id: "disk.write_peak",
-        nameKey: "diskWritePeak",
-        kind: "num",
-        unit: "MB/s",
-        available: st => st?.dwm != null,
-        extract: (_s, st) => st?.dwm ?? null,
-      },
-      {
-        toggle: "metrics_networkPeak",
-        channel: "network",
-        id: "network.sent_peak",
-        nameKey: "networkSentPeak",
-        kind: "num",
-        unit: "MB/s",
-        available: st => st?.nsm != null,
-        extract: (_s, st) => st?.nsm ?? null,
-      },
-      {
-        toggle: "metrics_networkPeak",
-        channel: "network",
-        id: "network.recv_peak",
-        nameKey: "networkRecvPeak",
-        kind: "num",
-        unit: "MB/s",
-        available: st => st?.nrm != null,
-        extract: (_s, st) => st?.nrm ?? null,
-      },
-      {
-        toggle: "metrics_diskIo",
-        channel: "disk",
-        id: "disk.io_util",
-        nameKey: "diskIoUtil",
-        kind: "percent",
-        available: st => hasDio(st, 3),
-        extract: (_s, st) => st?.dios?.[2] ?? null,
-      },
-      {
-        toggle: "metrics_diskIo",
-        channel: "disk",
-        id: "disk.io_await_read",
-        nameKey: "diskIoAwaitRead",
-        kind: "num",
-        unit: "ms",
-        available: st => hasDio(st, 5),
-        extract: (_s, st) => st?.dios?.[3] ?? null,
-      },
-      {
-        toggle: "metrics_diskIo",
-        channel: "disk",
-        id: "disk.io_await_write",
-        nameKey: "diskIoAwaitWrite",
-        kind: "num",
-        unit: "ms",
-        available: st => hasDio(st, 5),
-        extract: (_s, st) => st?.dios?.[4] ?? null,
-      },
-    ];
-  }
-
-  /**
-   * Build the StateCommon for a metric definition via the existing factories.
-   *
-   * @param def Metric definition (kind/unit/role/nameKey) to build the common from.
-   */
-  private commonFor(def: MetricDef): ioBroker.StateCommon {
-    const name = tName(def.nameKey as Parameters<typeof tName>[0]);
-    switch (def.kind) {
-      case "percent":
-        return this.percentCommon(name, def.role);
-      case "text":
-        return this.textCommon(name);
-      case "bool":
-        return this.boolCommon(name);
-      default:
-        return this.numCommon(name, def.unit, def.role ?? "value");
-    }
+    return (this.metricDefsCache ??= buildMetricDefs());
   }
 
   /**
@@ -910,12 +304,12 @@ export class StateManager {
     });
     const channels = new Set(active.map(d => d.channel));
     for (const ch of channels) {
-      await this.ensureChannel(`${sysId}.${ch}`, this.channelName(ch));
+      await this.ensureChannel(`${sysId}.${ch}`, channelName(ch));
     }
     for (const def of active) {
       const raw = def.extract(system, stats);
-      const value = def.kind === "percent" && typeof raw === "number" ? this.clampPercent(raw) : raw;
-      await this.createAndSetState(`${sysId}.${def.id}`, this.commonFor(def), value);
+      const value = def.kind === "percent" && typeof raw === "number" ? clampPercent(raw) : raw;
+      await this.createAndSetState(`${sysId}.${def.id}`, commonFor(def), value);
     }
   }
 
@@ -974,18 +368,18 @@ export class StateManager {
     }
 
     // Info channel (always created)
-    await this.ensureChannel(`${sysId}.info`, this.channelName("info"));
+    await this.ensureChannel(`${sysId}.info`, channelName("info"));
 
     // Always: online + status
     await this.createAndSetState(
       `${sysId}.info.online`,
-      this.boolCommon(tName("online"), "indicator.reachable"),
+      boolCommon(tName("online"), "indicator.reachable"),
       system.status === "up",
     );
     await this.createAndSetState(
       `${sysId}.info.status`,
       {
-        ...this.textCommon(tName("status"), "info.status"),
+        ...textCommon(tName("status"), "info.status"),
         states: { up: "Online", down: "Offline", paused: "Paused", pending: "Pending" },
       },
       system.status,
@@ -1119,7 +513,7 @@ export class StateManager {
       set.add(def.toggle);
       channelToggles.set(def.channel, set);
     }
-    for (const [channel, extras] of Object.entries(StateManager.DYNAMIC_CHANNEL_TOGGLES)) {
+    for (const [channel, extras] of Object.entries(DYNAMIC_CHANNEL_TOGGLES)) {
       const set = channelToggles.get(channel) ?? new Set<keyof AdapterConfig>();
       for (const t of extras) {
         set.add(t);
@@ -1302,13 +696,13 @@ export class StateManager {
         stats.t ? Object.entries(stats.t) : [],
         "state",
         async () => {
-          await this.ensureChannel(`${sysId}.temperature`, this.channelName("temperature"));
-          await this.ensureChannel(`${sysId}.temperature.sensors`, this.channelName("sensors"));
+          await this.ensureChannel(`${sysId}.temperature`, channelName("temperature"));
+          await this.ensureChannel(`${sysId}.temperature.sensors`, channelName("sensors"));
         },
         async (safeSensor, sensor, temp) => {
           await this.createAndSetState(
             `${sysId}.temperature.sensors.${safeSensor}`,
-            this.numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
+            numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
             temp,
           );
         },
@@ -1320,14 +714,14 @@ export class StateManager {
       const cores = stats.cpus ?? [];
       const activeCores = new Set<string>();
       if (cores.length > 0) {
-        await this.ensureChannel(`${sysId}.cpu`, this.channelName("cpu"));
-        await this.ensureChannel(`${sysId}.cpu.cores`, this.channelName("cores"));
+        await this.ensureChannel(`${sysId}.cpu`, channelName("cpu"));
+        await this.ensureChannel(`${sysId}.cpu.cores`, channelName("cores"));
         for (let i = 0; i < cores.length; i++) {
           activeCores.add(`core${i}`);
           await this.createAndSetState(
             `${sysId}.cpu.cores.core${i}`,
-            this.percentCommon(`Core ${i}`),
-            this.clampPercent(cores[i]),
+            percentCommon(`Core ${i}`),
+            clampPercent(cores[i]),
           );
         }
       }
@@ -1345,31 +739,31 @@ export class StateManager {
         stats.ni ? Object.entries(stats.ni) : [],
         "channel",
         async () => {
-          await this.ensureChannel(`${sysId}.network`, this.channelName("network"));
-          await this.ensureChannel(`${sysId}.network.interfaces`, this.channelName("interfaces"));
+          await this.ensureChannel(`${sysId}.network`, channelName("network"));
+          await this.ensureChannel(`${sysId}.network.interfaces`, channelName("interfaces"));
         },
         async (safeId, iface, vals) => {
           // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
           await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
-            this.numCommon(tName("ifaceUp"), "MB/s"),
-            this.bytesToMib(vals[0]),
+            numCommon(tName("ifaceUp"), "MB/s"),
+            bytesToMib(vals[0]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.down`,
-            this.numCommon(tName("ifaceDown"), "MB/s"),
-            this.bytesToMib(vals[1]),
+            numCommon(tName("ifaceDown"), "MB/s"),
+            bytesToMib(vals[1]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_up`,
-            this.numCommon(tName("ifaceTotalUp"), "GB"),
-            this.bytesToGib(vals[2]),
+            numCommon(tName("ifaceTotalUp"), "GB"),
+            bytesToGib(vals[2]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_down`,
-            this.numCommon(tName("ifaceTotalDown"), "GB"),
-            this.bytesToGib(vals[3]),
+            numCommon(tName("ifaceTotalDown"), "GB"),
+            bytesToGib(vals[3]),
           );
         },
       );
@@ -1384,28 +778,28 @@ export class StateManager {
         stats.g ? Object.entries(stats.g) : [],
         "channel",
         async () => {
-          await this.ensureChannel(`${sysId}.gpu`, this.channelName("gpu"));
+          await this.ensureChannel(`${sysId}.gpu`, channelName("gpu"));
         },
         async (safeId, gpuId, gpuData) => {
           await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeForLog(gpuData.n ?? gpuId));
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
-            this.percentCommon(tName("gpuUsage")),
-            this.clampPercent(gpuData.u ?? null),
+            percentCommon(tName("gpuUsage")),
+            clampPercent(gpuData.u ?? null),
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.memory_used`,
-            this.numCommon(tName("gpuMemoryUsed"), "MB"),
+            numCommon(tName("gpuMemoryUsed"), "MB"),
             gpuData.mu ?? null,
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.memory_total`,
-            this.numCommon(tName("gpuMemoryTotal"), "MB"),
+            numCommon(tName("gpuMemoryTotal"), "MB"),
             gpuData.mt ?? null,
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.power`,
-            this.numCommon(tName("gpuPower"), "W", "value.power"),
+            numCommon(tName("gpuPower"), "W", "value.power"),
             gpuData.p ?? null,
           );
           // GPU details (v0.6.0): package power + per-engine usage. Engines the
@@ -1413,7 +807,7 @@ export class StateManager {
           if (config.metrics_gpuDetails) {
             await this.createAndSetState(
               `${sysId}.gpu.${safeId}.power_package`,
-              this.numCommon(tName("gpuPowerPackage"), "W", "value.power"),
+              numCommon(tName("gpuPowerPackage"), "W", "value.power"),
               gpuData.pp ?? null,
             );
             await this.syncDynamicGroup(
@@ -1421,14 +815,14 @@ export class StateManager {
               gpuData.e ? Object.entries(gpuData.e) : [],
               "state",
               async () => {
-                await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, this.channelName("engines"));
+                await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, channelName("engines"));
               },
               async (safeEngine, engine, value) => {
                 // Engine name is vendor-defined → kept as-is.
                 await this.createAndSetState(
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                  this.percentCommon(sanitizeForLog(engine)),
-                  this.clampPercent(value),
+                  percentCommon(sanitizeForLog(engine)),
+                  clampPercent(value),
                 );
               },
             );
@@ -1446,7 +840,7 @@ export class StateManager {
         stats.efs ? Object.entries(stats.efs) : [],
         "channel",
         async () => {
-          await this.ensureChannel(`${sysId}.filesystems`, this.channelName("filesystems"));
+          await this.ensureChannel(`${sysId}.filesystems`, channelName("filesystems"));
         },
         async (safeId, fsName, fsData) => {
           await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeForLog(fsName));
@@ -1463,27 +857,27 @@ export class StateManager {
 
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.disk_percent`,
-            this.percentCommon(tName("diskPercent")),
+            percentCommon(tName("diskPercent")),
             percent,
           );
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.disk_used`,
-            this.numCommon(tName("diskUsed"), "GB"),
+            numCommon(tName("diskUsed"), "GB"),
             used,
           );
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.disk_total`,
-            this.numCommon(tName("diskTotal"), "GB"),
+            numCommon(tName("diskTotal"), "GB"),
             total,
           );
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.read_speed`,
-            this.numCommon(tName("readSpeed"), "MB/s"),
+            numCommon(tName("readSpeed"), "MB/s"),
             fsData.r ?? null,
           );
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.write_speed`,
-            this.numCommon(tName("writeSpeed"), "MB/s"),
+            numCommon(tName("writeSpeed"), "MB/s"),
             fsData.w ?? null,
           );
         },
@@ -1522,7 +916,7 @@ export class StateManager {
       return;
     }
 
-    await this.ensureChannel(`${sysId}.containers`, this.channelName("containers"));
+    await this.ensureChannel(`${sysId}.containers`, channelName("containers"));
 
     const healthLabels = ["none", "starting", "healthy", "unhealthy"];
 
@@ -1533,32 +927,24 @@ export class StateManager {
       }
       // container.name is user-defined (Docker container name) → keep as-is.
       await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeForLog(container.name));
-      await this.createAndSetState(
-        `${sysId}.containers.${cId}.status`,
-        this.textCommon(tName("status")),
-        container.status,
-      );
+      await this.createAndSetState(`${sysId}.containers.${cId}.status`, textCommon(tName("status")), container.status);
       // v0.4.3 (SM7): floor the health index — API drift could send a
       // float (e.g. 2.5) which `healthLabels[2.5]` resolves to undefined.
       const healthIdx = Math.floor(container.health);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
-        this.textCommon(tName("containerHealth")),
+        textCommon(tName("containerHealth")),
         healthLabels[healthIdx] ?? "unknown",
       );
-      await this.createAndSetState(
-        `${sysId}.containers.${cId}.cpu`,
-        this.percentCommon(tName("cpuUsage")),
-        container.cpu,
-      );
+      await this.createAndSetState(`${sysId}.containers.${cId}.cpu`, percentCommon(tName("cpuUsage")), container.cpu);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.memory`,
-        this.numCommon(tName("containerMemory"), "MB"),
+        numCommon(tName("containerMemory"), "MB"),
         container.memory,
       );
       await this.createAndSetState(
         `${sysId}.containers.${cId}.image`,
-        this.textCommon(tName("containerImage")),
+        textCommon(tName("containerImage")),
         container.image,
       );
       // v0.6.0: combined network throughput (sent + recv, bytes/s). Only when
@@ -1566,7 +952,7 @@ export class StateManager {
       if (container.net != null) {
         await this.createAndSetState(
           `${sysId}.containers.${cId}.network`,
-          this.numCommon(tName("containerNetwork"), "B/s"),
+          numCommon(tName("containerNetwork"), "B/s"),
           container.net,
         );
       }
@@ -1743,103 +1129,6 @@ export class StateManager {
   // State common factories
   // -------------------------------------------------------------------------
 
-  private percentCommon(name: LocalizedName, role = "value"): ioBroker.StateCommon {
-    return {
-      name,
-      type: "number",
-      role,
-      unit: "%",
-      min: 0,
-      max: 100,
-      read: true,
-      write: false,
-    };
-  }
-
-  private numCommon(name: LocalizedName, unit?: string, role = "value"): ioBroker.StateCommon {
-    return {
-      name,
-      type: "number",
-      role,
-      unit,
-      read: true,
-      write: false,
-    };
-  }
-
-  private textCommon(name: LocalizedName, role = "text"): ioBroker.StateCommon {
-    return {
-      name,
-      type: "string",
-      role,
-      read: true,
-      write: false,
-    };
-  }
-
-  private boolCommon(name: LocalizedName, role = "indicator"): ioBroker.StateCommon {
-    return {
-      name,
-      type: "boolean",
-      role,
-      read: true,
-      write: false,
-    };
-  }
-
-  // -------------------------------------------------------------------------
-  // Computation helpers
-  // -------------------------------------------------------------------------
-
-  private computeTopAvgTemp(temps: Record<string, number> | undefined): number | null {
-    const values = this.finiteTempValues(temps);
-    if (!values) {
-      return null;
-    }
-    values.sort((a, b) => b - a);
-    const top3 = values.slice(0, 3);
-    return this.round1(top3.reduce((sum, v) => sum + v, 0) / top3.length);
-  }
-
-  /**
-   * F7: hottest single sensor — the actionable "is anything overheating" value
-   * (vs. the top-3 average). Returns null when there are no finite readings.
-   *
-   * @param temps Sensor → °C map, or undefined.
-   */
-  private computeMaxTemp(temps: Record<string, number> | undefined): number | null {
-    const values = this.finiteTempValues(temps);
-    if (!values) {
-      return null;
-    }
-    // INFO: reduce, not Math.max(...values) — a hostile Hub could send a huge
-    // sensor map and blow V8's argument-count limit (RangeError). computeTopAvgTemp
-    // already avoided the spread.
-    return this.round1(values.reduce((max, v) => (v > max ? v : max), -Infinity));
-  }
-
-  /**
-   * D1: finite sensor readings shared by the temperature computations, or null when none.
-   *
-   * @param temps Sensor → °C map, or undefined.
-   */
-  private finiteTempValues(temps: Record<string, number> | undefined): number[] | null {
-    if (!temps) {
-      return null;
-    }
-    const values = Object.values(temps).filter(v => typeof v === "number" && isFinite(v));
-    return values.length > 0 ? values : null;
-  }
-
-  /**
-   * D1: round to one decimal place.
-   *
-   * @param x Value to round.
-   */
-  private round1(x: number): number {
-    return Math.round(x * 10) / 10;
-  }
-
   /**
    * N1: strip the adapter namespace prefix (`beszel.0.`) from a full object id.
    *
@@ -1847,91 +1136,5 @@ export class StateManager {
    */
   private stripNamespace(id: string): string {
     return id.slice(this.adapter.namespace.length + 1);
-  }
-
-  /**
-   * INFO: clamp a percentage to [0, 100], defense-in-depth against a Hub that
-   * reports a transiently out-of-range value (mirrors the computed FS percent,
-   * SM8). Null passes through so absent data stays null.
-   *
-   * @param v Percentage value, or null.
-   */
-  private clampPercent(v: number | null): number | null {
-    return v === null ? null : Math.min(100, Math.max(0, v));
-  }
-
-  /**
-   * N7: resolve a channel's translated display name from CHANNEL_NAME_KEY. The
-   * `tName` key cast lives here once instead of at every ensureChannel call.
-   *
-   * @param ch Channel key (e.g. "cpu", "cores", "containers").
-   */
-  private channelName(ch: string): ReturnType<typeof tName> {
-    return tName(StateManager.CHANNEL_NAME_KEY[ch] as Parameters<typeof tName>[0]);
-  }
-
-  /**
-   * US7: bytes → MiB, 3-decimal, null-safe. Per-interface network speeds arrive
-   * as raw bytes (`ni` = [4]uint64) while the aggregate network.sent/recv is
-   * MiB-based MB/s (the Hub does `NetworkSent * 1024 * 1024`, v0.18.7
-   * system.go). Normalizing here keeps a dashboard's per-interface and
-   * aggregate rows on the same scale.
-   *
-   * @param v Raw byte value, or undefined.
-   */
-  private bytesToMib(v: number | undefined): number | null {
-    return typeof v === "number" ? Math.round((v / (1024 * 1024)) * 1000) / 1000 : null;
-  }
-
-  /**
-   * US7: bytes → GiB, 3-decimal, null-safe. For the per-interface cumulative
-   * transfer totals, matching the MiB convention above.
-   *
-   * @param v Raw byte value, or undefined.
-   */
-  private bytesToGib(v: number | undefined): number | null {
-    return typeof v === "number" ? Math.round((v / (1024 * 1024 * 1024)) * 1000) / 1000 : null;
-  }
-
-  /**
-   * F2: map the numeric OS platform enum from system_details into a readable
-   * label. Values verified against the v0.18.7 source
-   * (`Ressourcen/beszel/beszel-0.18.7/internal/entities/system/system.go`).
-   *
-   * @param os Platform enum (0=Linux, 1=Darwin/macOS, 2=Windows, 3=FreeBSD).
-   */
-  private osLabel(os: number | undefined): string | null {
-    switch (os) {
-      case 0:
-        return "Linux";
-      case 1:
-        return "macOS";
-      case 2:
-        return "Windows";
-      case 3:
-        return "FreeBSD";
-      default:
-        return os == null ? null : `Unknown (${os})`;
-    }
-  }
-
-  private formatUptime(seconds: number): string {
-    // v0.4.3 (SM10): clamp >= 0 — clock-skew or agent bug could send a
-    // negative value, which used to produce strings like "-1d -2h -3m".
-    const s = Math.max(0, seconds);
-    const d = Math.floor(s / 86400);
-    const h = Math.floor((s % 86400) / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const parts: string[] = [];
-    if (d > 0) {
-      parts.push(`${d}d`);
-    }
-    if (h > 0) {
-      parts.push(`${h}h`);
-    }
-    if (m > 0 || parts.length === 0) {
-      parts.push(`${m}m`);
-    }
-    return parts.join(" ");
   }
 }
