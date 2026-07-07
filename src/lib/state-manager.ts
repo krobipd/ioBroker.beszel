@@ -1339,7 +1339,9 @@ export class StateManager {
       await this.pruneGroup(`${sysId}.cpu.cores`, activeCores, "state", cores.length === 0);
     }
 
-    // Per-network-interface (v0.6.0). ni: name -> [up, down, total up, total down] bytes.
+    // Per-network-interface (v0.6.0). ni: name -> [up, down, total up, total down] raw bytes.
+    // US7: normalized to MB/s (speeds) + GB (totals) so per-interface matches the
+    // MiB-based aggregate network.sent/recv scale instead of showing raw bytes.
     if (config.metrics_networkInterfaces) {
       const entries = stats.ni ? Object.entries(stats.ni) : [];
       const activeIfaces = new Set<string>();
@@ -1357,23 +1359,23 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
-            this.numCommon(tName("ifaceUp"), "B/s"),
-            vals[0] ?? null,
+            this.numCommon(tName("ifaceUp"), "MB/s"),
+            this.bytesToMib(vals[0]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.down`,
-            this.numCommon(tName("ifaceDown"), "B/s"),
-            vals[1] ?? null,
+            this.numCommon(tName("ifaceDown"), "MB/s"),
+            this.bytesToMib(vals[1]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_up`,
-            this.numCommon(tName("ifaceTotalUp"), "B"),
-            vals[2] ?? null,
+            this.numCommon(tName("ifaceTotalUp"), "GB"),
+            this.bytesToGib(vals[2]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_down`,
-            this.numCommon(tName("ifaceTotalDown"), "B"),
-            vals[3] ?? null,
+            this.numCommon(tName("ifaceTotalDown"), "GB"),
+            this.bytesToGib(vals[3]),
           );
         }
       }
@@ -1847,6 +1849,29 @@ export class StateManager {
    */
   private channelName(ch: string): ReturnType<typeof tName> {
     return tName(StateManager.CHANNEL_NAME_KEY[ch] as Parameters<typeof tName>[0]);
+  }
+
+  /**
+   * US7: bytes → MiB, 3-decimal, null-safe. Per-interface network speeds arrive
+   * as raw bytes (`ni` = [4]uint64) while the aggregate network.sent/recv is
+   * MiB-based MB/s (the Hub does `NetworkSent * 1024 * 1024`, v0.18.7
+   * system.go). Normalizing here keeps a dashboard's per-interface and
+   * aggregate rows on the same scale.
+   *
+   * @param v Raw byte value, or undefined.
+   */
+  private bytesToMib(v: number | undefined): number | null {
+    return typeof v === "number" ? Math.round((v / (1024 * 1024)) * 1000) / 1000 : null;
+  }
+
+  /**
+   * US7: bytes → GiB, 3-decimal, null-safe. For the per-interface cumulative
+   * transfer totals, matching the MiB convention above.
+   *
+   * @param v Raw byte value, or undefined.
+   */
+  private bytesToGib(v: number | undefined): number | null {
+    return typeof v === "number" ? Math.round((v / (1024 * 1024 * 1024)) * 1000) / 1000 : null;
   }
 
   /**

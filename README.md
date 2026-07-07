@@ -154,7 +154,7 @@ beszel.0.
         │   ├── recv                 — Download (MB/s)
         │   ├── sent_peak *          — Peak upload in interval (MB/s)
         │   ├── recv_peak *          — Peak download in interval (MB/s)
-        │   └── interfaces/ *        — Per interface: up, down (bytes/s) + total_up, total_down (cumulative bytes)
+        │   └── interfaces/ *        — Per interface: up, down (MB/s) + total_up, total_down (cumulative GB)
         ├── temperature/              — Temperature metrics
         │   ├── average              — Avg of top 3 sensors (°C)
         │   ├── max                  — Hottest single sensor (°C)

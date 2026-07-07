@@ -1023,14 +1023,22 @@ describe("StateManager", () => {
   });
 
   describe("updateSystem — per-interface network (v0.6.0)", () => {
-    it("creates up/down/total states per interface", async () => {
-      const stats = { ...testStats, ni: { eth0: [10, 20, 1000, 2000] as [number, number, number, number] } };
+    it("creates up/down/total states per interface, normalized to MB/s + GB (US7)", async () => {
+      // Raw bytes (ni = [4]uint64) → MiB/GiB: 10 MiB/s up, 5 MiB/s down, 2 GiB + 3 GiB totals.
+      const stats = {
+        ...testStats,
+        ni: {
+          eth0: [10 * 1024 * 1024, 5 * 1024 * 1024, 2 * 1024 ** 3, 3 * 1024 ** 3] as [number, number, number, number],
+        },
+      };
       await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_networkInterfaces: true }));
       expect(adapter.objects.get("systems.my_server.network.interfaces.eth0")?.type).to.equal("channel");
       expect(adapter.states.get("systems.my_server.network.interfaces.eth0.up")?.val).to.equal(10);
-      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.down")?.val).to.equal(20);
-      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.total_up")?.val).to.equal(1000);
-      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.total_down")?.val).to.equal(2000);
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.down")?.val).to.equal(5);
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.total_up")?.val).to.equal(2);
+      expect(adapter.states.get("systems.my_server.network.interfaces.eth0.total_down")?.val).to.equal(3);
+      expect(adapter.objects.get("systems.my_server.network.interfaces.eth0.up")?.common.unit).to.equal("MB/s");
+      expect(adapter.objects.get("systems.my_server.network.interfaces.eth0.total_up")?.common.unit).to.equal("GB");
     });
 
     it("does NOT create interface states when disabled", async () => {
