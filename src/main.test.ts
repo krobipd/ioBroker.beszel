@@ -12,6 +12,7 @@ vi.mock("@iobroker/adapter-core", () => {
     public on = vi.fn();
     public setStateAsync = vi.fn(async () => {});
     public setState = vi.fn(async () => {});
+    public setStateChangedAsync = vi.fn(async () => {});
     public setInterval = vi.fn(() => ({}) as unknown);
     public clearInterval = vi.fn();
     public setTimeout = vi.fn(() => ({}) as unknown);
@@ -84,6 +85,7 @@ function internalOf(adapter: BeszelAdapter): {
   };
   setStateAsync: ReturnType<typeof vi.fn>;
   setState: ReturnType<typeof vi.fn>;
+  setStateChangedAsync: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   extendForeignObjectAsync: ReturnType<typeof vi.fn>;
@@ -210,7 +212,7 @@ describe("BeszelAdapter onReady", () => {
     const { adapter } = setup();
     const i = internalOf(adapter);
     await i.onReady();
-    expect(i.setStateAsync.mock.calls[0]).toEqual(["info.connection", { val: false, ack: true }]);
+    expect(i.setStateChangedAsync.mock.calls[0]).toEqual(["info.connection", { val: false, ack: true }]);
   });
 
   it("catches a failing boot step instead of crashing (boundary try/catch)", async () => {
@@ -278,7 +280,7 @@ describe("BeszelAdapter poll — happy path", () => {
 
     expect(stateMgr.prepareForPoll).toHaveBeenCalledWith([sysA, sysB]);
     expect(stateMgr.updateSystem).toHaveBeenCalledTimes(2);
-    expect(i.setStateAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
     expect(i.lastSystemCount).toBe(2);
   });
 
@@ -319,7 +321,7 @@ describe("BeszelAdapter poll — per-system failure dedup", () => {
 
     await i.poll();
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Failed to update system 'Server A'"));
-    expect(i.failedSystems.has("Server A")).toBe(true);
+    expect(i.failedSystems.has("sys001")).toBe(true);
 
     i.log.warn.mockClear();
     await i.poll();
@@ -328,7 +330,7 @@ describe("BeszelAdapter poll — per-system failure dedup", () => {
 
     stateMgr.updateSystem.mockResolvedValue(undefined);
     await i.poll();
-    expect(i.failedSystems.has("Server A")).toBe(false);
+    expect(i.failedSystems.has("sys001")).toBe(false);
   });
 
   it("one bad system does not poison the others", async () => {
@@ -344,9 +346,9 @@ describe("BeszelAdapter poll — per-system failure dedup", () => {
     });
 
     await i.poll();
-    expect(i.failedSystems.has("Server A")).toBe(true);
-    expect(i.failedSystems.has("Server B")).toBe(false);
-    expect(i.setStateAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
+    expect(i.failedSystems.has("sys001")).toBe(true);
+    expect(i.failedSystems.has("sys002")).toBe(false);
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
   });
 });
 
@@ -415,7 +417,7 @@ describe("BeszelAdapter poll — error classification routing", () => {
     const i = internalOf(adapter);
     client.getSystems.mockRejectedValueOnce(errnoError("refused", "ECONNREFUSED"));
     await i.poll();
-    expect(i.setStateAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
 
     await i.poll(); // success
     expect(i.log.info).toHaveBeenCalledWith("Connection restored");
@@ -506,7 +508,7 @@ describe("BeszelAdapter poll — system_details cadence (F2)", () => {
     await i.onReady(); // first poll hits the 404
     expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("system_details fetch failed (non-fatal"));
     expect(stateMgr.updateSystem).toHaveBeenCalled(); // poll continued
-    expect(i.setStateAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: true, ack: true });
 
     await i.poll();
     expect(client.getSystemDetails).toHaveBeenCalledTimes(1); // 404'd Hub → no hammering

@@ -30,8 +30,11 @@ describe("i18n completeness", () => {
   });
 
   it("all languages have identical keysets", () => {
+    // L7: compare as sorted sets — key PRESENCE matters, not order. A translation
+    // tool re-sorting a complete file must not fail this (it used to, via toEqual).
+    const enSorted = [...enKeys].sort();
     for (const { lang, keys } of keysets) {
-      expect(keys, `${lang} keyset mismatch`).toEqual(enKeys);
+      expect([...keys].sort(), `${lang} keyset mismatch`).toEqual(enSorted);
     }
   });
 

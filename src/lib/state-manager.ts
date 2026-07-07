@@ -46,6 +46,9 @@ export class StateManager {
    */
   private readonly resolvedSafeNames = new Map<string, string>();
 
+  /** L5: collision bases already warned about — the warn fires once, not every poll. */
+  private readonly warnedCollisions = new Set<string>();
+
   /**
    * v0.7.2: per dynamic group (`<sysId>.<group>` → set of child segments seen
    * in the last poll). Used by {@link pruneDynamicChildren} to delete states
@@ -183,6 +186,11 @@ export class StateManager {
       }
     }
     for (const [safe, dupes] of collisions) {
+      // L5: warn once per collision base — persistent collisions used to warn every poll.
+      if (this.warnedCollisions.has(safe)) {
+        continue;
+      }
+      this.warnedCollisions.add(safe);
       const names = dupes.map(s => `${sanitizeForLog(s.name)}(${s.id.slice(0, 8)})`).join(", ");
       this.adapter.log.warn(
         `Multiple systems sanitize to '${safe}' (${names}) — adding hash suffix to disambiguate. Consider renaming on the Hub.`,
@@ -919,7 +927,7 @@ export class StateManager {
     // that practically never changes.
     const deviceSig = `${system.id} ${system.host} ${system.name}`;
     if (this.deviceWritten.get(sysId) !== deviceSig) {
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         sysId,
         {
           type: "device",
@@ -1139,8 +1147,16 @@ export class StateManager {
    * Must be called once during onReady before the first poll.
    */
   public async migrateLegacyStates(): Promise<void> {
+    // L6: one-shot guard. Pre-0.3.0 flat states only exist on installs that
+    // upgraded through <0.3.0; once swept (or confirmed absent) a marker lets
+    // later restarts skip probing dozens of legacy ids per system every time.
+    const marker = await this.adapter.getStateAsync("info.legacyMigrated");
+    if (marker?.val === true) {
+      return;
+    }
     const existingNames = await this.getExistingSystemNames();
     if (existingNames.length === 0) {
+      await this.markLegacyMigrationDone();
       return;
     }
     // v0.4.4 (G4): trace the scan-start so the migration-summary at the end
@@ -1213,6 +1229,23 @@ export class StateManager {
     if (migrated > 0) {
       this.adapter.log.info(`Migration: removed ${migrated} legacy state(s) from flat structure`);
     }
+    await this.markLegacyMigrationDone();
+  }
+
+  /** L6: set the one-shot marker so later restarts skip the legacy-state scan. */
+  private async markLegacyMigrationDone(): Promise<void> {
+    await this.adapter.setObjectNotExistsAsync("info.legacyMigrated", {
+      type: "state",
+      common: {
+        name: "Legacy state migration completed",
+        type: "boolean",
+        role: "indicator",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    await this.adapter.setStateChangedAsync("info.legacyMigrated", { val: true, ack: true });
   }
 
   // -------------------------------------------------------------------------

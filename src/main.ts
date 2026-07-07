@@ -13,7 +13,7 @@ import {
 } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
-import type { AdapterConfig, SystemDetails } from "./lib/types";
+import type { AdapterConfig, BeszelContainer, SystemDetails } from "./lib/types";
 
 /**
  * Beszel adapter — polls a Beszel Hub (PocketBase) and mirrors systems,
@@ -57,6 +57,8 @@ export class BeszelAdapter extends utils.Adapter {
   private isPolling = false;
   private lastSystemCount = 0;
   private lastErrorCode = "";
+  /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
+  private containersUnavailable = false;
   private authFailCount = 0;
   private failedSystems = new Set<string>();
   /**
@@ -102,7 +104,8 @@ export class BeszelAdapter extends utils.Adapter {
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`,
       );
 
-      await this.setStateAsync("info.connection", { val: false, ack: true });
+      // L1: setStateChanged (not the deprecated setStateAsync) — no needless event.
+      await this.setStateChangedAsync("info.connection", { val: false, ack: true });
 
       if (!config.url || !config.username || !config.password) {
         this.log.error(
@@ -248,6 +251,39 @@ export class BeszelAdapter extends utils.Adapter {
     return code || "UNKNOWN";
   }
 
+  /**
+   * L3: fetch containers without letting a failure poison the whole poll. A 403
+   * (the configured user lacks permission for the `containers` collection) or a
+   * transient error used to reject the poll's `Promise.all` and freeze EVERY
+   * system's states. Now it degrades to an empty list (like the non-fatal
+   * system_details fetch), warning once then tracing.
+   *
+   * @param config Adapter configuration (containers only fetched when enabled).
+   */
+  private async fetchContainersSafe(config: AdapterConfig): Promise<BeszelContainer[]> {
+    if (!config.metrics_containers || !this.client) {
+      return [];
+    }
+    try {
+      const containers = await this.client.getContainers();
+      if (this.containersUnavailable) {
+        this.log.info("Container data is available again");
+        this.containersUnavailable = false;
+      }
+      return containers;
+    } catch (err) {
+      const code = this.classifyError(err);
+      const msg = `Container fetch failed (non-fatal, ${code}) — other metrics still update. Check the configured user's permission for the containers collection.`;
+      if (this.containersUnavailable) {
+        this.log.debug(msg);
+      } else {
+        this.log.warn(msg);
+        this.containersUnavailable = true;
+      }
+      return [];
+    }
+  }
+
   private async poll(): Promise<void> {
     if (this.isPolling) {
       this.log.debug("Skipping poll — previous poll still running");
@@ -270,12 +306,12 @@ export class BeszelAdapter extends utils.Adapter {
       // though the API endpoint doesn't actually need the system IDs.
       const [systems, containers, statsMap] = await Promise.all([
         this.client.getSystems(),
-        config.metrics_containers ? this.client.getContainers() : Promise.resolve([]),
+        this.fetchContainersSafe(config),
         this.client.getLatestStats(),
       ]);
 
-      // Update connection state
-      await this.setStateAsync("info.connection", { val: true, ack: true });
+      // Update connection state (L1: setStateChanged → no event when unchanged).
+      await this.setStateChangedAsync("info.connection", { val: true, ack: true });
 
       // v0.6.0 (F2): static hardware/OS details. Only when "System info" is
       // enabled, and only fetched when we don't already have details for every
@@ -342,14 +378,14 @@ export class BeszelAdapter extends utils.Adapter {
               `updateSystem: '${sanitizeForLog(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`,
             );
             await this.stateManager!.updateSystem(system, stats, containers, config);
-            this.failedSystems.delete(system.name);
+            this.failedSystems.delete(system.id);
           } catch (err) {
             const msg = `Failed to update system '${sanitizeForLog(system.name)}': ${errText(err)}`;
-            if (this.failedSystems.has(system.name)) {
+            if (this.failedSystems.has(system.id)) {
               this.log.debug(msg);
             } else {
               this.log.warn(msg);
-              this.failedSystems.add(system.name);
+              this.failedSystems.add(system.id);
             }
           }
         }),
@@ -366,13 +402,14 @@ export class BeszelAdapter extends utils.Adapter {
         // re-added system would inherit the old failure-dedup entry (its
         // first failure warn silently demoted to debug) and a stale
         // detailsAttempted marker.
-        const activeNames = new Set(systems.map(s => s.name));
-        for (const name of [...this.failedSystems]) {
-          if (!activeNames.has(name)) {
-            this.failedSystems.delete(name);
+        // L5: bookkeeping keyed by the STABLE system id — two systems that share
+        // a sanitized name would otherwise clobber each other's failure-dedup marker.
+        const activeIds = new Set(systems.map(s => s.id));
+        for (const id of [...this.failedSystems]) {
+          if (!activeIds.has(id)) {
+            this.failedSystems.delete(id);
           }
         }
-        const activeIds = new Set(systems.map(s => s.id));
         for (const id of [...this.detailsAttempted]) {
           if (!activeIds.has(id)) {
             this.detailsAttempted.delete(id);
@@ -429,7 +466,12 @@ export class BeszelAdapter extends utils.Adapter {
         this.log.debug(`Poll failed: ${errMsg}`);
       }
 
-      await this.setStateAsync("info.connection", { val: false, ack: true });
+      // L1: fire-and-forget with .catch — this runs in the catch of the un-awaited
+      // interval poll; an unguarded await here would escape as an unhandled
+      // rejection if the states DB is also down (crash-loop, no stack). Mirrors onUnload.
+      void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
+        /* broker shutting down / states unreachable */
+      });
     } finally {
       this.isPolling = false;
     }

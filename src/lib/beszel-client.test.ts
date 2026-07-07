@@ -534,7 +534,13 @@ describe("BeszelClient", () => {
               totalItems: 3,
               totalPages: 3,
               items: [
-                { id: `r${pageRequests}`, system: `sys00${pageRequests}`, type: "1m", stats: { cpu: pageRequests }, updated: "t" },
+                {
+                  id: `r${pageRequests}`,
+                  system: `sys00${pageRequests}`,
+                  type: "1m",
+                  stats: { cpu: pageRequests },
+                  updated: "t",
+                },
               ],
             }),
           };
@@ -1081,7 +1087,7 @@ describe("BeszelClient", () => {
   });
 
   describe("429 rate-limit retry (B3 v0.4.3)", () => {
-    it("retries once on 429 honouring Retry-After, then succeeds", async () => {
+    it("retries once on a 429, then succeeds", async () => {
       let calls = 0;
       mock = createMockServer({
         systemsHandler: () => {
@@ -1106,11 +1112,18 @@ describe("BeszelClient", () => {
         },
       });
       const port = await mock.start();
-      // Inject a Retry-After: 1 header in the mock response — the mock
-      // helper above doesn't expose headers, so we rely on the default
-      // 1-second backoff inside the client.
+      // L7: honest scope — this exercises the 429 → single-retry → success path.
+      // The mock server does not set a Retry-After header, so the client uses its
+      // default back-off; the header-parse branch is left to a hostile-Hub audit.
       const instantDelay = () => Promise.resolve();
-      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, instantDelay);
+      const client = new BeszelClient(
+        `http://127.0.0.1:${port}`,
+        "admin",
+        "secret",
+        undefined,
+        undefined,
+        instantDelay,
+      );
       const systems = await client.getSystems();
       expect(systems).to.have.lengthOf(0);
       // First systems-request was 429 → retry → 200
@@ -1127,7 +1140,14 @@ describe("BeszelClient", () => {
       });
       const port = await mock.start();
       const instantDelay = () => Promise.resolve();
-      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, instantDelay);
+      const client = new BeszelClient(
+        `http://127.0.0.1:${port}`,
+        "admin",
+        "secret",
+        undefined,
+        undefined,
+        instantDelay,
+      );
       try {
         await client.getSystems();
         expect.fail("Should have thrown");

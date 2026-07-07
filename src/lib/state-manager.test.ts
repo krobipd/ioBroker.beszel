@@ -35,11 +35,12 @@ interface MockAdapter {
     warn: (msg: string) => void;
     error: (msg: string) => void;
   };
-  extendObjectAsync: (id: string, obj: Partial<ObjectDef>) => Promise<void>;
+  extendObject: (id: string, obj: Partial<ObjectDef>) => Promise<void>;
   setObjectNotExistsAsync: (id: string, obj: ObjectDef) => Promise<void>;
   setStateAsync: (id: string, state: StateValue) => Promise<void>;
   setStateChangedAsync: (id: string, state: StateValue) => Promise<void>;
   getObjectAsync: (id: string) => Promise<ObjectDef | null>;
+  getStateAsync: (id: string) => Promise<StateValue | null>;
   getObjectViewAsync: (
     design: string,
     search: string,
@@ -62,7 +63,7 @@ function createMockAdapter(): MockAdapter {
       warn: (): void => {},
       error: (): void => {},
     },
-    extendObjectAsync: async (id: string, obj: Partial<ObjectDef>): Promise<void> => {
+    extendObject: async (id: string, obj: Partial<ObjectDef>): Promise<void> => {
       const existing = objects.get(id) || { type: "", common: {}, native: {} };
       objects.set(id, {
         type: obj.type || existing.type,
@@ -83,6 +84,9 @@ function createMockAdapter(): MockAdapter {
     },
     getObjectAsync: async (id: string): Promise<ObjectDef | null> => {
       return objects.get(id) || null;
+    },
+    getStateAsync: async (id: string): Promise<StateValue | null> => {
+      return states.get(id) ?? null;
     },
     getObjectViewAsync: async (
       _design: string,
@@ -1698,7 +1702,9 @@ describe("StateManager", () => {
 
       await manager.migrateLegacyStates();
 
-      expect(adapter.objects.size).to.equal(objectCountBefore);
+      // L6: nothing to migrate here, but the one-shot marker is created (+1).
+      expect(adapter.objects.has("info.legacyMigrated")).to.be.true;
+      expect(adapter.objects.size).to.equal(objectCountBefore + 1);
     });
 
     it("should handle empty adapter with no systems", async () => {
@@ -2051,8 +2057,8 @@ describe("StateManager", () => {
   describe("device-object write cache (v0.7.2)", () => {
     it("writes the device object only once while id/host/name are unchanged", async () => {
       let extendCalls = 0;
-      const origExtend = adapter.extendObjectAsync;
-      adapter.extendObjectAsync = async (...args): Promise<void> => {
+      const origExtend = adapter.extendObject;
+      adapter.extendObject = async (...args): Promise<void> => {
         extendCalls++;
         return origExtend(...args);
       };
@@ -2066,8 +2072,8 @@ describe("StateManager", () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       const moved = { ...testSystem, host: "192.168.1.99" };
       let extendCalls = 0;
-      const origExtend = adapter.extendObjectAsync;
-      adapter.extendObjectAsync = async (...args): Promise<void> => {
+      const origExtend = adapter.extendObject;
+      adapter.extendObject = async (...args): Promise<void> => {
         extendCalls++;
         return origExtend(...args);
       };
@@ -2080,8 +2086,8 @@ describe("StateManager", () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       await manager.cleanupSystems([]); // removes systems.my_server
       let extendCalls = 0;
-      const origExtend = adapter.extendObjectAsync;
-      adapter.extendObjectAsync = async (...args): Promise<void> => {
+      const origExtend = adapter.extendObject;
+      adapter.extendObject = async (...args): Promise<void> => {
         extendCalls++;
         return origExtend(...args);
       };
@@ -2260,11 +2266,11 @@ describe("StateManager", () => {
   });
 
   describe("preserve option", () => {
-    it("extendObjectAsync passes preserve option for devices", async () => {
+    it("extendObject passes preserve option for devices", async () => {
       const adapter = createMockAdapter();
       const calls: any[][] = [];
-      const origExtend = adapter.extendObjectAsync;
-      adapter.extendObjectAsync = async (...args: any[]): Promise<void> => {
+      const origExtend = adapter.extendObject;
+      adapter.extendObject = async (...args: any[]): Promise<void> => {
         calls.push(args);
         return origExtend(args[0], args[1]);
       };
