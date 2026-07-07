@@ -278,16 +278,10 @@ export interface SystemStats {
  * A system_stats record from /api/collections/system_stats/records
  */
 export interface BeszelSystemStats {
-  /** PocketBase record ID */
-  id: string;
-  /** Reference to systems.id */
+  /** Reference to systems.id — the only reference the client keys on. */
   system: string;
-  /** Stats type, e.g. "1m" */
-  type: string;
   /** Metric values */
   stats: SystemStats;
-  /** ISO timestamp of last update */
-  updated: string;
 }
 
 /**
@@ -319,15 +313,11 @@ export interface BeszelContainer {
 }
 
 /**
- * PocketBase list response
+ * PocketBase list response — only the two fields the client actually reads.
+ * `page`/`perPage`/`totalItems` are dropped from the raw body during coercion
+ * (fetchAllPages drives pagination from `totalPages` alone).
  */
 export interface PocketBaseList<T> {
-  /** Current page number */
-  page: number;
-  /** Items per page */
-  perPage: number;
-  /** Total number of items */
-  totalItems: number;
   /** Total number of pages */
   totalPages: number;
   /** Records on this page */

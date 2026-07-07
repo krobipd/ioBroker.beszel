@@ -126,16 +126,8 @@
       "uk": "Підключається до Beszel Hub та надає метрики сервера як стани ioBroker",
       "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
     },
-    "authors": [
-      "krobi <krobi@power-dreams.com>"
-    ],
-    "keywords": [
-      "beszel",
-      "monitoring",
-      "server",
-      "metrics",
-      "hardware"
-    ],
+    "authors": ["krobi <krobi@power-dreams.com>"],
+    "keywords": ["beszel", "monitoring", "server", "metrics", "hardware"],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -237,14 +229,8 @@
       "native": {}
     }
   ],
-  "encryptedNative": [
-    "username",
-    "password"
-  ],
-  "protectedNative": [
-    "username",
-    "password"
-  ],
+  "encryptedNative": ["username", "password"],
+  "protectedNative": ["username", "password", "url"],
   "native": {
     "url": "",
     "username": "",

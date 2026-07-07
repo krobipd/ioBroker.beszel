@@ -214,16 +214,14 @@ export class StateManager {
   public async getExistingSystemNames(): Promise<string[]> {
     const objects = await this.adapter.getObjectViewAsync("system", "device", {
       startkey: `${this.adapter.namespace}.systems.`,
-      endkey: `${this.adapter.namespace}.systems.\u9999`,
+      endkey: `${this.adapter.namespace}.systems.\uFFFF`,
     });
     if (!objects?.rows) {
       return [];
     }
     const names: string[] = [];
     for (const row of objects.rows) {
-      const id = row.id.startsWith(`${this.adapter.namespace}.`)
-        ? row.id.slice(this.adapter.namespace.length + 1)
-        : row.id;
+      const id = row.id.startsWith(`${this.adapter.namespace}.`) ? this.stripNamespace(row.id) : row.id;
       const parts = id.split(".");
       if (parts.length === 2 && parts[0] === "systems") {
         names.push(parts[1]);
@@ -337,10 +335,26 @@ export class StateManager {
    * — this unifies the two old code paths (with-stats in updateStatsStates,
    * without-stats in updateSystem) that previously duplicated it.
    */
+  private metricDefsCache?: MetricDef[];
+
+  /**
+   * INFO: the registry is stateless — every `available`/`extract` predicate
+   * takes (system, stats) as args and closes only over pure helpers, so it can
+   * be built once and reused across polls/systems instead of rebuilt (and
+   * re-`tName`d) on every applyMetrics/cleanupMetrics call.
+   */
   private metricDefs(): MetricDef[] {
+    return (this.metricDefsCache ??= this.buildMetricDefs());
+  }
+
+  private buildMetricDefs(): MetricDef[] {
     const hasStats = (s: SystemStats | undefined): boolean => !!s;
     const la = (system: BeszelSystem, stats: SystemStats | undefined): [number, number, number] | undefined =>
       stats?.la ?? system.info.la;
+    // N4: the per-core (cpub) and disk-I/O (dios) availability guards were copied
+    // verbatim across their metric defs — hoist to one predicate each.
+    const hasCpub = (s: SystemStats | undefined): boolean => !!s?.cpub && s.cpub.length >= 5;
+    const hasDio = (s: SystemStats | undefined, n: number): boolean => !!s?.dios && s.dios.length >= n;
     return [
       // info (no stats required)
       {
@@ -512,7 +526,7 @@ export class StateManager {
         id: "cpu.user",
         nameKey: "cpuUser",
         kind: "percent",
-        available: st => !!st?.cpub && st.cpub.length >= 5,
+        available: hasCpub,
         extract: (_s, st) => st?.cpub?.[0] ?? null,
       },
       {
@@ -521,7 +535,7 @@ export class StateManager {
         id: "cpu.system",
         nameKey: "cpuSystem",
         kind: "percent",
-        available: st => !!st?.cpub && st.cpub.length >= 5,
+        available: hasCpub,
         extract: (_s, st) => st?.cpub?.[1] ?? null,
       },
       {
@@ -530,7 +544,7 @@ export class StateManager {
         id: "cpu.iowait",
         nameKey: "cpuIowait",
         kind: "percent",
-        available: st => !!st?.cpub && st.cpub.length >= 5,
+        available: hasCpub,
         extract: (_s, st) => st?.cpub?.[2] ?? null,
       },
       {
@@ -539,7 +553,7 @@ export class StateManager {
         id: "cpu.steal",
         nameKey: "cpuSteal",
         kind: "percent",
-        available: st => !!st?.cpub && st.cpub.length >= 5,
+        available: hasCpub,
         extract: (_s, st) => st?.cpub?.[3] ?? null,
       },
       {
@@ -548,7 +562,7 @@ export class StateManager {
         id: "cpu.idle",
         nameKey: "cpuIdle",
         kind: "percent",
-        available: st => !!st?.cpub && st.cpub.length >= 5,
+        available: hasCpub,
         extract: (_s, st) => st?.cpub?.[4] ?? null,
       },
       {
@@ -807,7 +821,7 @@ export class StateManager {
         id: "disk.io_util",
         nameKey: "diskIoUtil",
         kind: "percent",
-        available: st => !!st?.dios && st.dios.length >= 3,
+        available: st => hasDio(st, 3),
         extract: (_s, st) => st?.dios?.[2] ?? null,
       },
       {
@@ -817,7 +831,7 @@ export class StateManager {
         nameKey: "diskIoAwaitRead",
         kind: "num",
         unit: "ms",
-        available: st => !!st?.dios && st.dios.length >= 5,
+        available: st => hasDio(st, 5),
         extract: (_s, st) => st?.dios?.[3] ?? null,
       },
       {
@@ -827,7 +841,7 @@ export class StateManager {
         nameKey: "diskIoAwaitWrite",
         kind: "num",
         unit: "ms",
-        available: st => !!st?.dios && st.dios.length >= 5,
+        available: st => hasDio(st, 5),
         extract: (_s, st) => st?.dios?.[4] ?? null,
       },
     ];
@@ -889,7 +903,9 @@ export class StateManager {
       );
     }
     for (const def of active) {
-      await this.createAndSetState(`${sysId}.${def.id}`, this.commonFor(def), def.extract(system, stats));
+      const raw = def.extract(system, stats);
+      const value = def.kind === "percent" && typeof raw === "number" ? this.clampPercent(raw) : raw;
+      await this.createAndSetState(`${sysId}.${def.id}`, this.commonFor(def), value);
     }
   }
 
@@ -928,7 +944,7 @@ export class StateManager {
     // when id/host/name actually changed — extendObject on every poll meant
     // one object write + objectChange event per system per minute for data
     // that practically never changes.
-    const deviceSig = `${system.id} ${system.host} ${system.name}`;
+    const deviceSig = `${system.id} ${system.host} ${system.name}`;
     if (this.deviceWritten.get(sysId) !== deviceSig) {
       await this.adapter.extendObject(
         sysId,
@@ -1126,10 +1142,10 @@ export class StateManager {
     if (config.metrics_gpu && !config.metrics_gpuDetails) {
       const view = await this.adapter.getObjectViewAsync("system", "channel", {
         startkey: `${this.adapter.namespace}.${sysId}.gpu.`,
-        endkey: `${this.adapter.namespace}.${sysId}.gpu.\u9999`,
+        endkey: `${this.adapter.namespace}.${sysId}.gpu.\uFFFF`,
       });
       for (const row of view?.rows ?? []) {
-        const id = row.id.slice(this.adapter.namespace.length + 1);
+        const id = this.stripNamespace(row.id);
         const child = id.slice(`${sysId}.gpu.`.length);
         // Direct GPU channels only (`gpu.<id>`), not the engines channels.
         if (!child || child.includes(".")) {
@@ -1302,7 +1318,11 @@ export class StateManager {
         await this.ensureChannel(`${sysId}.cpu.cores`, tName("channelCores"));
         for (let i = 0; i < cores.length; i++) {
           activeCores.add(`core${i}`);
-          await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), cores[i]);
+          await this.createAndSetState(
+            `${sysId}.cpu.cores.core${i}`,
+            this.percentCommon(`Core ${i}`),
+            this.clampPercent(cores[i]),
+          );
         }
       }
       // v0.7.2 + H2: prune core states beyond the current count (VM resized down).
@@ -1368,7 +1388,7 @@ export class StateManager {
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
             this.percentCommon(tName("gpuUsage")),
-            gpuData.u ?? null,
+            this.clampPercent(gpuData.u ?? null),
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.memory_used`,
@@ -1404,7 +1424,7 @@ export class StateManager {
                   await this.createAndSetState(
                     `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
                     this.percentCommon(sanitizeForLog(engine)),
-                    value,
+                    this.clampPercent(value),
                   );
                   activeEngines.add(safeEngine);
                 }
@@ -1612,12 +1632,10 @@ export class StateManager {
       known = new Set<string>();
       const view = await this.adapter.getObjectViewAsync("system", childType, {
         startkey: `${this.adapter.namespace}.${base}.`,
-        endkey: `${this.adapter.namespace}.${base}.\u9999`,
+        endkey: `${this.adapter.namespace}.${base}.\uFFFF`,
       });
       for (const row of view?.rows ?? []) {
-        const id = row.id.startsWith(`${this.adapter.namespace}.`)
-          ? row.id.slice(this.adapter.namespace.length + 1)
-          : row.id;
+        const id = row.id.startsWith(`${this.adapter.namespace}.`) ? this.stripNamespace(row.id) : row.id;
         if (!id.startsWith(`${base}.`)) {
           continue;
         }
@@ -1743,17 +1761,13 @@ export class StateManager {
   // -------------------------------------------------------------------------
 
   private computeTopAvgTemp(temps: Record<string, number> | undefined): number | null {
-    if (!temps) {
-      return null;
-    }
-    const values = Object.values(temps).filter(v => typeof v === "number" && isFinite(v));
-    if (values.length === 0) {
+    const values = this.finiteTempValues(temps);
+    if (!values) {
       return null;
     }
     values.sort((a, b) => b - a);
     const top3 = values.slice(0, 3);
-    const avg = top3.reduce((sum, v) => sum + v, 0) / top3.length;
-    return Math.round(avg * 10) / 10;
+    return this.round1(top3.reduce((sum, v) => sum + v, 0) / top3.length);
   }
 
   /**
@@ -1763,14 +1777,56 @@ export class StateManager {
    * @param temps Sensor → °C map, or undefined.
    */
   private computeMaxTemp(temps: Record<string, number> | undefined): number | null {
+    const values = this.finiteTempValues(temps);
+    if (!values) {
+      return null;
+    }
+    // INFO: reduce, not Math.max(...values) — a hostile Hub could send a huge
+    // sensor map and blow V8's argument-count limit (RangeError). computeTopAvgTemp
+    // already avoided the spread.
+    return this.round1(values.reduce((max, v) => (v > max ? v : max), -Infinity));
+  }
+
+  /**
+   * D1: finite sensor readings shared by the temperature computations, or null when none.
+   *
+   * @param temps Sensor → °C map, or undefined.
+   */
+  private finiteTempValues(temps: Record<string, number> | undefined): number[] | null {
     if (!temps) {
       return null;
     }
     const values = Object.values(temps).filter(v => typeof v === "number" && isFinite(v));
-    if (values.length === 0) {
-      return null;
-    }
-    return Math.round(Math.max(...values) * 10) / 10;
+    return values.length > 0 ? values : null;
+  }
+
+  /**
+   * D1: round to one decimal place.
+   *
+   * @param x Value to round.
+   */
+  private round1(x: number): number {
+    return Math.round(x * 10) / 10;
+  }
+
+  /**
+   * N1: strip the adapter namespace prefix (`beszel.0.`) from a full object id.
+   *
+   * @param id Full object id.
+   */
+  private stripNamespace(id: string): string {
+    return id.slice(this.adapter.namespace.length + 1);
+  }
+
+  /**
+   * INFO: clamp a percentage to [0, 100], defense-in-depth against a Hub that
+   * reports a transiently out-of-range value (mirrors the computed FS percent,
+   * SM8). Null passes through so absent data stays null.
+   *
+   * @param v Percentage value, or null.
+   */
+  private clampPercent(v: number | null): number | null {
+    return v === null ? null : Math.min(100, Math.max(0, v));
   }
 
   /**

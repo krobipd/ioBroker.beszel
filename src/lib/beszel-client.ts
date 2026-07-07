@@ -347,9 +347,17 @@ export class BeszelClient {
       // poll. The auth request itself (token === null) is never retried here,
       // and if the retry also 401s it propagates to the poll's auth-backoff.
       if (e.code === "UNAUTHORIZED" && token !== null) {
-        this.log?.debug(`request: 401 on ${path} — re-authenticating and retrying once`);
-        this.invalidateToken();
-        await this.ensureToken();
+        // INFO: only re-auth if the token that got the 401 is still current.
+        // Under parallel 401s the first request refreshes the token; the rest
+        // must retry with the fresh token instead of each burning a redundant
+        // re-auth (and clobbering the just-refreshed token via invalidateToken).
+        if (this.token === token) {
+          this.log?.debug(`request: 401 on ${path} — re-authenticating and retrying once`);
+          this.invalidateToken();
+          await this.ensureToken();
+        } else {
+          this.log?.debug(`request: 401 on ${path} — token already refreshed concurrently, retrying`);
+        }
         return this.requestOnce<T>(method, path, body, this.token);
       }
       if (e.code !== "RATE_LIMITED") {

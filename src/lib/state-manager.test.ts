@@ -493,6 +493,13 @@ describe("StateManager", () => {
       expect(obj?.common.role).to.equal("value");
       expect(obj?.common.unit).to.equal("%");
     });
+
+    it("should clamp an out-of-range percent to [0, 100] (INFO hardening)", async () => {
+      await manager.updateSystem(testSystem, { ...testStats, cpu: 150 }, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(100);
+      await manager.updateSystem(testSystem, { ...testStats, cpu: -5 }, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(0);
+    });
   });
 
   // -----------------------------------------------------------------------

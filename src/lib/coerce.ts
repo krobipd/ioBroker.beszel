@@ -373,46 +373,36 @@ function coerceFsStats(value: unknown): FsStats {
   if (!obj) {
     return {};
   }
+  // D4: all FsStats fields are plain finite numbers — loop like coerceSystemStats
+  // rather than four copy-pasted blocks.
   const out: FsStats = {};
-  const d = coerceFiniteNumber(obj.d);
-  if (d !== null) {
-    out.d = d;
-  }
-  const du = coerceFiniteNumber(obj.du);
-  if (du !== null) {
-    out.du = du;
-  }
-  const r = coerceFiniteNumber(obj.r);
-  if (r !== null) {
-    out.r = r;
-  }
-  const w = coerceFiniteNumber(obj.w);
-  if (w !== null) {
-    out.w = w;
+  const NUMBER_FIELDS: (keyof FsStats)[] = ["d", "du", "r", "w"];
+  for (const k of NUMBER_FIELDS) {
+    const n = coerceFiniteNumber(obj[k]);
+    if (n !== null) {
+      (out as Record<string, number>)[k] = n;
+    }
   }
   return out;
 }
 
-function coerceGpuMap(value: unknown): Record<string, GPUData> | undefined {
+/**
+ * D2: coerce an object-of-T map. Each value passes through `itemCoercer`
+ * (which must be total — GPUData/FsStats always coerce to a value). Shared by
+ * the GPU (`g`) and filesystem (`efs`) maps. coerceNumberMap stays separate: it
+ * drops non-numeric entries rather than coercing every key.
+ *
+ * @param value Unknown object whose values are per-entry stats.
+ * @param itemCoercer Total per-value coercer.
+ */
+function coerceMapOf<T>(value: unknown, itemCoercer: (raw: unknown) => T): Record<string, T> | undefined {
   const obj = coerceObject(value);
   if (!obj) {
     return undefined;
   }
-  const out: Record<string, GPUData> = {};
+  const out: Record<string, T> = {};
   for (const [k, v] of Object.entries(obj)) {
-    out[k] = coerceGPUData(v);
-  }
-  return out;
-}
-
-function coerceFsMap(value: unknown): Record<string, FsStats> | undefined {
-  const obj = coerceObject(value);
-  if (!obj) {
-    return undefined;
-  }
-  const out: Record<string, FsStats> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    out[k] = coerceFsStats(v);
+    out[k] = itemCoercer(v);
   }
   return out;
 }
@@ -472,11 +462,11 @@ export function coerceSystemStats(value: unknown): SystemStats {
   if (la) {
     s.la = [la[0], la[1], la[2]];
   }
-  const g = coerceGpuMap(obj.g);
+  const g = coerceMapOf(obj.g, coerceGPUData);
   if (g) {
     s.g = g;
   }
-  const efs = coerceFsMap(obj.efs);
+  const efs = coerceMapOf(obj.efs, coerceFsStats);
   if (efs) {
     s.efs = efs;
   }
@@ -518,7 +508,9 @@ export function coerceSystemStats(value: unknown): SystemStats {
 
 /**
  * Coerce a raw system_stats record. Returns null if required references
- * (id, system) are missing.
+ * (id, system) are missing. Only `system` + `stats` are retained — the client
+ * keys stats by `system` and never reads the record id/type/updated (A2); the
+ * id presence-check stays as a sanity guard against malformed rows.
  *
  * @param value Unknown record from PocketBase /system_stats/records
  */
@@ -533,11 +525,8 @@ export function coerceSystemStatsRecord(value: unknown): BeszelSystemStats | nul
     return null;
   }
   return {
-    id,
     system,
-    type: coerceString(obj.type) ?? "",
     stats: coerceSystemStats(obj.stats),
-    updated: coerceString(obj.updated) ?? "",
   };
 }
 
@@ -628,6 +617,19 @@ export function isPlaintextRemoteUrl(url: unknown): boolean {
 }
 
 /**
+ * N3: parse a numeric admin-config value (number or numeric string) to a finite
+ * number, falling back to `fallback` when absent/unparseable. The finite/clamp
+ * prolog was duplicated by coercePollInterval and coerceTimeoutMs.
+ *
+ * @param raw Raw config value (number or numeric string).
+ * @param fallback Value to return when `raw` is missing or not finite.
+ */
+function parseConfigNumber(raw: unknown, fallback: number): number {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
  * v0.5.0 (S1+K15): coerce poll-interval to a finite number of seconds,
  * default 60 s, clamped to [10, 300] — matches admin/jsonConfig.json
  * min/max so a script bypassing the admin UI cannot push the value
@@ -636,11 +638,7 @@ export function isPlaintextRemoteUrl(url: unknown): boolean {
  * @param raw Raw `pollInterval` from admin config (number or numeric string).
  */
 export function coercePollInterval(raw: unknown): number {
-  const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
-  if (!Number.isFinite(n)) {
-    return 60;
-  }
-  return Math.max(10, Math.min(300, Math.floor(n)));
+  return Math.max(10, Math.min(300, Math.floor(parseConfigNumber(raw, 60))));
 }
 
 /**
@@ -666,11 +664,7 @@ export function shouldFetchSystemDetails(systemIds: string[], attempted: Readonl
  * @param raw Raw `requestTimeout` from admin config (number or numeric string).
  */
 export function coerceTimeoutMs(raw: unknown): number {
-  const n = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
-  if (!Number.isFinite(n)) {
-    return 15_000;
-  }
-  return Math.max(5, Math.min(120, Math.floor(n))) * 1000;
+  return Math.max(5, Math.min(120, Math.floor(parseConfigNumber(raw, 15)))) * 1000;
 }
 
 /**
@@ -683,7 +677,7 @@ export function coerceTimeoutMs(raw: unknown): number {
 export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unknown) => T | null): PocketBaseList<T> {
   const obj = coerceObject(value);
   if (!obj) {
-    return { page: 0, perPage: 0, totalItems: 0, totalPages: 0, items: [] };
+    return { totalPages: 0, items: [] };
   }
   const rawItems = coerceArray(obj.items) ?? [];
   const items: T[] = [];
@@ -694,9 +688,6 @@ export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unkno
     }
   }
   return {
-    page: coerceFiniteNumber(obj.page) ?? 0,
-    perPage: coerceFiniteNumber(obj.perPage) ?? 0,
-    totalItems: coerceFiniteNumber(obj.totalItems) ?? 0,
     totalPages: coerceFiniteNumber(obj.totalPages) ?? 0,
     items,
   };

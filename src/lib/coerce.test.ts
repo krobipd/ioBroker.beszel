@@ -479,7 +479,6 @@ describe("coerce", () => {
         updated: "2026-01-01T12:00:00Z",
       });
       expect(rec).to.not.be.null;
-      expect(rec!.id).to.equal("s1");
       expect(rec!.system).to.equal("sys001");
       expect(rec!.stats.cpu).to.equal(45);
     });
@@ -706,7 +705,7 @@ describe("coerce", () => {
     it("returns empty list for non-object input", () => {
       const result = coercePocketBaseList(null, coerceSystem);
       expect(result.items).to.deep.equal([]);
-      expect(result.totalItems).to.equal(0);
+      expect(result.totalPages).to.equal(0);
     });
 
     it("returns empty list when items key is missing", () => {
