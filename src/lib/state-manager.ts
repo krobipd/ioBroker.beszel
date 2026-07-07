@@ -248,7 +248,12 @@ export class StateManager {
    */
   private static readonly BATTERY_STATE_CHARGING = 3;
 
-  /** i18n key for each metric channel. */
+  /**
+   * N7: i18n key for every channel — the scalar metric channels (driven by
+   * `metricDefs().channel` in applyMetrics) and the dynamic-group parents /
+   * sub-channels ensured in updateDynamicStats. Single source so a channel's
+   * display name is never spelled inline in two places.
+   */
   private static readonly CHANNEL_NAME_KEY: Record<string, string> = {
     info: "channelInfo",
     cpu: "channelCpu",
@@ -257,6 +262,14 @@ export class StateManager {
     network: "channelNetwork",
     temperature: "channelTemperature",
     battery: "channelBattery",
+    // dynamic-group parents + sub-channels
+    cores: "channelCores",
+    sensors: "channelSensors",
+    interfaces: "channelInterfaces",
+    gpu: "channelGpu",
+    engines: "channelEngines",
+    filesystems: "channelFilesystems",
+    containers: "channelContainers",
   };
 
   /**
@@ -897,10 +910,7 @@ export class StateManager {
     });
     const channels = new Set(active.map(d => d.channel));
     for (const ch of channels) {
-      await this.ensureChannel(
-        `${sysId}.${ch}`,
-        tName(StateManager.CHANNEL_NAME_KEY[ch] as Parameters<typeof tName>[0]),
-      );
+      await this.ensureChannel(`${sysId}.${ch}`, this.channelName(ch));
     }
     for (const def of active) {
       const raw = def.extract(system, stats);
@@ -964,7 +974,7 @@ export class StateManager {
     }
 
     // Info channel (always created)
-    await this.ensureChannel(`${sysId}.info`, tName("channelInfo"));
+    await this.ensureChannel(`${sysId}.info`, this.channelName("info"));
 
     // Always: online + status
     await this.createAndSetState(
@@ -1288,8 +1298,8 @@ export class StateManager {
       const entries = stats.t ? Object.entries(stats.t) : [];
       const activeSensors = new Set<string>();
       if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
-        await this.ensureChannel(`${sysId}.temperature.sensors`, tName("channelSensors"));
+        await this.ensureChannel(`${sysId}.temperature`, this.channelName("temperature"));
+        await this.ensureChannel(`${sysId}.temperature.sensors`, this.channelName("sensors"));
         const seenSensors = new Set<string>();
         for (const [sensor, temp] of entries) {
           const safeSensor = this.resolveChildId(sensor, sensor, seenSensors);
@@ -1314,8 +1324,8 @@ export class StateManager {
       const cores = stats.cpus ?? [];
       const activeCores = new Set<string>();
       if (cores.length > 0) {
-        await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
-        await this.ensureChannel(`${sysId}.cpu.cores`, tName("channelCores"));
+        await this.ensureChannel(`${sysId}.cpu`, this.channelName("cpu"));
+        await this.ensureChannel(`${sysId}.cpu.cores`, this.channelName("cores"));
         for (let i = 0; i < cores.length; i++) {
           activeCores.add(`core${i}`);
           await this.createAndSetState(
@@ -1334,8 +1344,8 @@ export class StateManager {
       const entries = stats.ni ? Object.entries(stats.ni) : [];
       const activeIfaces = new Set<string>();
       if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
-        await this.ensureChannel(`${sysId}.network.interfaces`, tName("channelInterfaces"));
+        await this.ensureChannel(`${sysId}.network`, this.channelName("network"));
+        await this.ensureChannel(`${sysId}.network.interfaces`, this.channelName("interfaces"));
         const seenIfaces = new Set<string>();
         for (const [iface, vals] of entries) {
           const safeId = this.resolveChildId(iface, iface, seenIfaces);
@@ -1376,7 +1386,7 @@ export class StateManager {
       const entries = stats.g ? Object.entries(stats.g) : [];
       const activeGpus = new Set<string>();
       if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.gpu`, tName("channelGpu"));
+        await this.ensureChannel(`${sysId}.gpu`, this.channelName("gpu"));
         const seenGpus = new Set<string>();
         for (const [gpuId, gpuData] of entries) {
           const safeId = this.resolveChildId(gpuId, gpuId, seenGpus);
@@ -1415,7 +1425,7 @@ export class StateManager {
             const engineEntries = gpuData.e ? Object.entries(gpuData.e) : [];
             const activeEngines = new Set<string>();
             if (engineEntries.length > 0) {
-              await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, tName("channelEngines"));
+              await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, this.channelName("engines"));
               const seenEngines = new Set<string>();
               for (const [engine, value] of engineEntries) {
                 const safeEngine = this.resolveChildId(engine, engine, seenEngines);
@@ -1445,7 +1455,7 @@ export class StateManager {
       const entries = stats.efs ? Object.entries(stats.efs) : [];
       const activeFs = new Set<string>();
       if (entries.length > 0) {
-        await this.ensureChannel(`${sysId}.filesystems`, tName("channelFilesystems"));
+        await this.ensureChannel(`${sysId}.filesystems`, this.channelName("filesystems"));
         const seenFs = new Set<string>();
         for (const [fsName, fsData] of entries) {
           const safeId = this.resolveChildId(fsName, fsName, seenFs);
@@ -1529,7 +1539,7 @@ export class StateManager {
       return;
     }
 
-    await this.ensureChannel(`${sysId}.containers`, tName("channelContainers"));
+    await this.ensureChannel(`${sysId}.containers`, this.channelName("containers"));
 
     const healthLabels = ["none", "starting", "healthy", "unhealthy"];
 
@@ -1827,6 +1837,16 @@ export class StateManager {
    */
   private clampPercent(v: number | null): number | null {
     return v === null ? null : Math.min(100, Math.max(0, v));
+  }
+
+  /**
+   * N7: resolve a channel's translated display name from CHANNEL_NAME_KEY. The
+   * `tName` key cast lives here once instead of at every ensureChannel call.
+   *
+   * @param ch Channel key (e.g. "cpu", "cores", "containers").
+   */
+  private channelName(ch: string): ReturnType<typeof tName> {
+    return tName(StateManager.CHANNEL_NAME_KEY[ch] as Parameters<typeof tName>[0]);
   }
 
   /**
