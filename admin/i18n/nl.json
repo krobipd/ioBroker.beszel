@@ -54,9 +54,7 @@
     "channelMemory": "Geheugen",
     "channelNetwork": "Netwerk",
     "channelSensors": "Sensoren",
-    "channelSystems": "Gecontroleerde systemen",
     "channelTemperature": "Temperatuur",
-    "connectionStatus": "Verbindingsstatus",
     "containerHealth": "Health",
     "containerImage": "Image",
     "containerMemory": "Geheugen",
@@ -157,5 +155,10 @@
     "help_metric_gpuDetails": "Package-vermogen en gebruik per GPU-engine.",
     "help_metric_containers": "Per container: status, health, CPU, geheugen en netwerk.",
     "help_metric_battery": "Batterijniveau en oplaadstatus.",
-    "containerNetwork": "Netwerk"
+    "containerNetwork": "Netwerk",
+    "systemsTotal": "Systems total",
+    "systemsOnline": "Systems online",
+    "systemsAllUp": "All systems online",
+    "help_username": "The email/login you use for the Beszel web UI (PocketBase authenticates by email).",
+    "help_password": "The password for that Beszel login."
 }

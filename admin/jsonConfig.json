@@ -16,6 +16,26 @@
           "lg": 8,
           "xl": 8
         },
+        "username": {
+          "type": "text",
+          "label": "label_username",
+          "help": "help_username",
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "password": {
+          "type": "password",
+          "label": "label_password",
+          "help": "help_password",
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
         "pollInterval": {
           "type": "number",
           "label": "label_pollInterval",
@@ -41,24 +61,6 @@
           "md": 2,
           "lg": 2,
           "xl": 2
-        },
-        "username": {
-          "type": "text",
-          "label": "label_username",
-          "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 6,
-          "xl": 6
-        },
-        "password": {
-          "type": "password",
-          "label": "label_password",
-          "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 6,
-          "xl": 6
         },
         "checkConnection": {
           "type": "sendTo",

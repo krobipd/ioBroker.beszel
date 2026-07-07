@@ -459,6 +459,7 @@ export class StateManager {
         id: "info.services_total",
         nameKey: "servicesTotal",
         kind: "num",
+        available: (_st, s) => s.info.sv != null,
         extract: s => s.info.sv?.[0] ?? null,
       },
       {
@@ -467,6 +468,7 @@ export class StateManager {
         id: "info.services_failed",
         nameKey: "servicesFailed",
         kind: "num",
+        available: (_st, s) => s.info.sv != null,
         extract: s => s.info.sv?.[1] ?? null,
       },
       // load average — always created if toggled (stats.la or info.la fallback)
@@ -715,6 +717,7 @@ export class StateManager {
         id: "battery.percent",
         nameKey: "batteryPercent",
         kind: "percent",
+        role: "value.battery",
         available: hasStats,
         extract: (s, st) => (st?.bat ?? s.info.bat)?.[0] ?? null,
       },
@@ -839,7 +842,7 @@ export class StateManager {
     const name = tName(def.nameKey as Parameters<typeof tName>[0]);
     switch (def.kind) {
       case "percent":
-        return this.percentCommon(name);
+        return this.percentCommon(name, def.role);
       case "text":
         return this.textCommon(name);
       case "bool":
@@ -953,7 +956,14 @@ export class StateManager {
       this.boolCommon(tName("online"), "indicator.reachable"),
       system.status === "up",
     );
-    await this.createAndSetState(`${sysId}.info.status`, this.textCommon(tName("status")), system.status);
+    await this.createAndSetState(
+      `${sysId}.info.status`,
+      {
+        ...this.textCommon(tName("status"), "info.status"),
+        states: { up: "Online", down: "Offline", paused: "Paused", pending: "Pending" },
+      },
+      system.status,
+    );
 
     // All toggled scalar metrics (info + cpu + memory + disk + network +
     // temperature + battery) are driven by the registry (K1) — single source
@@ -1372,14 +1382,14 @@ export class StateManager {
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.power`,
-            this.numCommon(tName("gpuPower"), "W"),
+            this.numCommon(tName("gpuPower"), "W", "value.power"),
             gpuData.p ?? null,
           );
           // GPU details (v0.6.0): package power + per-engine usage.
           if (config.metrics_gpuDetails) {
             await this.createAndSetState(
               `${sysId}.gpu.${safeId}.power_package`,
-              this.numCommon(tName("gpuPowerPackage"), "W"),
+              this.numCommon(tName("gpuPowerPackage"), "W", "value.power"),
               gpuData.pp ?? null,
             );
             const engineEntries = gpuData.e ? Object.entries(gpuData.e) : [];
@@ -1670,11 +1680,11 @@ export class StateManager {
 
   private async createAndSetState(id: string, common: ioBroker.StateCommon, value: ioBroker.StateValue): Promise<void> {
     if (!this.createdIds.has(id)) {
-      await this.adapter.setObjectNotExistsAsync(id, {
-        type: "state",
-        common,
-        native: {},
-      });
+      // DP-retrofit: extendObject (not setObjectNotExists) on first touch so a
+      // changed `common` (the value.battery/value.power/info.status role fixes)
+      // reaches states that already exist on an upgraded install — user-renamed
+      // names are preserved. Runs once per state per restart (createdIds-gated).
+      await this.adapter.extendObject(id, { type: "state", common, native: {} }, { preserve: { common: ["name"] } });
       this.createdIds.add(id);
     }
     await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
@@ -1684,11 +1694,11 @@ export class StateManager {
   // State common factories
   // -------------------------------------------------------------------------
 
-  private percentCommon(name: LocalizedName): ioBroker.StateCommon {
+  private percentCommon(name: LocalizedName, role = "value"): ioBroker.StateCommon {
     return {
       name,
       type: "number",
-      role: "value",
+      role,
       unit: "%",
       min: 0,
       max: 100,
@@ -1708,11 +1718,11 @@ export class StateManager {
     };
   }
 
-  private textCommon(name: LocalizedName): ioBroker.StateCommon {
+  private textCommon(name: LocalizedName, role = "text"): ioBroker.StateCommon {
     return {
       name,
       type: "string",
-      role: "text",
+      role,
       read: true,
       write: false,
     };

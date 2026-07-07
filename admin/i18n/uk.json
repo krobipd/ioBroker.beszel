@@ -54,9 +54,7 @@
     "channelMemory": "Пам'ять",
     "channelNetwork": "Мережа",
     "channelSensors": "Датчики",
-    "channelSystems": "Відстежувані системи",
     "channelTemperature": "Температура",
-    "connectionStatus": "Стан з'єднання",
     "containerHealth": "Стан здоров'я",
     "containerImage": "Образ",
     "containerMemory": "Пам'ять",
@@ -157,5 +155,10 @@
     "help_metric_gpuDetails": "Енергоспоживання пакета та завантаження для кожного рушія GPU.",
     "help_metric_containers": "Для кожного контейнера: статус, стан, ЦП, пам'ять і мережа.",
     "help_metric_battery": "Рівень заряду батареї та стан заряджання.",
-    "containerNetwork": "Мережа"
+    "containerNetwork": "Мережа",
+    "systemsTotal": "Systems total",
+    "systemsOnline": "Systems online",
+    "systemsAllUp": "All systems online",
+    "help_username": "The email/login you use for the Beszel web UI (PocketBase authenticates by email).",
+    "help_password": "The password for that Beszel login."
 }

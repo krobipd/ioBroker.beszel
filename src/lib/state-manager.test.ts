@@ -460,8 +460,10 @@ describe("StateManager", () => {
     it("should handle missing services info", async () => {
       const sys = { ...testSystem, info: {} };
       await manager.updateSystem(sys, undefined, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.info.services_total")?.val).to.be.null;
-      expect(adapter.states.get("systems.my_server.info.services_failed")?.val).to.be.null;
+      // US5: services are now available-gated — a system without `sv` creates no
+      // (perpetually-null) service states at all.
+      expect(adapter.states.has("systems.my_server.info.services_total")).to.be.false;
+      expect(adapter.states.has("systems.my_server.info.services_failed")).to.be.false;
     });
   });
 
@@ -2059,7 +2061,11 @@ describe("StateManager", () => {
       let extendCalls = 0;
       const origExtend = adapter.extendObject;
       adapter.extendObject = async (...args): Promise<void> => {
-        extendCalls++;
+        // DP-retrofit: createAndSetState now also extendObjects each state, so
+        // count only the DEVICE-object write to keep testing the device cache.
+        if (args[0] === "systems.my_server") {
+          extendCalls++;
+        }
         return origExtend(...args);
       };
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
@@ -2074,7 +2080,11 @@ describe("StateManager", () => {
       let extendCalls = 0;
       const origExtend = adapter.extendObject;
       adapter.extendObject = async (...args): Promise<void> => {
-        extendCalls++;
+        // DP-retrofit: createAndSetState now also extendObjects each state, so
+        // count only the DEVICE-object write to keep testing the device cache.
+        if (args[0] === "systems.my_server") {
+          extendCalls++;
+        }
         return origExtend(...args);
       };
       await manager.updateSystem(moved, testStats, [], allMetricsConfig());
@@ -2088,7 +2098,11 @@ describe("StateManager", () => {
       let extendCalls = 0;
       const origExtend = adapter.extendObject;
       adapter.extendObject = async (...args): Promise<void> => {
-        extendCalls++;
+        // DP-retrofit: createAndSetState now also extendObjects each state, so
+        // count only the DEVICE-object write to keep testing the device cache.
+        if (args[0] === "systems.my_server") {
+          extendCalls++;
+        }
         return origExtend(...args);
       };
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
@@ -2387,5 +2401,31 @@ describe("StateManager", () => {
         expect(adapter.objects.has(`systems.my_server.${g.channel}`), `${g.channel} should be cleaned up`).to.be.false;
       });
     }
+  });
+
+  // -----------------------------------------------------------------------
+  // DP — standard-role alignment (value.battery / value.power / info.status)
+  // -----------------------------------------------------------------------
+
+  describe("DP: standard-role alignment", () => {
+    it("battery.percent uses value.battery, GPU power uses value.power", async () => {
+      const stats: SystemStats = { ...testStats, bat: [80, 3], g: { gpu0: { n: "GPU", u: 10, p: 100, pp: 120 } } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_gpuDetails: true }));
+      expect(adapter.objects.get("systems.my_server.battery.percent")?.common.role).to.equal("value.battery");
+      expect(adapter.objects.get("systems.my_server.gpu.gpu0.power")?.common.role).to.equal("value.power");
+      expect(adapter.objects.get("systems.my_server.gpu.gpu0.power_package")?.common.role).to.equal("value.power");
+    });
+
+    it("info.status uses the info.status role and a common.states map", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      const status = adapter.objects.get("systems.my_server.info.status");
+      expect(status?.common.role).to.equal("info.status");
+      expect(status?.common.states).to.deep.equal({
+        up: "Online",
+        down: "Offline",
+        paused: "Paused",
+        pending: "Pending",
+      });
+    });
   });
 });

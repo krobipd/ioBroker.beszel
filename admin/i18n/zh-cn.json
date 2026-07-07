@@ -54,9 +54,7 @@
     "channelMemory": "内存",
     "channelNetwork": "网络",
     "channelSensors": "传感器",
-    "channelSystems": "受监控的系统",
     "channelTemperature": "温度",
-    "connectionStatus": "连接状态",
     "containerHealth": "健康状态",
     "containerImage": "镜像",
     "containerMemory": "内存",
@@ -157,5 +155,10 @@
     "help_metric_gpuDetails": "封装功耗以及每个 GPU 引擎的使用率。",
     "help_metric_containers": "每个容器：状态、健康状况、CPU、内存和网络。",
     "help_metric_battery": "电池电量和充电状态。",
-    "containerNetwork": "网络"
+    "containerNetwork": "网络",
+    "systemsTotal": "Systems total",
+    "systemsOnline": "Systems online",
+    "systemsAllUp": "All systems online",
+    "help_username": "The email/login you use for the Beszel web UI (PocketBase authenticates by email).",
+    "help_password": "The password for that Beszel login."
 }

@@ -59,6 +59,8 @@ export class BeszelAdapter extends utils.Adapter {
   private lastErrorCode = "";
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   private containersUnavailable = false;
+  /** DP4: whether the fleet-rollup state objects have been created this run. */
+  private rollupCreated = false;
   private authFailCount = 0;
   private failedSystems = new Set<string>();
   /**
@@ -284,6 +286,56 @@ export class BeszelAdapter extends utils.Adapter {
     }
   }
 
+  /**
+   * DP4: write the fleet-level rollup states (total / online / all-up) so a
+   * dashboard can show "N of M up" without enumerating every system. Creates the
+   * objects lazily on the first write.
+   *
+   * @param total Number of systems in the current poll.
+   * @param online Number of those reporting status "up".
+   */
+  private async writeRollup(total: number, online: number): Promise<void> {
+    if (!this.rollupCreated) {
+      await this.setObjectNotExistsAsync("info.systemsTotal", {
+        type: "state",
+        common: {
+          name: I18n.getTranslatedObject("systemsTotal"),
+          type: "number",
+          role: "value",
+          read: true,
+          write: false,
+        },
+        native: {},
+      });
+      await this.setObjectNotExistsAsync("info.systemsOnline", {
+        type: "state",
+        common: {
+          name: I18n.getTranslatedObject("systemsOnline"),
+          type: "number",
+          role: "value",
+          read: true,
+          write: false,
+        },
+        native: {},
+      });
+      await this.setObjectNotExistsAsync("info.systemsAllUp", {
+        type: "state",
+        common: {
+          name: I18n.getTranslatedObject("systemsAllUp"),
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false,
+        },
+        native: {},
+      });
+      this.rollupCreated = true;
+    }
+    await this.setStateChangedAsync("info.systemsTotal", { val: total, ack: true });
+    await this.setStateChangedAsync("info.systemsOnline", { val: online, ack: true });
+    await this.setStateChangedAsync("info.systemsAllUp", { val: total > 0 && online === total, ack: true });
+  }
+
   private async poll(): Promise<void> {
     if (this.isPolling) {
       this.log.debug("Skipping poll — previous poll still running");
@@ -420,6 +472,9 @@ export class BeszelAdapter extends utils.Adapter {
             this.systemDetails.delete(id);
           }
         }
+
+        // DP4: fleet rollup for dashboards (non-empty poll only, like the cleanup).
+        await this.writeRollup(systems.length, systems.filter(s => s.status === "up").length);
       }
 
       this.lastSystemCount = systems.length;

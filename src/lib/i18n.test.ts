@@ -40,8 +40,6 @@ describe("i18n completeness", () => {
 
   it("state name keys are present", () => {
     expect(enKeys).toContain("channelInfo");
-    expect(enKeys).toContain("connectionStatus");
-    expect(enKeys).toContain("channelSystems");
     expect(enKeys).toContain("cpuUsage");
     expect(enKeys).toContain("memoryPercent");
     expect(enKeys).toContain("diskPercent");

@@ -13,6 +13,7 @@ vi.mock("@iobroker/adapter-core", () => {
     public setStateAsync = vi.fn(async () => {});
     public setState = vi.fn(async () => {});
     public setStateChangedAsync = vi.fn(async () => {});
+    public setObjectNotExistsAsync = vi.fn(async () => {});
     public setInterval = vi.fn(() => ({}) as unknown);
     public clearInterval = vi.fn();
     public setTimeout = vi.fn(() => ({}) as unknown);
