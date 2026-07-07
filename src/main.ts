@@ -13,7 +13,7 @@ import {
 } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { StateManager } from "./lib/state-manager";
-import type { AdapterConfig, BeszelContainer, SystemDetails } from "./lib/types";
+import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails } from "./lib/types";
 
 /**
  * Beszel adapter — polls a Beszel Hub (PocketBase) and mirrors systems,
@@ -365,52 +365,9 @@ export class BeszelAdapter extends utils.Adapter {
       // Update connection state (L1: setStateChanged → no event when unchanged).
       await this.setStateChangedAsync("info.connection", { val: true, ack: true });
 
-      // v0.6.0 (F2): static hardware/OS details. Only when "System info" is
-      // enabled, and only fetched when we don't already have details for every
-      // current system (first poll, or a newly-added system) — the data is
-      // static so re-fetching each poll would be waste. A failed fetch (e.g.
-      // older Hub without the collection) is non-fatal: details stay absent →
-      // no hardware states are created.
-      if (config.metrics_agentVersion) {
-        // Refetch only when a system id we've never attempted appears. Marking
-        // every current id as attempted afterwards (even on failure) stops a
-        // details-less system or an older Hub's 404 from refetching each poll.
-        // Edge: a system that is `pending` at this moment gets marked attempted,
-        // so its hardware info appears only after the next adapter restart — an
-        // accepted trait of the "static data, restart-to-refresh" model.
-        const needFetch = shouldFetchSystemDetails(
-          systems.map(s => s.id),
-          this.detailsAttempted,
-        );
-        if (needFetch) {
-          let markAttempted = true;
-          try {
-            this.systemDetails = await this.client.getSystemDetails();
-            this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
-          } catch (err) {
-            // F3: only a DEFINITIVE failure (e.g. a 404 on an older Hub without
-            // the collection) marks the systems attempted so we stop refetching.
-            // A transient NETWORK/TIMEOUT failure must be retried next poll instead
-            // of suppressing hardware info until the next adapter restart.
-            const code = this.classifyError(err);
-            markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
-            this.log.debug(
-              `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${errText(err)}`,
-            );
-          }
-          if (markAttempted) {
-            for (const s of systems) {
-              this.detailsAttempted.add(s.id);
-            }
-          }
-        }
-        for (const system of systems) {
-          const d = this.systemDetails.get(system.id);
-          if (d) {
-            system.details = d;
-          }
-        }
-      }
+      // v0.6.0 (F2): attach static hardware/OS details when "System info" is on
+      // (F3/N5: extracted to keep the poll body readable).
+      await this.fetchAndAttachDetails(systems, config);
 
       // v0.4.3 (SM5): pre-resolve safeNames deterministically so collisions
       // between two systems with the same sanitized name get suffixed
@@ -487,49 +444,112 @@ export class BeszelAdapter extends utils.Adapter {
       }
       this.log.debug(`Polled ${systems.length} systems successfully`);
     } catch (err) {
-      const errMsg = errText(err);
-      const errorCode = this.classifyError(err);
-      const isRepeat = errorCode === this.lastErrorCode;
-      this.lastErrorCode = errorCode;
-
-      if (errorCode === "UNAUTHORIZED") {
-        this.client?.invalidateToken();
-        this.authFailCount++;
-        if (this.authFailCount <= 3) {
-          this.log.error("Authentication failed — check username and password");
-        } else if (this.authFailCount === 4) {
-          this.log.error("Authentication keeps failing — suppressing further auth errors");
-        } else {
-          this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
-        }
-      } else if (isRepeat) {
-        this.log.debug(`Poll failed (ongoing): ${errMsg}`);
-      } else if (errorCode === "FORBIDDEN") {
-        // v0.4.3 (B4'): permission issue — reauth wouldn't help. Hint the user.
-        this.log.error(
-          `Beszel Hub returned 403 Forbidden — the configured user has no permission for these collections. Check the user role on the Hub admin UI.`,
-        );
-      } else if (errorCode === "RATE_LIMITED") {
-        this.log.warn("Beszel Hub rate-limited the request — slowing down. Consider increasing the poll interval.");
-      } else if (errorCode === "NETWORK") {
-        this.log.warn("Cannot reach Beszel Hub — will keep retrying");
-      } else {
-        // SEC-1: the dynamic message can carry a Hub response snippet / URL —
-        // keep it at debug; the error-level line (captured by opt-in Sentry)
-        // carries only the error class, no Hub-supplied content.
-        this.log.error(`Poll failed (${errorCode})`);
-        this.log.debug(`Poll failed: ${errMsg}`);
-      }
-
-      // L1: fire-and-forget with .catch — this runs in the catch of the un-awaited
-      // interval poll; an unguarded await here would escape as an unhandled
-      // rejection if the states DB is also down (crash-loop, no stack). Mirrors onUnload.
-      void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
-        /* broker shutting down / states unreachable */
-      });
+      this.handlePollError(err);
     } finally {
       this.isPolling = false;
     }
+  }
+
+  /**
+   * F2/F3: fetch the static `system_details` collection (hardware/OS) and attach
+   * it to the current systems. No-op unless "System info" is enabled. Only
+   * fetched when a system id we've never attempted appears (first poll or a new
+   * system) — the data is static, so re-fetching each poll would be waste. A
+   * failed fetch is non-fatal (details stay absent → no hardware states); a
+   * transient NETWORK/TIMEOUT is retried next poll rather than marked attempted.
+   *
+   * @param systems Systems from the current poll (mutated: `.details` attached).
+   * @param config Adapter configuration.
+   */
+  private async fetchAndAttachDetails(systems: BeszelSystem[], config: AdapterConfig): Promise<void> {
+    if (!config.metrics_agentVersion) {
+      return;
+    }
+    // Edge: a system that is `pending` right now gets marked attempted, so its
+    // hardware info appears only after the next adapter restart — an accepted
+    // trait of the "static data, restart-to-refresh" model.
+    const needFetch = shouldFetchSystemDetails(
+      systems.map(s => s.id),
+      this.detailsAttempted,
+    );
+    if (needFetch) {
+      let markAttempted = true;
+      try {
+        this.systemDetails = await this.client!.getSystemDetails();
+        this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
+      } catch (err) {
+        // F3: only a DEFINITIVE failure (e.g. a 404 on an older Hub without the
+        // collection) marks the systems attempted so we stop refetching. A
+        // transient NETWORK/TIMEOUT failure must be retried next poll instead.
+        const code = this.classifyError(err);
+        markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
+        this.log.debug(
+          `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${errText(err)}`,
+        );
+      }
+      if (markAttempted) {
+        for (const s of systems) {
+          this.detailsAttempted.add(s.id);
+        }
+      }
+    }
+    for (const system of systems) {
+      const d = this.systemDetails.get(system.id);
+      if (d) {
+        system.details = d;
+      }
+    }
+  }
+
+  /**
+   * N5: classify a failed poll and log it at the right level (dedup repeats to
+   * debug, hint FORBIDDEN/RATE_LIMITED, escalate then suppress repeated auth
+   * failures) and mark the connection state offline. Extracted from `poll` so
+   * the happy path reads top-to-bottom.
+   *
+   * @param err The error thrown by the poll body.
+   */
+  private handlePollError(err: unknown): void {
+    const errMsg = errText(err);
+    const errorCode = this.classifyError(err);
+    const isRepeat = errorCode === this.lastErrorCode;
+    this.lastErrorCode = errorCode;
+
+    if (errorCode === "UNAUTHORIZED") {
+      this.client?.invalidateToken();
+      this.authFailCount++;
+      if (this.authFailCount <= 3) {
+        this.log.error("Authentication failed — check username and password");
+      } else if (this.authFailCount === 4) {
+        this.log.error("Authentication keeps failing — suppressing further auth errors");
+      } else {
+        this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
+      }
+    } else if (isRepeat) {
+      this.log.debug(`Poll failed (ongoing): ${errMsg}`);
+    } else if (errorCode === "FORBIDDEN") {
+      // v0.4.3 (B4'): permission issue — reauth wouldn't help. Hint the user.
+      this.log.error(
+        `Beszel Hub returned 403 Forbidden — the configured user has no permission for these collections. Check the user role on the Hub admin UI.`,
+      );
+    } else if (errorCode === "RATE_LIMITED") {
+      this.log.warn("Beszel Hub rate-limited the request — slowing down. Consider increasing the poll interval.");
+    } else if (errorCode === "NETWORK") {
+      this.log.warn("Cannot reach Beszel Hub — will keep retrying");
+    } else {
+      // SEC-1: the dynamic message can carry a Hub response snippet / URL —
+      // keep it at debug; the error-level line (captured by opt-in Sentry)
+      // carries only the error class, no Hub-supplied content.
+      this.log.error(`Poll failed (${errorCode})`);
+      this.log.debug(`Poll failed: ${errMsg}`);
+    }
+
+    // L1: fire-and-forget with .catch — this runs in the catch of the un-awaited
+    // interval poll; an unguarded await here would escape as an unhandled
+    // rejection if the states DB is also down (crash-loop, no stack). Mirrors onUnload.
+    void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
+      /* broker shutting down / states unreachable */
+    });
   }
 }
 
