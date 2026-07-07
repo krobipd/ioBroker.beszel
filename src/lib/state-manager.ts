@@ -57,6 +57,15 @@ export class StateManager {
   private readonly dynamicChildren = new Map<string, Set<string>>();
 
   /**
+   * H2: per dynamic group (`<sysId>.<group>`, incl. containers) → was the group
+   * empty on the previous poll. Debounces the drop-to-zero prune: a single empty
+   * response (the `g/efs/t/ni` maps are `omitempty` on the wire, so a transient
+   * gap drops the key) must not wipe the group's states — only a second
+   * consecutive empty confirms removal. Replaces the old global `lastContainersEmpty`.
+   */
+  private readonly lastGroupEmpty = new Map<string, boolean>();
+
+  /**
    * v0.7.2: last-written device-object signature per sysId (`id|host|name`).
    * `updateSystem` used to extendObject the device on EVERY poll — one write
    * + objectChange event per system per minute for data that practically
@@ -494,7 +503,7 @@ export class StateManager {
         nameKey: "cpuUser",
         kind: "percent",
         available: st => !!st?.cpub && st.cpub.length >= 5,
-        extract: (_s, st) => st!.cpub![0],
+        extract: (_s, st) => st?.cpub?.[0] ?? null,
       },
       {
         toggle: "metrics_cpuBreakdown",
@@ -503,7 +512,7 @@ export class StateManager {
         nameKey: "cpuSystem",
         kind: "percent",
         available: st => !!st?.cpub && st.cpub.length >= 5,
-        extract: (_s, st) => st!.cpub![1],
+        extract: (_s, st) => st?.cpub?.[1] ?? null,
       },
       {
         toggle: "metrics_cpuBreakdown",
@@ -512,7 +521,7 @@ export class StateManager {
         nameKey: "cpuIowait",
         kind: "percent",
         available: st => !!st?.cpub && st.cpub.length >= 5,
-        extract: (_s, st) => st!.cpub![2],
+        extract: (_s, st) => st?.cpub?.[2] ?? null,
       },
       {
         toggle: "metrics_cpuBreakdown",
@@ -521,7 +530,7 @@ export class StateManager {
         nameKey: "cpuSteal",
         kind: "percent",
         available: st => !!st?.cpub && st.cpub.length >= 5,
-        extract: (_s, st) => st!.cpub![3],
+        extract: (_s, st) => st?.cpub?.[3] ?? null,
       },
       {
         toggle: "metrics_cpuBreakdown",
@@ -530,7 +539,7 @@ export class StateManager {
         nameKey: "cpuIdle",
         kind: "percent",
         available: st => !!st?.cpub && st.cpub.length >= 5,
-        extract: (_s, st) => st!.cpub![4],
+        extract: (_s, st) => st?.cpub?.[4] ?? null,
       },
       {
         toggle: "metrics_memory",
@@ -847,7 +856,20 @@ export class StateManager {
     stats: SystemStats | undefined,
     config: AdapterConfig,
   ): Promise<void> {
-    const active = this.metricDefs().filter(d => config[d.toggle] && (d.available ? d.available(stats, system) : true));
+    const active = this.metricDefs().filter(d => {
+      if (!config[d.toggle]) {
+        return false;
+      }
+      if (!d.available || d.available(stats, system)) {
+        return true;
+      }
+      // H2b: a field that went absent (e.g. `dios`/`cpub` are omitzero/omitempty
+      // on the wire, so a fully-idle disk drops them) is no longer "available" —
+      // but if the state was already created we must still UPDATE it (extract →
+      // null) instead of freezing the last busy value. A never-created state on
+      // an older Hub stays uncreated.
+      return this.createdIds.has(`${sysId}.${d.id}`);
+    });
     const channels = new Set(active.map(d => d.channel));
     for (const ch of channels) {
       await this.ensureChannel(
@@ -867,16 +889,12 @@ export class StateManager {
    * @param stats Latest stats for this system, or undefined if unavailable
    * @param containers Container records belonging to this system
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
-   * @param skipContainerPrune F2: when true, do not prune container channels this poll
-   *   (the poll loop sets this on the first empty getContainers() result to debounce a
-   *   transient empty response — a second consecutive empty confirms and prunes).
    */
   public async updateSystem(
     system: BeszelSystem,
     stats: SystemStats | undefined,
     containers: BeszelContainer[],
     rawConfig: AdapterConfig,
-    skipContainerPrune = false,
   ): Promise<void> {
     // Detail toggles inherit their category's base toggle (off category → off
     // detail). Applied once here so applyMetrics + updateDynamicStats + the
@@ -943,7 +961,7 @@ export class StateManager {
 
     // Containers
     if (config.metrics_containers) {
-      await this.updateContainers(sysId, system.id, containers, skipContainerPrune);
+      await this.updateContainers(sysId, system.id, containers);
     }
   }
 
@@ -1000,6 +1018,11 @@ export class StateManager {
     for (const key of [...this.deviceWritten.keys()]) {
       if (key === exact || key.startsWith(dot)) {
         this.deviceWritten.delete(key);
+      }
+    }
+    for (const key of [...this.lastGroupEmpty.keys()]) {
+      if (key === exact || key.startsWith(dot)) {
+        this.lastGroupEmpty.delete(key);
       }
     }
   }
@@ -1202,207 +1225,217 @@ export class StateManager {
     // Ensure the parent `temperature` channel here too: the registry only
     // creates it when the average (metrics_temperature) is enabled, but the
     // details can be on with the average off.
-    if (config.metrics_temperatureDetails && stats.t) {
-      await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
-      await this.ensureChannel(`${sysId}.temperature.sensors`, tName("channelSensors"));
+    if (config.metrics_temperatureDetails) {
+      const entries = stats.t ? Object.entries(stats.t) : [];
       const activeSensors = new Set<string>();
-      const seenSensors = new Set<string>();
-      for (const [sensor, temp] of Object.entries(stats.t)) {
-        const safeSensor = this.resolveChildId(sensor, sensor, seenSensors);
-        if (!safeSensor) {
-          continue;
+      if (entries.length > 0) {
+        await this.ensureChannel(`${sysId}.temperature`, tName("channelTemperature"));
+        await this.ensureChannel(`${sysId}.temperature.sensors`, tName("channelSensors"));
+        const seenSensors = new Set<string>();
+        for (const [sensor, temp] of entries) {
+          const safeSensor = this.resolveChildId(sensor, sensor, seenSensors);
+          if (!safeSensor) {
+            continue;
+          }
+          activeSensors.add(safeSensor);
+          await this.createAndSetState(
+            `${sysId}.temperature.sensors.${safeSensor}`,
+            this.numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
+            temp,
+          );
         }
-        activeSensors.add(safeSensor);
-        await this.createAndSetState(
-          `${sysId}.temperature.sensors.${safeSensor}`,
-          this.numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
-          temp,
-        );
       }
-      // v0.7.2: a renamed/removed sensor (kernel update, hardware change) used
-      // to leave a frozen state behind forever.
-      await this.pruneDynamicChildren(`${sysId}.temperature.sensors`, activeSensors, "state");
+      // v0.7.2 + H2: prune renamed/removed sensors — runs even when every sensor
+      // vanished (debounced 2 polls so a transient empty response doesn't wipe them).
+      await this.pruneGroup(`${sysId}.temperature.sensors`, activeSensors, "state", entries.length === 0);
     }
 
     // Per-core CPU usage (v0.6.0). Core labels are positional (CPU0..), shown as-is.
-    if (config.metrics_cpuCores && stats.cpus && stats.cpus.length > 0) {
-      await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
-      await this.ensureChannel(`${sysId}.cpu.cores`, tName("channelCores"));
+    if (config.metrics_cpuCores) {
+      const cores = stats.cpus ?? [];
       const activeCores = new Set<string>();
-      for (let i = 0; i < stats.cpus.length; i++) {
-        activeCores.add(`core${i}`);
-        await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), stats.cpus[i]);
+      if (cores.length > 0) {
+        await this.ensureChannel(`${sysId}.cpu`, tName("channelCpu"));
+        await this.ensureChannel(`${sysId}.cpu.cores`, tName("channelCores"));
+        for (let i = 0; i < cores.length; i++) {
+          activeCores.add(`core${i}`);
+          await this.createAndSetState(`${sysId}.cpu.cores.core${i}`, this.percentCommon(`Core ${i}`), cores[i]);
+        }
       }
-      // v0.7.2: prune core states beyond the current count (VM resized down).
-      await this.pruneDynamicChildren(`${sysId}.cpu.cores`, activeCores, "state");
+      // v0.7.2 + H2: prune core states beyond the current count (VM resized down).
+      await this.pruneGroup(`${sysId}.cpu.cores`, activeCores, "state", cores.length === 0);
     }
 
     // Per-network-interface (v0.6.0). ni: name -> [up, down, total up, total down] bytes.
-    if (config.metrics_networkInterfaces && stats.ni && Object.keys(stats.ni).length > 0) {
-      await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
-      await this.ensureChannel(`${sysId}.network.interfaces`, tName("channelInterfaces"));
+    if (config.metrics_networkInterfaces) {
+      const entries = stats.ni ? Object.entries(stats.ni) : [];
       const activeIfaces = new Set<string>();
-      const seenIfaces = new Set<string>();
-      for (const [iface, vals] of Object.entries(stats.ni)) {
-        const safeId = this.resolveChildId(iface, iface, seenIfaces);
-        if (!safeId) {
-          continue;
+      if (entries.length > 0) {
+        await this.ensureChannel(`${sysId}.network`, tName("channelNetwork"));
+        await this.ensureChannel(`${sysId}.network.interfaces`, tName("channelInterfaces"));
+        const seenIfaces = new Set<string>();
+        for (const [iface, vals] of entries) {
+          const safeId = this.resolveChildId(iface, iface, seenIfaces);
+          if (!safeId) {
+            continue;
+          }
+          activeIfaces.add(safeId);
+          // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
+          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
+          await this.createAndSetState(
+            `${sysId}.network.interfaces.${safeId}.up`,
+            this.numCommon(tName("ifaceUp"), "B/s"),
+            vals[0] ?? null,
+          );
+          await this.createAndSetState(
+            `${sysId}.network.interfaces.${safeId}.down`,
+            this.numCommon(tName("ifaceDown"), "B/s"),
+            vals[1] ?? null,
+          );
+          await this.createAndSetState(
+            `${sysId}.network.interfaces.${safeId}.total_up`,
+            this.numCommon(tName("ifaceTotalUp"), "B"),
+            vals[2] ?? null,
+          );
+          await this.createAndSetState(
+            `${sysId}.network.interfaces.${safeId}.total_down`,
+            this.numCommon(tName("ifaceTotalDown"), "B"),
+            vals[3] ?? null,
+          );
         }
-        activeIfaces.add(safeId);
-        // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
-        await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
-        await this.createAndSetState(
-          `${sysId}.network.interfaces.${safeId}.up`,
-          this.numCommon(tName("ifaceUp"), "B/s"),
-          vals[0] ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.network.interfaces.${safeId}.down`,
-          this.numCommon(tName("ifaceDown"), "B/s"),
-          vals[1] ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.network.interfaces.${safeId}.total_up`,
-          this.numCommon(tName("ifaceTotalUp"), "B"),
-          vals[2] ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.network.interfaces.${safeId}.total_down`,
-          this.numCommon(tName("ifaceTotalDown"), "B"),
-          vals[3] ?? null,
-        );
       }
-      // v0.7.2: a renamed interface (predictable-names migration, USB NIC
-      // swap) used to leave its old channel behind with frozen counters.
-      await this.pruneDynamicChildren(`${sysId}.network.interfaces`, activeIfaces, "channel");
+      // v0.7.2 + H2: prune renamed/removed interfaces — runs on drop-to-zero too (debounced).
+      await this.pruneGroup(`${sysId}.network.interfaces`, activeIfaces, "channel", entries.length === 0);
     }
 
     // GPU — gpuData.n is the raw vendor name; we keep it as a plain string.
-    if (config.metrics_gpu && stats.g && Object.keys(stats.g).length > 0) {
-      await this.ensureChannel(`${sysId}.gpu`, tName("channelGpu"));
+    if (config.metrics_gpu) {
+      const entries = stats.g ? Object.entries(stats.g) : [];
       const activeGpus = new Set<string>();
-      const seenGpus = new Set<string>();
-      for (const [gpuId, gpuData] of Object.entries(stats.g)) {
-        const safeId = this.resolveChildId(gpuId, gpuId, seenGpus);
-        if (!safeId) {
-          continue;
-        }
-        activeGpus.add(safeId);
-        await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeForLog(gpuData.n ?? gpuId));
-        await this.createAndSetState(
-          `${sysId}.gpu.${safeId}.usage`,
-          this.percentCommon(tName("gpuUsage")),
-          gpuData.u ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.gpu.${safeId}.memory_used`,
-          this.numCommon(tName("gpuMemoryUsed"), "MB"),
-          gpuData.mu ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.gpu.${safeId}.memory_total`,
-          this.numCommon(tName("gpuMemoryTotal"), "MB"),
-          gpuData.mt ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.gpu.${safeId}.power`,
-          this.numCommon(tName("gpuPower"), "W"),
-          gpuData.p ?? null,
-        );
-        // GPU details (v0.6.0): package power + per-engine usage.
-        if (config.metrics_gpuDetails) {
+      if (entries.length > 0) {
+        await this.ensureChannel(`${sysId}.gpu`, tName("channelGpu"));
+        const seenGpus = new Set<string>();
+        for (const [gpuId, gpuData] of entries) {
+          const safeId = this.resolveChildId(gpuId, gpuId, seenGpus);
+          if (!safeId) {
+            continue;
+          }
+          activeGpus.add(safeId);
+          await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeForLog(gpuData.n ?? gpuId));
           await this.createAndSetState(
-            `${sysId}.gpu.${safeId}.power_package`,
-            this.numCommon(tName("gpuPowerPackage"), "W"),
-            gpuData.pp ?? null,
+            `${sysId}.gpu.${safeId}.usage`,
+            this.percentCommon(tName("gpuUsage")),
+            gpuData.u ?? null,
           );
-          const activeEngines = new Set<string>();
-          const seenEngines = new Set<string>();
-          if (gpuData.e && Object.keys(gpuData.e).length > 0) {
-            await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, tName("channelEngines"));
-            for (const [engine, value] of Object.entries(gpuData.e)) {
-              const safeEngine = this.resolveChildId(engine, engine, seenEngines);
-              if (safeEngine) {
-                // Engine name is vendor-defined → kept as-is.
-                await this.createAndSetState(
-                  `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                  this.percentCommon(sanitizeForLog(engine)),
-                  value,
-                );
-                activeEngines.add(safeEngine);
+          await this.createAndSetState(
+            `${sysId}.gpu.${safeId}.memory_used`,
+            this.numCommon(tName("gpuMemoryUsed"), "MB"),
+            gpuData.mu ?? null,
+          );
+          await this.createAndSetState(
+            `${sysId}.gpu.${safeId}.memory_total`,
+            this.numCommon(tName("gpuMemoryTotal"), "MB"),
+            gpuData.mt ?? null,
+          );
+          await this.createAndSetState(
+            `${sysId}.gpu.${safeId}.power`,
+            this.numCommon(tName("gpuPower"), "W"),
+            gpuData.p ?? null,
+          );
+          // GPU details (v0.6.0): package power + per-engine usage.
+          if (config.metrics_gpuDetails) {
+            await this.createAndSetState(
+              `${sysId}.gpu.${safeId}.power_package`,
+              this.numCommon(tName("gpuPowerPackage"), "W"),
+              gpuData.pp ?? null,
+            );
+            const engineEntries = gpuData.e ? Object.entries(gpuData.e) : [];
+            const activeEngines = new Set<string>();
+            if (engineEntries.length > 0) {
+              await this.ensureChannel(`${sysId}.gpu.${safeId}.engines`, tName("channelEngines"));
+              const seenEngines = new Set<string>();
+              for (const [engine, value] of engineEntries) {
+                const safeEngine = this.resolveChildId(engine, engine, seenEngines);
+                if (safeEngine) {
+                  // Engine name is vendor-defined → kept as-is.
+                  await this.createAndSetState(
+                    `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
+                    this.percentCommon(sanitizeForLog(engine)),
+                    value,
+                  );
+                  activeEngines.add(safeEngine);
+                }
               }
             }
+            // v0.7.2 + H2: engines the driver stopped reporting get pruned (debounced).
+            await this.pruneGroup(`${sysId}.gpu.${safeId}.engines`, activeEngines, "state", engineEntries.length === 0);
           }
-          // v0.7.2: engines the driver stopped reporting get pruned.
-          await this.pruneDynamicChildren(`${sysId}.gpu.${safeId}.engines`, activeEngines, "state");
         }
       }
-      // v0.7.2: a GPU that disappeared from the host (eGPU unplugged, VM
-      // passthrough change) used to keep its whole channel forever.
-      await this.pruneDynamicChildren(`${sysId}.gpu`, activeGpus, "channel");
+      // v0.7.2 + H2: a GPU that disappeared from the host (eGPU unplugged, VM
+      // passthrough change) used to keep its whole channel forever. Debounced.
+      await this.pruneGroup(`${sysId}.gpu`, activeGpus, "channel", entries.length === 0);
     }
 
     // Extra filesystems — fsName is the raw mount path, kept as plain string.
-    if (config.metrics_extraFs && stats.efs && Object.keys(stats.efs).length > 0) {
-      await this.ensureChannel(`${sysId}.filesystems`, tName("channelFilesystems"));
+    if (config.metrics_extraFs) {
+      const entries = stats.efs ? Object.entries(stats.efs) : [];
       const activeFs = new Set<string>();
-      const seenFs = new Set<string>();
-      for (const [fsName, fsData] of Object.entries(stats.efs)) {
-        const safeId = this.resolveChildId(fsName, fsName, seenFs);
-        if (!safeId) {
-          continue;
+      if (entries.length > 0) {
+        await this.ensureChannel(`${sysId}.filesystems`, tName("channelFilesystems"));
+        const seenFs = new Set<string>();
+        for (const [fsName, fsData] of entries) {
+          const safeId = this.resolveChildId(fsName, fsName, seenFs);
+          if (!safeId) {
+            continue;
+          }
+          activeFs.add(safeId);
+          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeForLog(fsName));
+
+          const total = fsData.d ?? null;
+          const used = fsData.du ?? null;
+          // v0.4.3 (SM8): clamp to [0, 100] — transient `used > total`
+          // (data drift between separate metric polls) shouldn't push > 100%
+          // into the state.
+          const percent =
+            total !== null && used !== null && total > 0
+              ? Math.min(100, Math.max(0, Math.round((used / total) * 100)))
+              : null;
+
+          await this.createAndSetState(
+            `${sysId}.filesystems.${safeId}.disk_percent`,
+            this.percentCommon(tName("diskPercent")),
+            percent,
+          );
+          await this.createAndSetState(
+            `${sysId}.filesystems.${safeId}.disk_used`,
+            this.numCommon(tName("diskUsed"), "GB"),
+            used,
+          );
+          await this.createAndSetState(
+            `${sysId}.filesystems.${safeId}.disk_total`,
+            this.numCommon(tName("diskTotal"), "GB"),
+            total,
+          );
+          await this.createAndSetState(
+            `${sysId}.filesystems.${safeId}.read_speed`,
+            this.numCommon(tName("readSpeed"), "MB/s"),
+            fsData.r ?? null,
+          );
+          await this.createAndSetState(
+            `${sysId}.filesystems.${safeId}.write_speed`,
+            this.numCommon(tName("writeSpeed"), "MB/s"),
+            fsData.w ?? null,
+          );
         }
-        activeFs.add(safeId);
-        await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeForLog(fsName));
-
-        const total = fsData.d ?? null;
-        const used = fsData.du ?? null;
-        // v0.4.3 (SM8): clamp to [0, 100] — transient `used > total`
-        // (data drift between separate metric polls) shouldn't push > 100%
-        // into the state.
-        const percent =
-          total !== null && used !== null && total > 0
-            ? Math.min(100, Math.max(0, Math.round((used / total) * 100)))
-            : null;
-
-        await this.createAndSetState(
-          `${sysId}.filesystems.${safeId}.disk_percent`,
-          this.percentCommon(tName("diskPercent")),
-          percent,
-        );
-        await this.createAndSetState(
-          `${sysId}.filesystems.${safeId}.disk_used`,
-          this.numCommon(tName("diskUsed"), "GB"),
-          used,
-        );
-        await this.createAndSetState(
-          `${sysId}.filesystems.${safeId}.disk_total`,
-          this.numCommon(tName("diskTotal"), "GB"),
-          total,
-        );
-        await this.createAndSetState(
-          `${sysId}.filesystems.${safeId}.read_speed`,
-          this.numCommon(tName("readSpeed"), "MB/s"),
-          fsData.r ?? null,
-        );
-        await this.createAndSetState(
-          `${sysId}.filesystems.${safeId}.write_speed`,
-          this.numCommon(tName("writeSpeed"), "MB/s"),
-          fsData.w ?? null,
-        );
       }
-      // v0.7.2: an unmounted/renamed extra filesystem used to keep its
-      // channel with frozen values forever.
-      await this.pruneDynamicChildren(`${sysId}.filesystems`, activeFs, "channel");
+      // v0.7.2 + H2: an unmounted/renamed extra filesystem used to keep its
+      // channel with frozen values forever. Debounced for the drop-to-zero case.
+      await this.pruneGroup(`${sysId}.filesystems`, activeFs, "channel", entries.length === 0);
     }
   }
 
-  private async updateContainers(
-    sysId: string,
-    systemId: string,
-    allContainers: BeszelContainer[],
-    skipPrune = false,
-  ): Promise<void> {
+  private async updateContainers(sysId: string, systemId: string, allContainers: BeszelContainer[]): Promise<void> {
     const sysContainers = allContainers.filter(c => c.system === systemId);
 
     // SEC-6: resolve each container's id segment once (keyed by record id),
@@ -1416,21 +1449,18 @@ export class StateManager {
 
     // F1: prune containers that disappeared from the host. Build the active set
     // and prune BEFORE the early-return — otherwise a system that drops to zero
-    // containers would keep its old container state-trees forever (only stale
-    // *systems* were cleaned up before, never stale containers within a system).
-    // v0.7.2: shares the generalised pruner (view-reconcile once, then in-memory).
-    // F2: skip the prune on a debounced empty container fetch — a single transient
-    // empty getContainers() result must not wipe valid container channels; only a
-    // second consecutive empty result (skipPrune=false) confirms removal and prunes.
+    // containers would keep its old container state-trees forever.
+    // H2: routed through the shared pruneGroup so a container drop-to-zero is
+    // debounced PER SYSTEM (2 polls), exactly like the other dynamic groups. This
+    // replaces the old global-only F2 debounce (`lastContainersEmpty` in main.ts),
+    // which missed one system's containers vanishing while others still reported.
     const activeIds = new Set<string>();
     for (const cId of resolvedIds.values()) {
       if (cId) {
         activeIds.add(cId);
       }
     }
-    if (!skipPrune) {
-      await this.pruneDynamicChildren(`${sysId}.containers`, activeIds, "channel");
-    }
+    await this.pruneGroup(`${sysId}.containers`, activeIds, "channel", sysContainers.length === 0);
 
     if (sysContainers.length === 0) {
       return;
@@ -1488,6 +1518,31 @@ export class StateManager {
   }
 
   /**
+   * H2: prune a dynamic group's disappeared children, with a drop-to-zero
+   * debounce. A NON-empty group prunes immediately (drops members that vanished
+   * among the ones still present). An EMPTY group (all members gone) prunes only
+   * on the SECOND consecutive empty poll — a single transient empty response
+   * must not wipe every state. Used by every dynamic group incl. containers.
+   *
+   * @param base Group prefix (e.g. `systems.<safeName>.gpu`).
+   * @param activeIds Sanitized direct-child segments currently present.
+   * @param childType Object type of the direct children (`channel` or `state`).
+   * @param isEmpty Whether the group has zero members this poll.
+   */
+  private async pruneGroup(
+    base: string,
+    activeIds: Set<string>,
+    childType: "channel" | "state",
+    isEmpty: boolean,
+  ): Promise<void> {
+    const wasEmpty = this.lastGroupEmpty.get(base) ?? false;
+    this.lastGroupEmpty.set(base, isEmpty);
+    if (!isEmpty || wasEmpty) {
+      await this.pruneDynamicChildren(base, activeIds, childType);
+    }
+  }
+
+  /**
    * v0.7.2 (generalised F1): remove children of a dynamic group that are no
    * longer reported by Beszel — stopped container, removed GPU, renamed
    * network interface or sensor, unmounted filesystem, shrunk core count.
@@ -1538,6 +1593,18 @@ export class StateManager {
         this.dropCacheUnder(`${base}.${cId}`);
       }),
     );
+    // H2d: if that removed the LAST child (the group emptied to zero), delete the
+    // now-empty parent group channel too — otherwise an empty `<sysId>.gpu` /
+    // `.containers` / `.filesystems` … object lingers. Gated on the emptying
+    // transition (something was removed AND nothing is left active), so it costs
+    // one extra object read only on that single poll, never per-poll.
+    if (stale.length > 0 && activeIds.size === 0) {
+      const parent = await this.adapter.getObjectAsync(base);
+      if (parent) {
+        await this.adapter.delObjectAsync(base);
+        this.createdIds.delete(base);
+      }
+    }
     this.dynamicChildren.set(base, new Set(activeIds));
   }
 

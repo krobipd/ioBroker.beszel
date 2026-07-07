@@ -56,13 +56,6 @@ export class BeszelAdapter extends utils.Adapter {
   private pollTimer: ioBroker.Interval | undefined = undefined;
   private isPolling = false;
   private lastSystemCount = 0;
-  /**
-   * F2: was the previous poll's container fetch empty? Used to debounce the
-   * container prune — a single empty getContainers() response (transient Hub
-   * glitch) must not wipe every container channel; only a second consecutive
-   * empty result prunes. A non-empty response prunes removed containers at once.
-   */
-  private lastContainersEmpty = false;
   private lastErrorCode = "";
   private authFailCount = 0;
   private failedSystems = new Set<string>();
@@ -279,13 +272,6 @@ export class BeszelAdapter extends utils.Adapter {
         this.client.getLatestStats(),
       ]);
 
-      // F2: debounce container pruning. A single empty getContainers() result
-      // (a transient Hub glitch) must not wipe every container channel — only a
-      // second consecutive empty result prunes; a non-empty result prunes
-      // removed containers at once. Only relevant while containers are polled.
-      const containersFetchEmpty = config.metrics_containers && containers.length === 0;
-      const skipContainerPrune = containersFetchEmpty && !this.lastContainersEmpty;
-
       // Update connection state
       await this.setStateAsync("info.connection", { val: true, ack: true });
 
@@ -353,7 +339,7 @@ export class BeszelAdapter extends utils.Adapter {
             this.log.debug(
               `updateSystem: '${sanitizeForLog(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`,
             );
-            await this.stateManager!.updateSystem(system, stats, containers, config, skipContainerPrune);
+            await this.stateManager!.updateSystem(system, stats, containers, config);
             this.failedSystems.delete(system.name);
           } catch (err) {
             const msg = `Failed to update system '${sanitizeForLog(system.name)}': ${errText(err)}`;
@@ -398,7 +384,6 @@ export class BeszelAdapter extends utils.Adapter {
       }
 
       this.lastSystemCount = systems.length;
-      this.lastContainersEmpty = containersFetchEmpty;
       this.authFailCount = 0;
 
       // Clear error state on success

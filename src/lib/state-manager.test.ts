@@ -1,4 +1,3 @@
-
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -1256,8 +1255,26 @@ describe("StateManager", () => {
 
     it("F1: removes container channels that disappeared from the host", async () => {
       const two: BeszelContainer[] = [
-        { id: "c1", system: testSystem.id, name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx" },
-        { id: "c2", system: testSystem.id, name: "postgres", status: "running", health: 2, cpu: 1, memory: 10, image: "pg" },
+        {
+          id: "c1",
+          system: testSystem.id,
+          name: "nginx",
+          status: "running",
+          health: 2,
+          cpu: 1,
+          memory: 10,
+          image: "nginx",
+        },
+        {
+          id: "c2",
+          system: testSystem.id,
+          name: "postgres",
+          status: "running",
+          health: 2,
+          cpu: 1,
+          memory: 10,
+          image: "pg",
+        },
       ];
       await manager.updateSystem(testSystem, testStats, two, allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
@@ -1270,13 +1287,27 @@ describe("StateManager", () => {
       expect(adapter.states.has("systems.my_server.containers.postgres.cpu")).to.be.false;
     });
 
-    it("F1: removes all container channels when the system drops to zero containers", async () => {
+    it("H2: removes container channels only after the system drops to zero for two consecutive polls", async () => {
       const one: BeszelContainer[] = [
-        { id: "c1", system: testSystem.id, name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx" },
+        {
+          id: "c1",
+          system: testSystem.id,
+          name: "nginx",
+          status: "running",
+          health: 2,
+          cpu: 1,
+          memory: 10,
+          image: "nginx",
+        },
       ];
       await manager.updateSystem(testSystem, testStats, one, allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
 
+      // First empty poll → debounced: a single transient empty getContainers() must not wipe.
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+
+      // Second consecutive empty poll → confirmed removal.
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.false;
     });
@@ -1347,7 +1378,17 @@ describe("StateManager", () => {
 
     it("v0.6.0: creates a network state when the container reports net (bytes/s)", async () => {
       const withNet: BeszelContainer[] = [
-        { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "nginx", net: 123456 },
+        {
+          id: "c1",
+          system: "sys001",
+          name: "nginx",
+          status: "running",
+          health: 2,
+          cpu: 1,
+          memory: 10,
+          image: "nginx",
+          net: 123456,
+        },
       ];
       await manager.updateSystem(testSystem, testStats, withNet, allMetricsConfig());
       expect(adapter.states.get("systems.my_server.containers.nginx.network")?.val).to.equal(123456);
@@ -1360,6 +1401,61 @@ describe("StateManager", () => {
       ];
       await manager.updateSystem(testSystem, testStats, noNet, allMetricsConfig());
       expect(adapter.states.has("systems.my_server.containers.nginx.network")).to.be.false;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // H2 — drop-to-zero prune debounce (dynamic groups)
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — H2 drop-to-zero prune debounce", () => {
+    // On the wire the g/efs/t/ni maps are omitempty, so a vanished group arrives
+    // as an absent key; an empty `{}` is equivalent for our guard (entries → []).
+    it("H2: a GPU that drops to zero is kept for ONE poll, then pruned on the second empty", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.true;
+
+      // First empty poll → transient guard: a single glitch must NOT wipe the states.
+      await manager.updateSystem(testSystem, { ...testStats, g: {} }, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.true;
+
+      // Second consecutive empty poll → confirmed removal, pruned.
+      await manager.updateSystem(testSystem, { ...testStats, g: {} }, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.false;
+      // H2d: the now-empty parent `gpu` channel is removed too (no lingering empty folder).
+      expect(adapter.objects.has("systems.my_server.gpu")).to.be.false;
+    });
+
+    it("H2: a transient empty GPU response recovers on the next poll without wiping states", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      // One empty poll (transient) …
+      await manager.updateSystem(testSystem, { ...testStats, g: {} }, [], allMetricsConfig());
+      // … then the GPU is back → never pruned, and the debounce counter resets.
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0")).to.be.true;
+    });
+
+    it("H2: an extra filesystem dropping to zero is pruned after two empty polls (not one)", async () => {
+      const withFs: SystemStats = { ...testStats, efs: { "/mnt/backup": { d: 100, du: 80, r: 1, w: 2 } } };
+      await manager.updateSystem(testSystem, withFs, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.filesystems.mnt_backup")).to.be.true;
+
+      await manager.updateSystem(testSystem, { ...testStats, efs: {} }, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.filesystems.mnt_backup")).to.be.true; // debounced
+
+      await manager.updateSystem(testSystem, { ...testStats, efs: {} }, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.filesystems.mnt_backup")).to.be.false; // pruned
+    });
+
+    it("H2b: a presence-gated scalar (disk I/O) that goes absent is reset to null, not frozen", async () => {
+      const cfg = allMetricsConfig({ metrics_diskIo: true });
+      await manager.updateSystem(testSystem, { ...testStats, dios: [10, 20, 35, 1, 2, 50] }, [], cfg);
+      expect(adapter.states.get("systems.my_server.disk.io_util")?.val).to.equal(35);
+
+      // Disk goes fully idle → `dios` is omitted on the wire (omitzero). The state
+      // must reset to null, not keep showing the last busy value.
+      await manager.updateSystem(testSystem, { ...testStats, dios: undefined }, [], cfg);
+      expect(adapter.states.get("systems.my_server.disk.io_util")?.val).to.equal(null);
     });
   });
 
@@ -2219,26 +2315,23 @@ describe("StateManager", () => {
   });
 
   // -----------------------------------------------------------------------
-  // F2 — updateSystem honours skipContainerPrune (debounced empty fetch)
+  // H2 — container partial-shrink prunes immediately; only drop-to-zero debounces
   // -----------------------------------------------------------------------
 
-  describe("F2: updateSystem skipContainerPrune", () => {
+  describe("H2: container partial-shrink prunes immediately (not debounced)", () => {
     const two: BeszelContainer[] = [
       { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 1, image: "n" },
       { id: "c2", system: "sys001", name: "postgres", status: "running", health: 2, cpu: 1, memory: 1, image: "pg" },
     ];
 
-    it("keeps container channels when skipContainerPrune=true, prunes them when false", async () => {
+    it("removes one container among others on the same poll (the debounce only guards drop-to-zero)", async () => {
       await manager.updateSystem(testSystem, testStats, two, allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.true;
 
-      // postgres gone, but this poll is a debounced empty fetch (skip=true) → keep it
-      await manager.updateSystem(testSystem, testStats, two.slice(0, 1), allMetricsConfig(), true);
-      expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.true;
-
-      // a confirming poll (skip=false) prunes the now-absent container
-      await manager.updateSystem(testSystem, testStats, two.slice(0, 1), allMetricsConfig(), false);
+      // postgres gone but nginx remains → the group is non-empty → pruned at once.
+      await manager.updateSystem(testSystem, testStats, two.slice(0, 1), allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.containers.postgres")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
     });
   });
 });

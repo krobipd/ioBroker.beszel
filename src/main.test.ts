@@ -68,7 +68,6 @@ function internalOf(adapter: BeszelAdapter): {
   stateManager: FakeStateMgr | null;
   isPolling: boolean;
   lastSystemCount: number;
-  lastContainersEmpty: boolean;
   lastErrorCode: string;
   authFailCount: number;
   failedSystems: Set<string>;
@@ -77,7 +76,12 @@ function internalOf(adapter: BeszelAdapter): {
   testClients: Set<{ cancelAll: () => void }>;
   pollTimer: unknown;
   config: Record<string, unknown>;
-  log: { debug: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
+  log: {
+    debug: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+  };
   setStateAsync: ReturnType<typeof vi.fn>;
   setState: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
@@ -460,57 +464,9 @@ describe("BeszelAdapter poll — empty-systems guard", () => {
   });
 });
 
-describe("BeszelAdapter poll — F2 container-prune debounce", () => {
-  const oneContainer = [
-    { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 1, image: "n" },
-  ];
-
-  it("skips the prune on the FIRST empty container fetch, prunes on the SECOND (debounce)", async () => {
-    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
-    const i = internalOf(adapter);
-    client.getSystems.mockResolvedValue([makeSystem()]);
-    client.getContainers.mockResolvedValue([]);
-    i.lastContainersEmpty = false; // previous poll had containers
-
-    stateMgr.updateSystem.mockClear();
-    await i.poll(); // 1st empty → skipContainerPrune = true (a transient glitch must not wipe)
-    expect(stateMgr.updateSystem).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      true,
-    );
-
-    stateMgr.updateSystem.mockClear();
-    await i.poll(); // 2nd consecutive empty → confirmed removal → prune
-    expect(stateMgr.updateSystem).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      false,
-    );
-  });
-
-  it("prunes immediately when the container fetch is non-empty (skip = false)", async () => {
-    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
-    const i = internalOf(adapter);
-    client.getSystems.mockResolvedValue([makeSystem()]);
-    client.getContainers.mockResolvedValue(oneContainer as never);
-    i.lastContainersEmpty = false;
-
-    stateMgr.updateSystem.mockClear();
-    await i.poll();
-    expect(stateMgr.updateSystem).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      false,
-    );
-  });
-});
+// H2: the container-prune debounce moved out of main.ts into StateManager's
+// per-group pruneGroup (tested in state-manager.test.ts). main.ts no longer
+// computes a skipContainerPrune flag, so its dedicated F2 test is gone.
 
 describe("BeszelAdapter poll — system_details cadence (F2)", () => {
   it("fetches details once for a new system and attaches them", async () => {
