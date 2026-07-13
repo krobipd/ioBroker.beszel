@@ -22,7 +22,6 @@
 	],
 	"exclude": [
 		"build/**",
-		"node_modules/**",
-		"widgets/**"
+		"node_modules/**"
 	]
 }

@@ -213,10 +213,9 @@ beszel.0.
 ---
 
 ## Changelog
+### 0.10.0 (2026-07-13)
 
-### **WORK IN PROGRESS**
-
-- Container states are no longer deleted when the adapter briefly loses access to the container data (permission change or connection problem) — they stay until the containers are really gone.
+- Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.
 
 ### 0.9.0 (2026-07-07)
 
@@ -245,10 +244,6 @@ beszel.0.
 ### 0.7.1 (2026-06-09)
 
 - Improved compact-mode behavior: beszel no longer registers global process error handlers that could interfere with other adapters running in the same process.
-
-### 0.7.0 (2026-06-07)
-
-- Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

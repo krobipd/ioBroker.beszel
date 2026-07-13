@@ -1,4 +1,8 @@
 # Older Changes
+## 0.7.0 (2026-06-07)
+
+- Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.
+
 ## 0.5.12 (2026-05-23)
 
 - Reduced unnecessary state-change events by skipping writes when the value has not changed.

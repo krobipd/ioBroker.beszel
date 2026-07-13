@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "news": {
+      "0.10.0": {
+        "en": "Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.",
+        "de": "Container-Datenpunkte werden nicht mehr gelöscht, wenn der Adapter kurz keinen Zugriff auf die Container-Daten hat — sie bleiben, bis die Container wirklich weg sind.",
+        "ru": "Состояния контейнеров больше не удаляются, когда адаптер ненадолго теряет доступ к данным контейнеров — они сохраняются, пока контейнеры действительно не исчезнут.",
+        "pt": "Os estados dos contêineres já não são apagados quando o adaptador perde brevemente o acesso aos dados dos contêineres — permanecem até os contêineres desaparecerem mesmo.",
+        "nl": "Containerstatussen worden niet meer verwijderd wanneer de adapter kort geen toegang heeft tot de containergegevens — ze blijven behouden tot de containers echt weg zijn.",
+        "fr": "Les états des conteneurs ne sont plus supprimés lorsque l'adaptateur perd brièvement l'accès aux données des conteneurs — ils sont conservés jusqu'à leur disparition réelle.",
+        "it": "Gli stati dei container non vengono più eliminati quando l'adapter perde brevemente l'accesso ai dati dei container — vengono mantenuti finché i container non spariscono davvero.",
+        "es": "Los estados de los contenedores ya no se eliminan cuando el adaptador pierde brevemente el acceso a los datos de los contenedores — se conservan hasta que desaparecen de verdad.",
+        "pl": "Stany kontenerów nie są już usuwane, gdy adapter na chwilę traci dostęp do danych kontenerów — pozostają, dopóki kontenery naprawdę nie znikną.",
+        "uk": "Стани контейнерів більше не видаляються, коли адаптер ненадовго втрачає доступ до даних контейнерів — вони зберігаються, доки контейнери справді не зникнуть.",
+        "zh-cn": "当适配器短暂无法访问容器数据时，容器状态不再被删除——它们会一直保留，直到容器真正消失。"
+      },
       "0.9.0": {
         "en": "The connection test now correctly reports a failure when your login is wrong, and states for a sensor, disk or interface that disappears are removed instead of frozen at their last value.",
         "de": "Der Verbindungstest meldet jetzt korrekt einen Fehler, wenn die Anmeldung falsch ist, und Datenpunkte eines verschwundenen Sensors, einer Platte oder Schnittstelle werden entfernt statt eingefroren.",
@@ -80,19 +93,6 @@
         "pl": "Więcej opcjonalnych metryk, informacje o systemie, sieć kontenerów i szczegóły GPU. Poprawiono jednostkę pamięci GPU i wskaźnik ładowania baterii.",
         "uk": "Більше необов'язкових метрик, інформація про систему, мережа контейнерів і деталі GPU. Виправлено одиницю пам'яті GPU та індикатор заряджання батареї.",
         "zh-cn": "更多可选指标，以及系统信息、容器网络和 GPU 详情。修复了 GPU 显存单位和电池充电指示。"
-      },
-      "0.5.12": {
-        "en": "Reduced unnecessary state-change events. Fixed duplicate error messages in compact mode.",
-        "de": "Unnötige State-Change-Events reduziert. Doppelte Fehlermeldungen im Compact-Modus behoben.",
-        "ru": "Сокращены ненужные события изменения состояний. Исправлены дублирующиеся сообщения об ошибках в компактном режиме.",
-        "pt": "Eventos de mudança de estado desnecessários reduzidos. Corrigidas mensagens de erro duplicadas no modo compacto.",
-        "nl": "Onnodige state-change-events verminderd. Dubbele foutmeldingen in compacte modus verholpen.",
-        "fr": "Réduction des événements de changement d'état inutiles. Correction des messages d'erreur en double en mode compact.",
-        "it": "Ridotti gli eventi di cambio stato non necessari. Corretti i messaggi di errore duplicati in modalità compatta.",
-        "es": "Reducidos los eventos de cambio de estado innecesarios. Corregidos los mensajes de error duplicados en modo compacto.",
-        "pl": "Zmniejszono niepotrzebne zdarzenia zmiany stanu. Naprawiono zduplikowane komunikaty o błędach w trybie kompaktowym.",
-        "uk": "Зменшено непотрібні події зміни стану. Виправлено дублювання повідомлень про помилки у компактному режимі.",
-        "zh-cn": "减少了不必要的状态变更事件。修复了紧凑模式下重复的错误消息。"
       }
     },
     "plugins": {
