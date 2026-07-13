@@ -209,6 +209,16 @@ describe("BeszelAdapter onReady", () => {
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("polling every 60s"));
   });
 
+  it("F3: fetches existing system names once and hands them to migrateLegacyStates", async () => {
+    const { adapter, stateMgr } = setup();
+    const i = internalOf(adapter);
+    stateMgr.getExistingSystemNames.mockResolvedValue(["server_a", "old_box"]);
+    await i.onReady();
+    // The names are fetched once in onReady and threaded into the migration, so the
+    // real StateManager needn't re-run the object view a second time on startup.
+    expect(stateMgr.migrateLegacyStates).toHaveBeenCalledWith(["server_a", "old_box"]);
+  });
+
   it("reports disconnected at start (info.connection false before the first poll)", async () => {
     const { adapter } = setup();
     const i = internalOf(adapter);
@@ -311,6 +321,50 @@ describe("BeszelAdapter poll — happy path", () => {
     const on = await setupReady({ metrics_containers: true });
     await internalOf(on.adapter).poll();
     expect(on.client.getContainers).toHaveBeenCalled();
+  });
+
+  it("F1: passes containersAvailable=false to updateSystem when the container fetch fails", async () => {
+    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getContainers.mockRejectedValue(errnoError("403", "FORBIDDEN"));
+    stateMgr.updateSystem.mockClear();
+
+    await i.poll();
+
+    // A failed container fetch must reach the StateManager as containersAvailable=false
+    // (5th arg) so it freezes the container tree instead of pruning it.
+    expect(stateMgr.updateSystem).toHaveBeenCalled();
+    expect(stateMgr.updateSystem.mock.calls[0][4]).toBe(false);
+  });
+
+  it("F1: passes containersAvailable=true when the container fetch succeeds", async () => {
+    const { adapter, stateMgr } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    stateMgr.updateSystem.mockClear();
+
+    await i.poll();
+
+    expect(stateMgr.updateSystem.mock.calls[0][4]).toBe(true);
+  });
+
+  it("F5: passes each system only its own containers (grouped by the poll)", async () => {
+    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getSystems.mockResolvedValue([makeSystem(), makeSystem({ id: "sys002", name: "Server B" })]);
+    client.getContainers.mockResolvedValue([
+      { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "n" },
+      { id: "c2", system: "sys002", name: "pg", status: "running", health: 2, cpu: 1, memory: 10, image: "p" },
+    ]);
+    stateMgr.updateSystem.mockClear();
+
+    await i.poll();
+
+    const containersFor = (id: string): string[] => {
+      const call = stateMgr.updateSystem.mock.calls.find(c => (c[0] as BeszelSystem).id === id);
+      return (call?.[2] as Array<{ id: string }>).map(c => c.id);
+    };
+    expect(containersFor("sys001")).toEqual(["c1"]);
+    expect(containersFor("sys002")).toEqual(["c2"]);
   });
 });
 

@@ -36,6 +36,7 @@ __export(coerce_exports, {
   coerceTimeoutMs: () => coerceTimeoutMs,
   errText: () => errText,
   isPlaintextRemoteUrl: () => isPlaintextRemoteUrl,
+  sanitizeDisplayName: () => sanitizeDisplayName,
   sanitizeForLog: () => sanitizeForLog,
   shouldFetchSystemDetails: () => shouldFetchSystemDetails,
   validateHubUrl: () => validateHubUrl
@@ -81,10 +82,16 @@ function errText(err) {
     return Object.prototype.toString.call(err);
   }
 }
-function sanitizeForLog(value, maxLength = 200) {
+function collapseControlAndCap(value, maxLength) {
   const s = typeof value === "string" ? value : String(value);
   const oneLine = s.replace(/[\r\n\t]+/g, " ");
   return oneLine.length > maxLength ? `${oneLine.slice(0, maxLength)}\u2026` : oneLine;
+}
+function sanitizeForLog(value, maxLength = 200) {
+  return collapseControlAndCap(value, maxLength);
+}
+function sanitizeDisplayName(value, maxLength = 200) {
+  return collapseControlAndCap(value, maxLength);
 }
 function coerceObject(value) {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
@@ -523,6 +530,7 @@ function coerceAuthResponse(value) {
   coerceTimeoutMs,
   errText,
   isPlaintextRemoteUrl,
+  sanitizeDisplayName,
   sanitizeForLog,
   shouldFetchSystemDetails,
   validateHubUrl

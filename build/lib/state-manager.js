@@ -289,10 +289,13 @@ class StateManager {
    *
    * @param system Beszel system record
    * @param stats Latest stats for this system, or undefined if unavailable
-   * @param containers Container records belonging to this system
+   * @param containers Container records belonging to this system (pre-filtered by the poll)
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
+   * @param containersAvailable F1: whether the container fetch succeeded this poll. `false`
+   *   (403 / timeout) means "unknown" — the container tree is left untouched (frozen), never
+   *   pruned. Defaults to `true` so unit tests exercising other metrics need not pass it.
    */
-  async updateSystem(system, stats, containers, rawConfig) {
+  async updateSystem(system, stats, containers, rawConfig, containersAvailable = true) {
     const config = this.effectiveConfig(rawConfig);
     const safeName = this.resolvedSafeName(system);
     if (safeName.length === 0) {
@@ -339,8 +342,8 @@ class StateManager {
     if (stats) {
       await this.updateDynamicStats(sysId, stats, config);
     }
-    if (config.metrics_containers) {
-      await this.updateContainers(sysId, system.id, containers);
+    if (config.metrics_containers && containersAvailable) {
+      await this.updateContainers(sysId, containers);
     }
   }
   /**
@@ -484,20 +487,25 @@ class StateManager {
   /**
    * Remove legacy flat state paths from pre-0.3.0 installations.
    * Must be called once during onReady before the first poll.
+   *
+   * F3: `existingNames` may be passed in when the caller (onReady) has already
+   * enumerated the system devices — then this method reuses that list instead of
+   * running the same object view a second time. Omitted (e.g. in unit tests) it
+   * enumerates on its own.
+   *
+   * @param existingNames Pre-enumerated system device names, or undefined to enumerate here.
    */
-  async migrateLegacyStates() {
+  async migrateLegacyStates(existingNames) {
     const marker = await this.adapter.getStateAsync("info.legacyMigrated");
     if ((marker == null ? void 0 : marker.val) === true) {
       return;
     }
-    const existingNames = await this.getExistingSystemNames();
-    if (existingNames.length === 0) {
+    const names = existingNames != null ? existingNames : await this.getExistingSystemNames();
+    if (names.length === 0) {
       await this.markLegacyMigrationDone();
       return;
     }
-    this.adapter.log.debug(
-      `migrateLegacyStates: scanning ${existingNames.length} existing system(s) for legacy flat states`
-    );
+    this.adapter.log.debug(`migrateLegacyStates: scanning ${names.length} existing system(s) for legacy flat states`);
     const legacyStates = [
       "online",
       "status",
@@ -534,7 +542,7 @@ class StateManager {
       "battery_charging"
     ];
     const counts = await Promise.all(
-      existingNames.map(async (name) => {
+      names.map(async (name) => {
         const sysId = `systems.${name}`;
         let local = 0;
         for (const stateId of legacyStates) {
@@ -588,7 +596,7 @@ class StateManager {
         async (safeSensor, sensor, temp) => {
           await this.createAndSetState(
             `${sysId}.temperature.sensors.${safeSensor}`,
-            (0, import_metric_registry.numCommon)((0, import_coerce.sanitizeForLog)(sensor), "\xB0C", "value.temperature"),
+            (0, import_metric_registry.numCommon)((0, import_coerce.sanitizeDisplayName)(sensor), "\xB0C", "value.temperature"),
             temp
           );
         }
@@ -621,7 +629,7 @@ class StateManager {
           await this.ensureChannel(`${sysId}.network.interfaces`, (0, import_metric_registry.channelName)("interfaces"));
         },
         async (safeId, iface, vals) => {
-          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, (0, import_coerce.sanitizeForLog)(iface));
+          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, (0, import_coerce.sanitizeDisplayName)(iface));
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
             (0, import_metric_registry.numCommon)((0, import_i18n.tName)("ifaceUp"), "MB/s"),
@@ -655,7 +663,7 @@ class StateManager {
         },
         async (safeId, gpuId, gpuData) => {
           var _a2, _b, _c, _d, _e, _f;
-          await this.ensureChannel(`${sysId}.gpu.${safeId}`, (0, import_coerce.sanitizeForLog)((_a2 = gpuData.n) != null ? _a2 : gpuId));
+          await this.ensureChannel(`${sysId}.gpu.${safeId}`, (0, import_coerce.sanitizeDisplayName)((_a2 = gpuData.n) != null ? _a2 : gpuId));
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
             (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("gpuUsage")),
@@ -692,7 +700,7 @@ class StateManager {
               async (safeEngine, engine, value) => {
                 await this.createAndSetState(
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                  (0, import_metric_registry.percentCommon)((0, import_coerce.sanitizeForLog)(engine)),
+                  (0, import_metric_registry.percentCommon)((0, import_coerce.sanitizeDisplayName)(engine)),
                   (0, import_metric_registry.clampPercent)(value)
                 );
               }
@@ -711,7 +719,7 @@ class StateManager {
         },
         async (safeId, fsName, fsData) => {
           var _a2, _b, _c, _d;
-          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, (0, import_coerce.sanitizeForLog)(fsName));
+          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, (0, import_coerce.sanitizeDisplayName)(fsName));
           const total = (_a2 = fsData.d) != null ? _a2 : null;
           const used = (_b = fsData.du) != null ? _b : null;
           const percent = total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
@@ -744,9 +752,16 @@ class StateManager {
       );
     }
   }
-  async updateContainers(sysId, systemId, allContainers) {
+  /**
+   * F5: `sysContainers` is already the list belonging to THIS system — the poll
+   * groups the global container list by `system` once (O(containers)) instead of
+   * each system re-filtering the whole list (O(systems × containers)).
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   * @param sysContainers Container records for this system (already filtered).
+   */
+  async updateContainers(sysId, sysContainers) {
     var _a, _b;
-    const sysContainers = allContainers.filter((c) => c.system === systemId);
     const seenContainers = /* @__PURE__ */ new Set();
     const resolvedIds = /* @__PURE__ */ new Map();
     for (const container of sysContainers) {
@@ -769,7 +784,7 @@ class StateManager {
       if (cId.length === 0) {
         continue;
       }
-      await this.ensureChannel(`${sysId}.containers.${cId}`, (0, import_coerce.sanitizeForLog)(container.name));
+      await this.ensureChannel(`${sysId}.containers.${cId}`, (0, import_coerce.sanitizeDisplayName)(container.name));
       await this.createAndSetState(`${sysId}.containers.${cId}.status`, (0, import_metric_registry.textCommon)((0, import_i18n.tName)("status")), container.status);
       const healthIdx = Math.floor(container.health);
       await this.createAndSetState(

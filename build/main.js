@@ -135,8 +135,8 @@ class BeszelAdapter extends utils.Adapter {
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
       this.stateManager = this.makeStateManager();
-      await this.stateManager.migrateLegacyStates();
       const existingNames = await this.stateManager.getExistingSystemNames();
+      await this.stateManager.migrateLegacyStates(existingNames);
       await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
       this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
       await this.poll();
@@ -227,8 +227,14 @@ class BeszelAdapter extends utils.Adapter {
    * L3: fetch containers without letting a failure poison the whole poll. A 403
    * (the configured user lacks permission for the `containers` collection) or a
    * transient error used to reject the poll's `Promise.all` and freeze EVERY
-   * system's states. Now it degrades to an empty list (like the non-fatal
-   * system_details fetch), warning once then tracing.
+   * system's states. Now it degrades gracefully, warning once then tracing.
+   *
+   * F1: returns `null` on a FETCH FAILURE (distinct from `[]` = fetched OK, zero
+   * containers). The caller passes this distinction to `updateSystem` as
+   * `containersAvailable`: a failure freezes the existing container tree (never
+   * prunes it), while a genuine empty result prunes with the H2 debounce.
+   * Conflating the two used to delete every container state after a mere 2 polls
+   * of a persistent 403.
    *
    * @param config Adapter configuration (containers only fetched when enabled).
    */
@@ -245,14 +251,14 @@ class BeszelAdapter extends utils.Adapter {
       return containers;
     } catch (err) {
       const code = this.classifyError(err);
-      const msg = `Container fetch failed (non-fatal, ${code}) \u2014 other metrics still update. Check the configured user's permission for the containers collection.`;
+      const msg = `Container fetch failed (non-fatal, ${code}) \u2014 other metrics still update, existing container states are kept. Check the configured user's permission for the containers collection.`;
       if (this.containersUnavailable) {
         this.log.debug(msg);
       } else {
         this.log.warn(msg);
         this.containersUnavailable = true;
       }
-      return [];
+      return null;
     }
   }
   /**
@@ -316,22 +322,39 @@ class BeszelAdapter extends utils.Adapter {
     this.isPolling = true;
     try {
       const config = this.config;
-      const [systems, containers, statsMap] = await Promise.all([
+      const [systems, containersResult, statsMap] = await Promise.all([
         this.client.getSystems(),
         this.fetchContainersSafe(config),
         this.client.getLatestStats()
       ]);
       await this.setStateChangedAsync("info.connection", { val: true, ack: true });
+      const containersAvailable = containersResult !== null;
+      const containersBySystem = /* @__PURE__ */ new Map();
+      for (const container of containersResult != null ? containersResult : []) {
+        const list = containersBySystem.get(container.system);
+        if (list) {
+          list.push(container);
+        } else {
+          containersBySystem.set(container.system, [container]);
+        }
+      }
       await this.fetchAndAttachDetails(systems, config);
       this.stateManager.prepareForPoll(systems);
       await Promise.all(
         systems.map(async (system) => {
+          var _a;
           try {
             const stats = statsMap.get(system.id);
             this.log.debug(
               `updateSystem: '${(0, import_coerce.sanitizeForLog)(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`
             );
-            await this.stateManager.updateSystem(system, stats, containers, config);
+            await this.stateManager.updateSystem(
+              system,
+              stats,
+              (_a = containersBySystem.get(system.id)) != null ? _a : [],
+              config,
+              containersAvailable
+            );
             this.failedSystems.delete(system.id);
           } catch (err) {
             const msg = `Failed to update system '${(0, import_coerce.sanitizeForLog)(system.name)}': ${(0, import_coerce.errText)(err)}`;

@@ -134,9 +134,10 @@ export class BeszelAdapter extends utils.Adapter {
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
       this.stateManager = this.makeStateManager();
 
-      await this.stateManager.migrateLegacyStates();
-
+      // F3: enumerate the existing system devices once and reuse the list for both
+      // the legacy migration and the metric cleanup, instead of two object views.
       const existingNames = await this.stateManager.getExistingSystemNames();
+      await this.stateManager.migrateLegacyStates(existingNames);
       await Promise.all(existingNames.map(name => this.stateManager!.cleanupMetrics(name, config)));
       this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
 
@@ -257,12 +258,20 @@ export class BeszelAdapter extends utils.Adapter {
    * L3: fetch containers without letting a failure poison the whole poll. A 403
    * (the configured user lacks permission for the `containers` collection) or a
    * transient error used to reject the poll's `Promise.all` and freeze EVERY
-   * system's states. Now it degrades to an empty list (like the non-fatal
-   * system_details fetch), warning once then tracing.
+   * system's states. Now it degrades gracefully, warning once then tracing.
+   *
+   * F1: returns `null` on a FETCH FAILURE (distinct from `[]` = fetched OK, zero
+   * containers). The caller passes this distinction to `updateSystem` as
+   * `containersAvailable`: a failure freezes the existing container tree (never
+   * prunes it), while a genuine empty result prunes with the H2 debounce.
+   * Conflating the two used to delete every container state after a mere 2 polls
+   * of a persistent 403.
    *
    * @param config Adapter configuration (containers only fetched when enabled).
    */
-  private async fetchContainersSafe(config: AdapterConfig): Promise<BeszelContainer[]> {
+  private async fetchContainersSafe(config: AdapterConfig): Promise<BeszelContainer[] | null> {
+    // Toggle off or no client: no fetch attempted — this is "nothing to show",
+    // not a failure, so return an empty (available) list rather than the null sentinel.
     if (!config.metrics_containers || !this.client) {
       return [];
     }
@@ -275,14 +284,14 @@ export class BeszelAdapter extends utils.Adapter {
       return containers;
     } catch (err) {
       const code = this.classifyError(err);
-      const msg = `Container fetch failed (non-fatal, ${code}) — other metrics still update. Check the configured user's permission for the containers collection.`;
+      const msg = `Container fetch failed (non-fatal, ${code}) — other metrics still update, existing container states are kept. Check the configured user's permission for the containers collection.`;
       if (this.containersUnavailable) {
         this.log.debug(msg);
       } else {
         this.log.warn(msg);
         this.containersUnavailable = true;
       }
-      return [];
+      return null;
     }
   }
 
@@ -356,7 +365,7 @@ export class BeszelAdapter extends utils.Adapter {
       // they share a single auth round-trip if the token is missing.
       // Earlier `getLatestStats` waited for `getSystems` to finish even
       // though the API endpoint doesn't actually need the system IDs.
-      const [systems, containers, statsMap] = await Promise.all([
+      const [systems, containersResult, statsMap] = await Promise.all([
         this.client.getSystems(),
         this.fetchContainersSafe(config),
         this.client.getLatestStats(),
@@ -364,6 +373,22 @@ export class BeszelAdapter extends utils.Adapter {
 
       // Update connection state (L1: setStateChanged → no event when unchanged).
       await this.setStateChangedAsync("info.connection", { val: true, ack: true });
+
+      // F1: null = the container fetch failed (403 / timeout). The per-system
+      // update freezes the existing container tree in that case instead of pruning it.
+      const containersAvailable = containersResult !== null;
+      // F5: group the flat container list by system id once (O(containers)) so each
+      // updateSystem gets only its own containers, instead of re-filtering the whole
+      // list per system (O(systems × containers)).
+      const containersBySystem = new Map<string, BeszelContainer[]>();
+      for (const container of containersResult ?? []) {
+        const list = containersBySystem.get(container.system);
+        if (list) {
+          list.push(container);
+        } else {
+          containersBySystem.set(container.system, [container]);
+        }
+      }
 
       // v0.6.0 (F2): attach static hardware/OS details when "System info" is on
       // (F3/N5: extracted to keep the poll body readable).
@@ -386,7 +411,13 @@ export class BeszelAdapter extends utils.Adapter {
             this.log.debug(
               `updateSystem: '${sanitizeForLog(system.name)}' (id=${system.id.slice(0, 8)}, hasStats=${!!stats})`,
             );
-            await this.stateManager!.updateSystem(system, stats, containers, config);
+            await this.stateManager!.updateSystem(
+              system,
+              stats,
+              containersBySystem.get(system.id) ?? [],
+              config,
+              containersAvailable,
+            );
             this.failedSystems.delete(system.id);
           } catch (err) {
             const msg = `Failed to update system '${sanitizeForLog(system.name)}': ${errText(err)}`;

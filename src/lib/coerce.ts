@@ -98,6 +98,20 @@ export function errText(err: unknown): string {
 }
 
 /**
+ * Shared normalization for an untrusted (Hub-supplied) string: collapse CR/LF/Tab
+ * runs into a single space and cap the length (marking truncation with an
+ * ellipsis). Backs both {@link sanitizeForLog} and {@link sanitizeDisplayName}.
+ *
+ * @param value Untrusted value.
+ * @param maxLength Maximum length before truncation.
+ */
+function collapseControlAndCap(value: unknown, maxLength: number): string {
+  const s = typeof value === "string" ? value : String(value);
+  const oneLine = s.replace(/[\r\n\t]+/g, " ");
+  return oneLine.length > maxLength ? `${oneLine.slice(0, maxLength)}…` : oneLine;
+}
+
+/**
  * SEC-8: make an untrusted (Hub-supplied) string safe to interpolate into a
  * single log line — collapse CR/LF/Tab to a space so a crafted name cannot
  * forge extra log lines, and cap the length so an oversized name cannot bloat
@@ -107,9 +121,21 @@ export function errText(err: unknown): string {
  * @param maxLength Maximum length before truncation (default 200).
  */
 export function sanitizeForLog(value: unknown, maxLength = 200): string {
-  const s = typeof value === "string" ? value : String(value);
-  const oneLine = s.replace(/[\r\n\t]+/g, " ");
-  return oneLine.length > maxLength ? `${oneLine.slice(0, maxLength)}…` : oneLine;
+  return collapseControlAndCap(value, maxLength);
+}
+
+/**
+ * F4: sanitize an untrusted (Hub-supplied) name for use as an ioBroker object
+ * `common.name`. Same normalization as {@link sanitizeForLog} (collapse CR/LF/Tab,
+ * cap length), but named for intent — a reader shouldn't be told a display name is
+ * being "sanitized for a log". Used for dynamic channel/state display names
+ * (sensor / interface / GPU / filesystem / container names from the Hub).
+ *
+ * @param value Untrusted display name.
+ * @param maxLength Maximum length before truncation (default 200).
+ */
+export function sanitizeDisplayName(value: unknown, maxLength = 200): string {
+  return collapseControlAndCap(value, maxLength);
 }
 
 /**

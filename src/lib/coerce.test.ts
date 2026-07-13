@@ -18,6 +18,7 @@ import {
   errText,
   isPlaintextRemoteUrl,
   sanitizeForLog,
+  sanitizeDisplayName,
   shouldFetchSystemDetails,
   validateHubUrl,
 } from "./coerce";
@@ -886,6 +887,19 @@ describe("coerce", () => {
     it("stringifies non-string input", () => {
       expect(sanitizeForLog(42)).to.equal("42");
       expect(sanitizeForLog(null)).to.equal("null");
+    });
+  });
+
+  describe("sanitizeDisplayName (F4)", () => {
+    it("collapses control chars and caps length like the log sanitizer (shared impl)", () => {
+      expect(sanitizeDisplayName("wlan0\r\nfoo")).to.equal("wlan0 foo");
+      const capped = sanitizeDisplayName("x".repeat(5000));
+      expect(capped).to.have.lengthOf(201); // 200 chars + ellipsis
+      expect(capped.endsWith("…")).to.equal(true);
+    });
+
+    it("leaves a normal display name unchanged", () => {
+      expect(sanitizeDisplayName("NVIDIA RTX 4090")).to.equal("NVIDIA RTX 4090");
     });
   });
 

@@ -1,5 +1,5 @@
 import type * as utils from "@iobroker/adapter-core";
-import { errText, sanitizeForLog } from "./coerce";
+import { errText, sanitizeDisplayName, sanitizeForLog } from "./coerce";
 import { tName } from "./i18n";
 import {
   buildMetricDefs,
@@ -318,14 +318,18 @@ export class StateManager {
    *
    * @param system Beszel system record
    * @param stats Latest stats for this system, or undefined if unavailable
-   * @param containers Container records belonging to this system
+   * @param containers Container records belonging to this system (pre-filtered by the poll)
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
+   * @param containersAvailable F1: whether the container fetch succeeded this poll. `false`
+   *   (403 / timeout) means "unknown" — the container tree is left untouched (frozen), never
+   *   pruned. Defaults to `true` so unit tests exercising other metrics need not pass it.
    */
   public async updateSystem(
     system: BeszelSystem,
     stats: SystemStats | undefined,
     containers: BeszelContainer[],
     rawConfig: AdapterConfig,
+    containersAvailable = true,
   ): Promise<void> {
     // Detail toggles inherit their category's base toggle (off category → off
     // detail). Applied once here so applyMetrics + updateDynamicStats + the
@@ -397,9 +401,14 @@ export class StateManager {
       await this.updateDynamicStats(sysId, stats, config);
     }
 
-    // Containers
-    if (config.metrics_containers) {
-      await this.updateContainers(sysId, system.id, containers);
+    // Containers. F1: only touch the container tree when the fetch actually
+    // succeeded this poll. A failed fetch (403 / timeout) arrives as
+    // containersAvailable=false — skip entirely so existing states freeze (what
+    // the changelog promises with "skipped") instead of the prune deleting them.
+    // A SUCCESSFUL empty result (containersAvailable=true, containers=[]) still
+    // prunes, with the H2 two-poll debounce.
+    if (config.metrics_containers && containersAvailable) {
+      await this.updateContainers(sysId, containers);
     }
   }
 
@@ -575,8 +584,15 @@ export class StateManager {
   /**
    * Remove legacy flat state paths from pre-0.3.0 installations.
    * Must be called once during onReady before the first poll.
+   *
+   * F3: `existingNames` may be passed in when the caller (onReady) has already
+   * enumerated the system devices — then this method reuses that list instead of
+   * running the same object view a second time. Omitted (e.g. in unit tests) it
+   * enumerates on its own.
+   *
+   * @param existingNames Pre-enumerated system device names, or undefined to enumerate here.
    */
-  public async migrateLegacyStates(): Promise<void> {
+  public async migrateLegacyStates(existingNames?: string[]): Promise<void> {
     // L6: one-shot guard. Pre-0.3.0 flat states only exist on installs that
     // upgraded through <0.3.0; once swept (or confirmed absent) a marker lets
     // later restarts skip probing dozens of legacy ids per system every time.
@@ -584,17 +600,15 @@ export class StateManager {
     if (marker?.val === true) {
       return;
     }
-    const existingNames = await this.getExistingSystemNames();
-    if (existingNames.length === 0) {
+    const names = existingNames ?? (await this.getExistingSystemNames());
+    if (names.length === 0) {
       await this.markLegacyMigrationDone();
       return;
     }
     // v0.4.4 (G4): trace the scan-start so the migration-summary at the end
     // is anchored. If no states need migration, only this debug line fires;
     // the existing info-summary stays silent.
-    this.adapter.log.debug(
-      `migrateLegacyStates: scanning ${existingNames.length} existing system(s) for legacy flat states`,
-    );
+    this.adapter.log.debug(`migrateLegacyStates: scanning ${names.length} existing system(s) for legacy flat states`);
 
     // Old flat state IDs that moved into channels
     const legacyStates = [
@@ -638,7 +652,7 @@ export class StateManager {
     // on doubly-nested Promise.all here — see Memory `feedback_mocha_esm_loader_bug`).
     // Outer parallel still cuts total time by N where N = system count.
     const counts = await Promise.all(
-      existingNames.map(async name => {
+      names.map(async name => {
         const sysId = `systems.${name}`;
         let local = 0;
         for (const stateId of legacyStates) {
@@ -702,7 +716,7 @@ export class StateManager {
         async (safeSensor, sensor, temp) => {
           await this.createAndSetState(
             `${sysId}.temperature.sensors.${safeSensor}`,
-            numCommon(sanitizeForLog(sensor), "°C", "value.temperature"),
+            numCommon(sanitizeDisplayName(sensor), "°C", "value.temperature"),
             temp,
           );
         },
@@ -744,7 +758,7 @@ export class StateManager {
         },
         async (safeId, iface, vals) => {
           // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
-          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeForLog(iface));
+          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeDisplayName(iface));
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
             numCommon(tName("ifaceUp"), "MB/s"),
@@ -781,7 +795,7 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.gpu`, channelName("gpu"));
         },
         async (safeId, gpuId, gpuData) => {
-          await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeForLog(gpuData.n ?? gpuId));
+          await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeDisplayName(gpuData.n ?? gpuId));
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
             percentCommon(tName("gpuUsage")),
@@ -821,7 +835,7 @@ export class StateManager {
                 // Engine name is vendor-defined → kept as-is.
                 await this.createAndSetState(
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
-                  percentCommon(sanitizeForLog(engine)),
+                  percentCommon(sanitizeDisplayName(engine)),
                   clampPercent(value),
                 );
               },
@@ -843,7 +857,7 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.filesystems`, channelName("filesystems"));
         },
         async (safeId, fsName, fsData) => {
-          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeForLog(fsName));
+          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeDisplayName(fsName));
 
           const total = fsData.d ?? null;
           const used = fsData.du ?? null;
@@ -885,9 +899,15 @@ export class StateManager {
     }
   }
 
-  private async updateContainers(sysId: string, systemId: string, allContainers: BeszelContainer[]): Promise<void> {
-    const sysContainers = allContainers.filter(c => c.system === systemId);
-
+  /**
+   * F5: `sysContainers` is already the list belonging to THIS system — the poll
+   * groups the global container list by `system` once (O(containers)) instead of
+   * each system re-filtering the whole list (O(systems × containers)).
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   * @param sysContainers Container records for this system (already filtered).
+   */
+  private async updateContainers(sysId: string, sysContainers: BeszelContainer[]): Promise<void> {
     // SEC-6: resolve each container's id segment once (keyed by record id),
     // disambiguating any collision so the prune set and the create loop use the
     // SAME id and two same-sanitizing names never overwrite each other.
@@ -926,7 +946,7 @@ export class StateManager {
         continue;
       }
       // container.name is user-defined (Docker container name) → keep as-is.
-      await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeForLog(container.name));
+      await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeDisplayName(container.name));
       await this.createAndSetState(`${sysId}.containers.${cId}.status`, textCommon(tName("status")), container.status);
       // v0.4.3 (SM7): floor the health index — API drift could send a
       // float (e.g. 2.5) which `healthLabels[2.5]` resolves to undefined.
@@ -1119,6 +1139,14 @@ export class StateManager {
       // changed `common` (the value.battery/value.power/info.status role fixes)
       // reaches states that already exist on an upgraded install — user-renamed
       // names are preserved. Runs once per state per restart (createdIds-gated).
+      //
+      // Deliberately every restart, NOT gated behind a one-shot schema-version
+      // marker. A marker would set "done" after the first successful poll — but a
+      // system that is `down`/`paused` at that moment never has its pre-existing
+      // states touched (they're not in createdIds on a fresh process), so their old
+      // role would be frozen forever. The every-restart extendObject is idempotent,
+      // self-healing (a returning system gets retrofitted next restart) and only a
+      // startup cost. Don't "optimize" it into that regression.
       await this.adapter.extendObject(id, { type: "state", common, native: {} }, { preserve: { common: ["name"] } });
       this.createdIds.add(id);
     }

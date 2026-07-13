@@ -1334,6 +1334,33 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.false;
     });
 
+    it("F1: a container fetch FAILURE (containersAvailable=false) never deletes existing states", async () => {
+      const one: BeszelContainer[] = [
+        {
+          id: "c1",
+          system: testSystem.id,
+          name: "nginx",
+          status: "running",
+          health: 2,
+          cpu: 1,
+          memory: 10,
+          image: "nginx",
+        },
+      ];
+      // Containers fetched fine → nginx state exists.
+      await manager.updateSystem(testSystem, testStats, one, allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+
+      // Two consecutive polls where the container fetch FAILED (e.g. persistent
+      // 403): the poll passes containersAvailable=false + an empty list. Unlike a
+      // genuine empty result (H2 above), a failure must NEVER prune — the states
+      // freeze, not delete. This is the failure-vs-empty distinction (F1).
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig(), false);
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig(), false);
+      expect(adapter.objects.has("systems.my_server.containers.nginx")).to.be.true;
+      expect(adapter.states.get("systems.my_server.containers.nginx.status")?.val).to.equal("running");
+    });
+
     it("should map health codes to labels", async () => {
       const healthTests: BeszelContainer[] = [
         { id: "h0", system: "sys001", name: "h_none", status: "exited", health: 0, cpu: 0, memory: 0, image: "test" },
