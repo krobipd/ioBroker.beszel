@@ -227,7 +227,7 @@ beszel.0.
 - A user account without permission to read containers no longer freezes all other system states — container data is skipped with a warning instead.
 - The connection settings are reordered and gained help texts explaining that the "Username" is your Beszel web login, plus a hint that polling faster than 60s brings no fresher data.
 
-### 0.8.0 (2026-06-24)
+### 0.8.0 (2026-06-24) — stable
 
 - A brief empty response from the Hub no longer deletes your devices or containers — for example right after a restart — so monitored systems and their history stay intact.
 - Server hardware and OS details now recover on their own after a short network problem, instead of staying empty until the adapter is restarted.
