@@ -289,8 +289,8 @@ export function bytesToGib(v: number | undefined): number | null {
 
 /**
  * F2: map the numeric OS platform enum from system_details into a readable
- * label. Values verified against the v0.18.7 source
- * (`Ressourcen/beszel/beszel-0.18.7/internal/entities/system/system.go`).
+ * label. Values verified against beszel v0.18.7 —
+ * `internal/entities/system/system.go`.
  *
  * @param os Platform enum (0=Linux, 1=Darwin/macOS, 2=Windows, 3=FreeBSD).
  */

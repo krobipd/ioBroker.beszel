@@ -398,7 +398,7 @@ export class BeszelClient {
       };
       if (token) {
         // Beszel/PocketBase wants the bare token without "Bearer " prefix
-        // (verified in Ressourcen/beszel/api-referenz.md:23).
+        // (verified against the v0.18.7 API).
         headers.Authorization = token;
       }
       if (body !== null) {

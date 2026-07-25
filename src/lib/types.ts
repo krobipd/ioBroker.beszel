@@ -106,9 +106,9 @@ export interface SystemInfo {
  *
  * Every field is optional — an older Beszel without the collection, or a
  * partially-populated agent, simply yields absent fields (→ no state created).
- * Column names verified against the v0.18.7 collection snapshot
- * (`Ressourcen/beszel/beszel-0.18.7/`) — note `os_name` is snake_case and
- * `os` is a numeric platform enum, not a string.
+ * Column names verified against the beszel v0.18.7 collection snapshot (the
+ * bundled release, not main) — note `os_name` is snake_case and `os` is a
+ * numeric platform enum, not a string.
  */
 export interface SystemDetails {
   /** Host name */
@@ -269,10 +269,10 @@ export interface SystemStats {
 }
 
 // Note: `b`/`bm` (Bandwidth) and `dio`/`diom` (DiskIO) are deliberately NOT in
-// this interface. Verified against agent/network.go:231 + agent/disk.go:638-641
-// (Ressourcen/beszel/beszel-0.18.7): they are byte/s *rates*, identical to
-// `ns`/`nr` and `dr`/`dw` in different units — redundant, so not surfaced.
-// `diosm` (peak dios) has no consumer either. See VERIFIED-v0.18.7.md.
+// this interface. Verified against beszel v0.18.7 agent/network.go:231 +
+// agent/disk.go:638-641: they are byte/s *rates*, identical to `ns`/`nr` and
+// `dr`/`dw` in different units — redundant, so not surfaced. `diosm` (peak
+// dios) has no consumer either.
 
 /**
  * A system_stats record from /api/collections/system_stats/records
