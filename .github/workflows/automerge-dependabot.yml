@@ -2,7 +2,6 @@ name: Dependabot Auto-Merge
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   pull-requests: write
@@ -14,10 +13,9 @@ jobs:
   # the required check. Recompute the lockfile (script-free, no install) and push
   # it back with a deploy key — a non-GITHUB_TOKEN push re-triggers the PR check,
   # unlike the built-in token. In-repo PRs only (Dependabot branches are in-repo).
-  # NOTE: the 'lockfix-test' label branch is a TEMPORARY manual-verification hook.
   lockfile-fix:
     if: >
-      (github.actor == 'dependabot[bot]' || github.event.label.name == 'lockfix-test') &&
+      github.actor == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
     env:
