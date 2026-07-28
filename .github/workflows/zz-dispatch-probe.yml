@@ -1,0 +1,41 @@
+name: zz-dispatch-probe
+
+# TEMPORARY probe workflow — verifies that a workflow_dispatch-triggered
+# check run satisfies the branch ruleset on a PR head after a GITHUB_TOKEN
+# push (which does not itself start workflow runs). Delete after the test.
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  probe:
+    # own repo only (Dependabot branches are in-repo, never a fork) + explicit label gate
+    if: >
+      github.event.label.name == 'dispatch-probe' &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Push a marker commit with GITHUB_TOKEN (should NOT trigger CI)
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          date -u +%s > .dispatch-probe-marker
+          git add .dispatch-probe-marker
+          git commit -m "probe: marker (GITHUB_TOKEN push, no CI expected)"
+          git push origin "HEAD:${HEAD_REF}"
+      - name: Manually dispatch the required check on the new head
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: gh workflow run test-and-release.yml --ref "${HEAD_REF}"
