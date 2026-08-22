@@ -61,7 +61,6 @@ function coerceString(value, maxLength = 1024) {
   return value.length > maxLength ? value.slice(0, maxLength) : value;
 }
 function errText(err) {
-  var _a;
   if (err instanceof Error) {
     return err.message;
   }
@@ -77,11 +76,8 @@ function errText(err) {
   if (typeof err === "number" || typeof err === "boolean" || typeof err === "bigint") {
     return String(err);
   }
-  if (typeof err === "symbol") {
-    return String(err);
-  }
   try {
-    return (_a = JSON.stringify(err)) != null ? _a : Object.prototype.toString.call(err);
+    return JSON.stringify(err);
   } catch {
     return Object.prototype.toString.call(err);
   }

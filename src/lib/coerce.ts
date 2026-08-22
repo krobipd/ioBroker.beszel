@@ -88,18 +88,10 @@ export function errText(err: unknown): string {
   if (typeof err === "number" || typeof err === "boolean" || typeof err === "bigint") {
     return String(err);
   }
-  if (typeof err === "symbol") {
-    // JSON.stringify(Symbol()) returns undefined (it does NOT throw), so the
-    // catch below would never run and the declared `string` return would be a
-    // lie. String(symbol) is the only safe conversion — `${symbol}` throws.
-    return String(err);
-  }
-  // Plain objects would otherwise stringify to "[object Object]". Prefer JSON so
-  // the log is at least diagnosable; circular structures fall back to the tag.
+  // Plain objects + symbols would otherwise stringify to "[object Object]" / fail.
+  // Prefer JSON for the common case so the log is at least diagnosable.
   try {
-    // A function, or an object whose toJSON drops everything, also yields
-    // undefined here — fall back rather than returning a non-string.
-    return JSON.stringify(err) ?? Object.prototype.toString.call(err);
+    return JSON.stringify(err);
   } catch {
     return Object.prototype.toString.call(err);
   }
