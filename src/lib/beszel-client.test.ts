@@ -5,12 +5,19 @@ import { BeszelClient } from "./beszel-client";
 // Test HTTP server — simulates Beszel PocketBase API
 // ---------------------------------------------------------------------------
 
+/** A handler's reply: status + body, plus optional extra response headers. */
+interface MockReply {
+  status: number;
+  body: string;
+  headers?: Record<string, string>;
+}
+
 interface MockServerConfig {
-  authHandler?: (body: string) => { status: number; body: string };
-  systemsHandler?: () => { status: number; body: string };
-  statsHandler?: () => { status: number; body: string };
-  containersHandler?: () => { status: number; body: string };
-  detailsHandler?: () => { status: number; body: string };
+  authHandler?: (body: string) => MockReply;
+  systemsHandler?: () => MockReply;
+  statsHandler?: () => MockReply;
+  containersHandler?: () => MockReply;
+  detailsHandler?: () => MockReply;
 }
 
 function createMockServer(config: MockServerConfig = {}): {
@@ -38,27 +45,27 @@ function createMockServer(config: MockServerConfig = {}): {
       if (path.includes("/api/collections/users/auth-with-password")) {
         const handler = config.authHandler || defaultAuthHandler;
         const result = handler(body);
-        res.writeHead(result.status, { "Content-Type": "application/json" });
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else if (path.includes("/api/collections/systems/records")) {
         const handler = config.systemsHandler || defaultSystemsHandler;
         const result = handler();
-        res.writeHead(result.status, { "Content-Type": "application/json" });
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else if (path.includes("/api/collections/system_stats/records")) {
         const handler = config.statsHandler || defaultStatsHandler;
         const result = handler();
-        res.writeHead(result.status, { "Content-Type": "application/json" });
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else if (path.includes("/api/collections/containers/records")) {
         const handler = config.containersHandler || defaultContainersHandler;
         const result = handler();
-        res.writeHead(result.status, { "Content-Type": "application/json" });
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else if (path.includes("/api/collections/system_details/records")) {
         const handler = config.detailsHandler || defaultSystemDetailsHandler;
         const result = handler();
-        res.writeHead(result.status, { "Content-Type": "application/json" });
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -90,7 +97,7 @@ function createMockServer(config: MockServerConfig = {}): {
   };
 }
 
-function defaultAuthHandler(body: string): { status: number; body: string } {
+function defaultAuthHandler(body: string): MockReply {
   const parsed = JSON.parse(body);
   if (parsed.identity === "admin" && parsed.password === "secret") {
     return {
@@ -107,7 +114,7 @@ function defaultAuthHandler(body: string): { status: number; body: string } {
   };
 }
 
-function defaultSystemsHandler(): { status: number; body: string } {
+function defaultSystemsHandler(): MockReply {
   return {
     status: 200,
     body: JSON.stringify({
@@ -135,7 +142,7 @@ function defaultSystemsHandler(): { status: number; body: string } {
   };
 }
 
-function defaultStatsHandler(): { status: number; body: string } {
+function defaultStatsHandler(): MockReply {
   return {
     status: 200,
     body: JSON.stringify({
@@ -163,7 +170,7 @@ function defaultStatsHandler(): { status: number; body: string } {
   };
 }
 
-function defaultContainersHandler(): { status: number; body: string } {
+function defaultContainersHandler(): MockReply {
   return {
     status: 200,
     body: JSON.stringify({
@@ -187,7 +194,7 @@ function defaultContainersHandler(): { status: number; body: string } {
   };
 }
 
-function defaultSystemDetailsHandler(): { status: number; body: string } {
+function defaultSystemDetailsHandler(): MockReply {
   return {
     status: 200,
     body: JSON.stringify({
@@ -243,22 +250,29 @@ describe("BeszelClient", () => {
   // -----------------------------------------------------------------------
 
   describe("constructor", () => {
-    it("should strip trailing slash from URL", async () => {
-      mock = createMockServer();
-      const port = await mock.start();
-
-      const client = new BeszelClient(`http://127.0.0.1:${port}/`, "admin", "secret");
-      const systems = await client.getSystems();
-      expect(systems).to.have.lengthOf(2);
-    });
-
-    it("should strip multiple trailing slashes", async () => {
+    it("should strip trailing slashes from the URL — the request path has no double slash", async () => {
+      // The old pair of tests only asserted "the call still works": with the
+      // strip removed the path became `//api/collections/...`, which the mock
+      // (and a real PocketBase) still route, so both stayed green (audit
+      // 2026-08-22). Assert the actual request line instead.
       mock = createMockServer();
       const port = await mock.start();
 
       const client = new BeszelClient(`http://127.0.0.1:${port}///`, "admin", "secret");
       const systems = await client.getSystems();
       expect(systems).to.have.lengthOf(2);
+      for (const req of mock.requestLog) {
+        expect(req.path.startsWith("/api/"), `unexpected request path: ${req.path}`).to.equal(true);
+      }
+    });
+
+    it("falls back to the default timeout for a non-positive value", async () => {
+      // A 0 / negative timeout would otherwise arm an immediate socket timeout.
+      const client = new BeszelClient("http://127.0.0.1:1", "a", "b", 0);
+      const timeout = (client as unknown as { timeoutMs: number }).timeoutMs;
+      expect(timeout).to.equal(15_000);
+      const negative = new BeszelClient("http://127.0.0.1:1", "a", "b", -5);
+      expect((negative as unknown as { timeoutMs: number }).timeoutMs).to.equal(15_000);
     });
   });
 
@@ -608,18 +622,9 @@ describe("BeszelClient", () => {
   // -----------------------------------------------------------------------
 
   describe("error handling", () => {
-    it("should set UNAUTHORIZED error code for 401 responses", async () => {
-      mock = createMockServer();
-      const port = await mock.start();
-
-      const client = new BeszelClient(`http://127.0.0.1:${port}`, "bad", "bad");
-      try {
-        await client.getSystems();
-        expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as NodeJS.ErrnoException).code).to.equal("UNAUTHORIZED");
-      }
-    });
+    // (The UNAUTHORIZED-code assertion lives in "should reject with error on
+    // invalid credentials" above, which checks the same path plus the message —
+    // this file's duplicate was removed in the 2026-08-22 audit.)
 
     it("should set HTTP_ERROR for non-401 errors", async () => {
       mock = createMockServer({
@@ -1198,6 +1203,61 @@ describe("BeszelClient", () => {
       expect(mock.requestLog.filter(r => r.path.includes("/systems/records")).length).to.equal(2);
     });
 
+    it("a concurrent 401 retries with the freshly refreshed token instead of re-authenticating again", async () => {
+      // Two parallel requests both hit a 401. The first refreshes the token; the
+      // second must NOT burn a second re-auth (and must not clobber the fresh
+      // token via invalidateToken). Determinism: the mock delays the SECOND auth
+      // response, so both 401s are certainly in flight before any refresh lands.
+      const debugs: string[] = [];
+      let authCalls = 0;
+      let sysCalls = 0;
+      let containerCalls = 0;
+      const okList = JSON.stringify({ page: 1, perPage: 200, totalItems: 0, totalPages: 0, items: [] });
+      const server = http.createServer((req, res) => {
+        const url = req.url ?? "";
+        const chunks: Buffer[] = [];
+        req.on("data", (c: Buffer) => chunks.push(c));
+        req.on("end", () => {
+          const reply = (status: number, body: string, delayMs = 0): void => {
+            setTimeout(() => {
+              res.writeHead(status, { "Content-Type": "application/json" });
+              res.end(body);
+            }, delayMs);
+          };
+          if (url.includes("auth-with-password")) {
+            authCalls++;
+            // The re-auth (2nd) is slowed so both original requests get their 401 first.
+            reply(200, JSON.stringify({ token: `token-${authCalls}` }), authCalls === 1 ? 0 : 60);
+          } else if (url.includes("/systems/records")) {
+            sysCalls++;
+            reply(sysCalls === 1 ? 401 : 200, sysCalls === 1 ? JSON.stringify({ message: "expired" }) : okList);
+          } else if (url.includes("/containers/records")) {
+            containerCalls++;
+            reply(
+              containerCalls === 1 ? 401 : 200,
+              containerCalls === 1 ? JSON.stringify({ message: "expired" }) : okList,
+            );
+          } else {
+            reply(404, "{}");
+          }
+        });
+      });
+      await new Promise<void>(resolve => server.listen(0, "127.0.0.1", () => resolve()));
+      const port = (server.address() as { port: number }).port;
+      try {
+        const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, {
+          debug: msg => debugs.push(msg),
+          warn: () => {},
+        });
+        await Promise.all([client.getSystems(), client.getContainers()]);
+        // Exactly one refresh for the pair — 1 initial + 1 re-auth.
+        expect(authCalls).to.equal(2);
+        expect(debugs.some(d => d.includes("token already refreshed concurrently"))).to.equal(true);
+      } finally {
+        await new Promise<void>(resolve => server.close(() => resolve()));
+      }
+    }, 5000);
+
     it("does NOT retry the auth request itself on 401 (bad credentials)", async () => {
       mock = createMockServer({
         authHandler: () => ({ status: 401, body: JSON.stringify({ message: "bad creds" }) }),
@@ -1305,6 +1365,196 @@ describe("BeszelClient", () => {
         await new Promise<void>(resolve => hangServer.close(() => resolve()));
       }
     }, 5000);
+  });
+
+  // -----------------------------------------------------------------------
+  // N6 — per-request timeout
+  // -----------------------------------------------------------------------
+
+  describe("request timeout (N6)", () => {
+    it("tags its own timeout with ETIMEDOUT so classifyError yields TIMEOUT", async () => {
+      // The whole timeout path was unexecuted before this test (audit
+      // 2026-08-22). It matters beyond the error text: main.ts keys the
+      // system_details retry on the TIMEOUT class, which comes from this code.
+      const hangServer = http.createServer(() => {
+        /* never respond */
+      });
+      await new Promise<void>(resolve => hangServer.listen(0, "127.0.0.1", () => resolve()));
+      const port = (hangServer.address() as { port: number }).port;
+      try {
+        const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", 150);
+        let caught: NodeJS.ErrnoException | undefined;
+        try {
+          await client.getSystems();
+        } catch (err) {
+          caught = err as NodeJS.ErrnoException;
+        }
+        expect(caught, "the request must reject").to.not.be.undefined;
+        expect(caught!.code).to.equal("ETIMEDOUT");
+        expect(caught!.message).to.match(/timed out/i);
+      } finally {
+        await new Promise<void>(resolve => hangServer.close(() => resolve()));
+      }
+    }, 5000);
+  });
+
+  // -----------------------------------------------------------------------
+  // Retry-After handling + pagination cap
+  // -----------------------------------------------------------------------
+
+  describe("429 Retry-After header (B3)", () => {
+    it("honours the header but never waits longer than 30 s", async () => {
+      // A hostile / misconfigured Hub answering `Retry-After: 86400` would
+      // otherwise park the poll for a day — the clamp was unguarded.
+      const waits: number[] = [];
+      let calls = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          calls++;
+          return calls === 1
+            ? { status: 429, body: JSON.stringify({ message: "slow down" }), headers: { "retry-after": "86400" } }
+            : {
+                status: 200,
+                body: JSON.stringify({ page: 1, perPage: 200, totalItems: 0, totalPages: 0, items: [] }),
+              };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, ms => {
+        waits.push(ms);
+        return Promise.resolve();
+      });
+      await client.getSystems();
+      expect(waits).to.deep.equal([30_000]);
+    });
+
+    it("uses the header value when it is inside the allowed window", async () => {
+      const waits: number[] = [];
+      let calls = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          calls++;
+          return calls === 1
+            ? { status: 429, body: JSON.stringify({ message: "slow down" }), headers: { "retry-after": "7" } }
+            : {
+                status: 200,
+                body: JSON.stringify({ page: 1, perPage: 200, totalItems: 0, totalPages: 0, items: [] }),
+              };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, ms => {
+        waits.push(ms);
+        return Promise.resolve();
+      });
+      await client.getSystems();
+      expect(waits).to.deep.equal([7_000]);
+    });
+
+    it("falls back to 1 s when the header is missing or unusable", async () => {
+      const waits: number[] = [];
+      let calls = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          calls++;
+          return calls === 1
+            ? { status: 429, body: JSON.stringify({ message: "slow down" }), headers: { "retry-after": "later" } }
+            : {
+                status: 200,
+                body: JSON.stringify({ page: 1, perPage: 200, totalItems: 0, totalPages: 0, items: [] }),
+              };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, undefined, ms => {
+        waits.push(ms);
+        return Promise.resolve();
+      });
+      await client.getSystems();
+      expect(waits).to.deep.equal([1_000]);
+    });
+  });
+
+  describe("pagination cap (MAX_PAGES)", () => {
+    it("stops at 50 pages and warns that the data is truncated", async () => {
+      // A Hub reporting 10 000 pages must not lock the poll into an endless
+      // walk. Both the cap and the warn were unguarded (audit 2026-08-22).
+      let pageRequests = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          pageRequests++;
+          return {
+            status: 200,
+            body: JSON.stringify({
+              page: pageRequests,
+              perPage: 200,
+              totalItems: 20_000,
+              totalPages: 100,
+              items: [{ id: `s${pageRequests}`, name: `Server ${pageRequests}`, status: "up", host: "h", info: {} }],
+            }),
+          };
+        },
+      });
+      const port = await mock.start();
+      const warns: string[] = [];
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, {
+        debug: () => {},
+        warn: msg => warns.push(msg),
+      });
+      const systems = await client.getSystems();
+      expect(pageRequests).to.equal(50);
+      expect(systems).to.have.lengthOf(50);
+      expect(warns.some(w => w.includes("MAX_PAGES=50") && w.includes("may be incomplete"))).to.equal(true);
+    }, 10000);
+  });
+
+  describe("injected logger (v0.4.4 trace)", () => {
+    it("traces auth, request and pagination through the adapter logger", async () => {
+      // No test ever passed a logger, so every `this.log?.…` line was dead in
+      // the suite — a throwing template would only have shown up in production.
+      const debugs: string[] = [];
+      mock = createMockServer({
+        systemsHandler: () => ({
+          status: 200,
+          body: JSON.stringify({
+            page: 1,
+            perPage: 200,
+            totalItems: 2,
+            totalPages: 2,
+            items: [{ id: "a", name: "A", status: "up", host: "h", info: {} }],
+          }),
+        }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, {
+        debug: msg => debugs.push(msg),
+        warn: () => {},
+      });
+      await client.getSystems();
+      expect(debugs.some(d => d.includes("ensureToken: fresh authentication"))).to.equal(true);
+      expect(debugs.some(d => d.includes("authenticate: success"))).to.equal(true);
+      expect(debugs.some(d => d.includes("HTTP POST /api/collections/users/auth-with-password"))).to.equal(true);
+      expect(debugs.some(d => d.includes("fetchAllPages: page 2/2"))).to.equal(true);
+
+      client.invalidateToken();
+      expect(debugs.some(d => d.includes("invalidateToken: cleared"))).to.equal(true);
+      client.cancelAll();
+      expect(debugs.some(d => d.includes("cancelAll: aborting 0 inflight requests"))).to.equal(true);
+    });
+
+    it("traces the HTTP error class of a failing response", async () => {
+      const debugs: string[] = [];
+      mock = createMockServer({
+        systemsHandler: () => ({ status: 500, body: JSON.stringify({ message: "boom" }) }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret", undefined, {
+        debug: msg => debugs.push(msg),
+        warn: () => {},
+      });
+      await client.getSystems().catch(() => undefined);
+      expect(debugs.some(d => d.includes("→ 500 HTTP_ERROR"))).to.equal(true);
+    });
   });
 
   // -----------------------------------------------------------------------

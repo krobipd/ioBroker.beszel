@@ -313,6 +313,24 @@ describe("coerce", () => {
       expect(sys!.info.la).to.be.undefined;
     });
 
+    it("carries the systemd services tuple through (info.sv)", () => {
+      // sv drives info.services_total / services_failed — dropping it here
+      // would silently remove both states from every system.
+      const sys = coerceSystem({ id: "a", name: "n", info: { sv: [12, 2] } });
+      expect(sys!.info.sv).to.deep.equal([12, 2]);
+    });
+
+    it("carries the battery tuple through (info.bat) — the fallback when stats have none", () => {
+      const sys = coerceSystem({ id: "a", name: "n", info: { bat: [55, 4] } });
+      expect(sys!.info.bat).to.deep.equal([55, 4]);
+    });
+
+    it("drops sv / bat when the tuple is malformed", () => {
+      const sys = coerceSystem({ id: "a", name: "n", info: { sv: [12], bat: [50, "bad"] } });
+      expect(sys!.info.sv).to.be.undefined;
+      expect(sys!.info.bat).to.be.undefined;
+    });
+
     it("returns null for non-object input", () => {
       expect(coerceSystem(null)).to.be.null;
       expect(coerceSystem([])).to.be.null;
@@ -388,13 +406,23 @@ describe("coerce", () => {
     it("handles GPU map with partial data", () => {
       const s = coerceSystemStats({
         g: {
-          gpu0: { n: "NVIDIA", u: 45, mu: 2.5, mt: 8 },
+          gpu0: { n: "NVIDIA", u: 45, mu: 2.5, mt: 8, p: 350 },
           gpu1: { u: NaN },
+          gpu2: "not an object",
         },
       });
       expect(s.g!.gpu0.n).to.equal("NVIDIA");
       expect(s.g!.gpu0.u).to.equal(45);
+      expect(s.g!.gpu0.p).to.equal(350);
       expect(s.g!.gpu1.u).to.be.undefined;
+      // A non-object GPU entry stays a member (so its channel survives) but
+      // carries no values — never a crash, never NaN.
+      expect(s.g!.gpu2).to.deep.equal({});
+    });
+
+    it("coerces the battery tuple in stats", () => {
+      const s = coerceSystemStats({ bat: [88, 4] });
+      expect(s.bat).to.deep.equal([88, 4]);
     });
 
     it("returns empty stats for non-object input", () => {
@@ -457,6 +485,26 @@ describe("coerce", () => {
       expect(s.ni).to.be.undefined;
     });
 
+    it("coerces the extra-filesystem map (efs) including read/write speeds", () => {
+      // FsStats carries four fields — total, used, read MB/s, write MB/s. All
+      // four reach a state, so all four must survive coercion.
+      const s = coerceSystemStats({
+        efs: {
+          "/data": { d: 1000, du: 400, r: 100.5, w: 50.25 },
+          "/broken": { d: "bad", du: NaN, r: Infinity, w: null },
+        },
+      });
+      expect(s.efs!["/data"]).to.deep.equal({ d: 1000, du: 400, r: 100.5, w: 50.25 });
+      // A filesystem whose every field is unusable coerces to an empty entry
+      // (kept as a member so the channel still exists), never to NaN values.
+      expect(s.efs!["/broken"]).to.deep.equal({});
+    });
+
+    it("returns an empty FsStats entry for a non-object filesystem value", () => {
+      const s = coerceSystemStats({ efs: { "/weird": "not an object" } });
+      expect(s.efs!["/weird"]).to.deep.equal({});
+    });
+
     it("coerces the v0.18.7 GPU fields pp (package power) and e (engines)", () => {
       const s = coerceSystemStats({
         g: { gpu0: { n: "Intel", u: 30, pp: 18.5, e: { render: 40, video: 5, bad: NaN } } },
@@ -499,6 +547,12 @@ describe("coerce", () => {
         stats: "not an object",
       });
       expect(rec!.stats).to.deep.equal({});
+    });
+
+    it("returns null for non-object input", () => {
+      expect(coerceSystemStatsRecord(null)).to.be.null;
+      expect(coerceSystemStatsRecord("x")).to.be.null;
+      expect(coerceSystemStatsRecord([])).to.be.null;
     });
   });
 
@@ -641,6 +695,25 @@ describe("coerce", () => {
       expect(c!.status).to.equal("unknown");
       expect(c!.image).to.equal("");
     });
+
+    it("carries the combined network throughput through (net, bytes/s)", () => {
+      // v0.6.0: `net` feeds containers.<name>.network. Dropping it here would
+      // silently remove that state on every Hub that provides the column.
+      const c = coerceContainer({ id: "c1", system: "s", name: "nginx", net: 123456 });
+      expect(c!.net).to.equal(123456);
+    });
+
+    it("omits net entirely on an older Hub (absent or unusable)", () => {
+      // Absent → no state at all, rather than a permanently-zero one.
+      expect(coerceContainer({ id: "c1", system: "s", name: "nginx" })!.net).to.be.undefined;
+      expect(coerceContainer({ id: "c1", system: "s", name: "nginx", net: "bad" })!.net).to.be.undefined;
+    });
+
+    it("returns null for non-object input", () => {
+      expect(coerceContainer(null)).to.be.null;
+      expect(coerceContainer("x")).to.be.null;
+      expect(coerceContainer([])).to.be.null;
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -760,6 +833,26 @@ describe("coerce", () => {
       a.self = a;
       const result = errText(a);
       expect(result).to.equal("[object Object]");
+    });
+
+    it("returns a string for a thrown symbol (JSON.stringify yields undefined, it does NOT throw)", () => {
+      // Regression guard: the catch never runs for a symbol, so the old code
+      // returned `undefined` while declaring `string` — the log line read
+      // "… : undefined". Fleet-wide defect, found in parcelapp on 2026-08-22.
+      const result = errText(Symbol("boom"));
+      expect(typeof result).to.equal("string");
+      expect(result).to.contain("boom");
+    });
+
+    it("returns a string for a thrown function too", () => {
+      expect(errText(() => 42)).to.equal("[object Function]");
+    });
+
+    it("returns a string when toJSON drops the whole value", () => {
+      // Same undefined-without-throw shape as a symbol, reached through a
+      // custom toJSON — the ?? fallback must catch it.
+      const weird = { toJSON: () => undefined };
+      expect(errText(weird)).to.equal("[object Object]");
     });
   });
 

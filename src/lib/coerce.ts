@@ -88,10 +88,18 @@ export function errText(err: unknown): string {
   if (typeof err === "number" || typeof err === "boolean" || typeof err === "bigint") {
     return String(err);
   }
-  // Plain objects + symbols would otherwise stringify to "[object Object]" / fail.
-  // Prefer JSON for the common case so the log is at least diagnosable.
+  if (typeof err === "symbol") {
+    // JSON.stringify(Symbol()) returns undefined (it does NOT throw), so the
+    // catch below would never run and the declared `string` return would be a
+    // lie. String(symbol) is the only safe conversion — `${symbol}` throws.
+    return String(err);
+  }
+  // Plain objects would otherwise stringify to "[object Object]". Prefer JSON so
+  // the log is at least diagnosable; circular structures fall back to the tag.
   try {
-    return JSON.stringify(err);
+    // A function, or an object whose toJSON drops everything, also yields
+    // undefined here — fall back rather than returning a non-string.
+    return JSON.stringify(err) ?? Object.prototype.toString.call(err);
   } catch {
     return Object.prototype.toString.call(err);
   }
@@ -610,6 +618,12 @@ export function validateHubUrl(url: unknown): string | null {
       return `protocol '${u.protocol}' is not http(s)`;
     }
     if (!u.hostname) {
+      // Not reachable for http(s) and therefore deliberately untested (audit
+      // 2026-08-22): every host-less spelling either throws in `new URL` —
+      // "http://", "https:///", "http://:8080/x" — or borrows the first path
+      // segment as the host ("http:///x" → hostname "x"). Kept as a guard in
+      // case a future URL implementation is laxer; a test here could only be
+      // written against a fake URL parser, which would prove nothing.
       return "hostname is missing";
     }
     return null;

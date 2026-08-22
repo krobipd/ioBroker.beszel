@@ -8,6 +8,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import { tName } from "./i18n";
+import { buildMetricDefs, CHANNEL_NAME_KEY } from "./metric-registry";
 
 describe("tName", () => {
   it("delegates to I18n.getTranslatedObject", () => {
@@ -38,12 +39,51 @@ describe("i18n completeness", () => {
     }
   });
 
-  it("state name keys are present", () => {
-    expect(enKeys).toContain("channelInfo");
-    expect(enKeys).toContain("cpuUsage");
-    expect(enKeys).toContain("memoryPercent");
-    expect(enKeys).toContain("diskPercent");
-    expect(enKeys).toContain("networkSent");
-    expect(enKeys).toContain("containerHealth");
+  it("every metric name key in the registry exists in en.json", () => {
+    // Replaces a hand-picked six-key spot check: a typo in any of the ~50
+    // `nameKey`s used to reach the state tree as an untranslated key, and only
+    // the two metrics that happen to be name-asserted elsewhere would have
+    // caught it (audit 2026-08-22).
+    const missing = buildMetricDefs()
+      .map(d => d.nameKey)
+      .filter(k => !enKeys.includes(k));
+    expect(missing, `metric nameKeys missing from en.json: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("every channel name key exists in en.json", () => {
+    const missing = Object.values(CHANNEL_NAME_KEY).filter(k => !enKeys.includes(k));
+    expect(missing, `channel keys missing from en.json: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("the hand-written state keys used outside the registry exist too", () => {
+    // These are passed to tName() directly in state-manager (not via a MetricDef).
+    const inlineKeys = [
+      "online",
+      "status",
+      "containerHealth",
+      "containerImage",
+      "containerMemory",
+      "containerNetwork",
+      "cpuUsage",
+      "diskPercent",
+      "diskUsed",
+      "diskTotal",
+      "readSpeed",
+      "writeSpeed",
+      "gpuUsage",
+      "gpuMemoryUsed",
+      "gpuMemoryTotal",
+      "gpuPower",
+      "gpuPowerPackage",
+      "ifaceUp",
+      "ifaceDown",
+      "ifaceTotalUp",
+      "ifaceTotalDown",
+      "systemsTotal",
+      "systemsOnline",
+      "systemsAllUp",
+    ];
+    const missing = inlineKeys.filter(k => !enKeys.includes(k));
+    expect(missing, `inline keys missing from en.json: ${missing.join(", ")}`).toEqual([]);
   });
 });

@@ -87,6 +87,7 @@ function internalOf(adapter: BeszelAdapter): {
   setStateAsync: ReturnType<typeof vi.fn>;
   setState: ReturnType<typeof vi.fn>;
   setStateChangedAsync: ReturnType<typeof vi.fn>;
+  setObjectNotExistsAsync: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   extendForeignObjectAsync: ReturnType<typeof vi.fn>;
@@ -105,6 +106,8 @@ function setup(configOverrides: Record<string, unknown> = {}): {
   adapter: BeszelAdapter;
   client: FakeClient;
   stateMgr: FakeStateMgr;
+  /** Args the adapter handed to its client factory (url, user, pass, timeoutMs). */
+  clientArgs: unknown[][];
 } {
   const adapter = new BeszelAdapter();
   const i = internalOf(adapter);
@@ -130,13 +133,17 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     updateSystem: vi.fn(async () => {}),
     cleanupSystems: vi.fn(async () => {}),
   };
+  const clientArgs: unknown[][] = [];
   const internal = adapter as unknown as {
-    makeClient: () => FakeClient;
+    makeClient: (...args: unknown[]) => FakeClient;
     makeStateManager: () => FakeStateMgr;
   };
-  internal.makeClient = () => client;
+  internal.makeClient = (...args: unknown[]) => {
+    clientArgs.push(args);
+    return client;
+  };
   internal.makeStateManager = () => stateMgr;
-  return { adapter, client, stateMgr };
+  return { adapter, client, stateMgr, clientArgs };
 }
 
 /** setup() + onReady() so client/stateManager are wired like in production. */
@@ -144,6 +151,7 @@ async function setupReady(configOverrides: Record<string, unknown> = {}): Promis
   adapter: BeszelAdapter;
   client: FakeClient;
   stateMgr: FakeStateMgr;
+  clientArgs: unknown[][];
 }> {
   const ctx = setup(configOverrides);
   await internalOf(ctx.adapter).onReady();
@@ -245,6 +253,37 @@ describe("BeszelAdapter onReady", () => {
     const loopback = await setupReady({ url: "http://localhost:8090" });
     expect(internalOf(loopback.adapter).log.warn).not.toHaveBeenCalledWith(expect.stringContaining("cleartext"));
   });
+
+  it("the scheduled callback really polls again — not just a timer that exists", async () => {
+    // Audit 2026-08-22: `setInterval` is a mock, so a test that only asserts it
+    // was called leaves the recurring poll completely unguarded — gutting the
+    // callback body kept all 448 tests green. Capture the callback, run it, and
+    // assert a SECOND poll actually reached the client.
+    const { adapter, client } = await setupReady();
+    const i = internalOf(adapter);
+    expect(client.getSystems).toHaveBeenCalledTimes(1); // the onReady poll
+    const tick = i.setInterval.mock.calls[0][0] as () => void;
+    expect(typeof tick).toBe("function");
+    tick();
+    await new Promise(r => setImmediate(r)); // the callback fires poll() un-awaited
+    expect(client.getSystems).toHaveBeenCalledTimes(2);
+  });
+
+  it("hands the configured poll interval and request timeout to timer + client", async () => {
+    // Both values used to be unverifiable: the fixture's 60 s / default 15 s
+    // matched a hardcoded mutant exactly, so ignoring the user's config was
+    // invisible. Non-default values make the wiring provable.
+    const { adapter, clientArgs } = await setupReady({ pollInterval: 120, requestTimeout: 30 });
+    const i = internalOf(adapter);
+    expect(i.setInterval.mock.calls[0][1]).toBe(120_000);
+    expect(clientArgs[0][3]).toBe(30_000);
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("polling every 120s"));
+  });
+
+  it("clamps an out-of-range poll interval before arming the timer", async () => {
+    const { adapter } = await setupReady({ pollInterval: 5000 });
+    expect(internalOf(adapter).setInterval.mock.calls[0][1]).toBe(300_000);
+  });
 });
 
 describe("BeszelAdapter onUnload", () => {
@@ -345,6 +384,53 @@ describe("BeszelAdapter poll — happy path", () => {
     await i.poll();
 
     expect(stateMgr.updateSystem.mock.calls[0][4]).toBe(true);
+  });
+
+  it("DP4: writes the fleet rollup — total, online and the all-up flag", async () => {
+    // The rollup states were written but never asserted: blanking them out, or
+    // pinning allUp to true, kept the suite green (audit 2026-08-22).
+    const { adapter, client } = await setupReady();
+    const i = internalOf(adapter);
+    client.getSystems.mockResolvedValue([
+      makeSystem(),
+      makeSystem({ id: "sys002", name: "Server B", status: "down" }),
+      makeSystem({ id: "sys003", name: "Server C" }),
+    ]);
+    await i.poll();
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsTotal", { val: 3, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsOnline", { val: 2, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsAllUp", { val: false, ack: true });
+  });
+
+  it("DP4: allUp is true only when every system reports up", async () => {
+    const { adapter, client } = await setupReady();
+    const i = internalOf(adapter);
+    client.getSystems.mockResolvedValue([makeSystem(), makeSystem({ id: "sys002", name: "Server B" })]);
+    await i.poll();
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsAllUp", { val: true, ack: true });
+  });
+
+  it("DP4: creates the three rollup objects once, then only writes values", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const created = (): string[] => i.setObjectNotExistsAsync.mock.calls.map(c => c[0] as string);
+    expect(created()).toEqual(["info.systemsTotal", "info.systemsOnline", "info.systemsAllUp"]);
+    i.setObjectNotExistsAsync.mockClear();
+    await i.poll();
+    expect(i.setObjectNotExistsAsync).not.toHaveBeenCalled();
+  });
+
+  it("groups several containers of the SAME system into one list", async () => {
+    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getContainers.mockResolvedValue([
+      { id: "c1", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 10, image: "n" },
+      { id: "c2", system: "sys001", name: "pg", status: "running", health: 2, cpu: 1, memory: 10, image: "p" },
+    ]);
+    stateMgr.updateSystem.mockClear();
+    await i.poll();
+    const passed = stateMgr.updateSystem.mock.calls[0][2] as Array<{ id: string }>;
+    expect(passed.map(c => c.id)).toEqual(["c1", "c2"]);
   });
 
   it("F5: passes each system only its own containers (grouped by the poll)", async () => {
@@ -470,6 +556,11 @@ describe("BeszelAdapter poll — error classification routing", () => {
   it("marks disconnected on failure and logs the recovery exactly once", async () => {
     const { adapter, client } = await setupReady();
     const i = internalOf(adapter);
+    // mockClear first: onReady already wrote `info.connection = false` before the
+    // first poll, so without this the assertion below passes even when the error
+    // path never touches the state at all (audit 2026-08-22 — the old test was
+    // green with the whole write removed).
+    i.setStateChangedAsync.mockClear();
     client.getSystems.mockRejectedValueOnce(errnoError("refused", "ECONNREFUSED"));
     await i.poll();
     expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
@@ -481,6 +572,14 @@ describe("BeszelAdapter poll — error classification routing", () => {
     i.log.info.mockClear();
     await i.poll(); // steady state — no repeated restore info
     expect(i.log.info).not.toHaveBeenCalledWith("Connection restored");
+  });
+
+  it("does not mark disconnected while polls keep succeeding", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.setStateChangedAsync.mockClear();
+    await i.poll();
+    expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.connection", { val: false, ack: true });
   });
 
   it("SEC-1: a generic poll error keeps Hub content out of the error-level log", async () => {
@@ -582,6 +681,20 @@ describe("BeszelAdapter poll — system_details cadence (F2)", () => {
     expect(client.getSystemDetails).toHaveBeenCalledTimes(2);
   });
 
+  it("F3: a TIMEOUT is transient too — retried, not marked attempted", async () => {
+    // The retry guard names two transient classes; only NETWORK was covered, so
+    // dropping TIMEOUT from the condition went unnoticed (audit 2026-08-22).
+    const { adapter, client } = setup({ metrics_agentVersion: true });
+    const i = internalOf(adapter);
+    client.getSystemDetails.mockRejectedValue(errnoError("slow hub", "ETIMEDOUT"));
+
+    await i.onReady();
+    expect(i.detailsAttempted.size).to.equal(0);
+    await i.poll();
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(2);
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("willRetry=true"));
+  });
+
   it("never fetches details when System info is disabled", async () => {
     const { adapter, client } = await setupReady({ metrics_agentVersion: false });
     await internalOf(adapter).poll();
@@ -634,5 +747,93 @@ describe("BeszelAdapter onMessage", () => {
       { error: "Unknown command" },
       expect.anything(),
     );
+  });
+
+  it("wires checkConnection end-to-end: real test-client, registered and released again", async () => {
+    // The onMessage dependency block (client factory + the two lifecycle hooks)
+    // was never executed by a test — only the router was tested in isolation.
+    // Port 1 refuses instantly, so this exercises the whole wiring without a
+    // stub client and without a slow network wait.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    await i.onMessage({
+      command: "checkConnection",
+      from: "system.adapter.admin.0",
+      callback: { id: 1, message: "x", time: 0, ack: false },
+      message: { url: "http://127.0.0.1:1", username: "u", password: "p" },
+    });
+    const [, command, response] = i.sendTo.mock.calls[0] as [string, string, { error?: string }];
+    expect(command).toBe("checkConnection");
+    expect(response.error, "a refused connection must surface as an error").toBeTruthy();
+    // The short-lived client must be gone again — otherwise onUnload would try
+    // to abort a completed client and the Set would grow without bound.
+    expect(i.testClients.size).toBe(0);
+  }, 10000);
+
+  it("logs instead of crashing when the message handler itself throws", async () => {
+    // A malformed payload (no `command` accessor at all) reaches the router and
+    // blows up there; the boundary try/catch must turn that into one error line.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.sendTo.mockImplementation(() => {
+      throw new Error("broker gone");
+    });
+    await i.onMessage({
+      command: "noSuchCommand",
+      from: "system.adapter.admin.0",
+      callback: { id: 1, message: "x", time: 0, ack: false },
+    });
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("onMessage failed: broker gone"));
+  });
+});
+
+describe("BeszelAdapter poll — container availability dedup (L3)", () => {
+  it("warns once while the container fetch keeps failing, then traces", async () => {
+    const { adapter, client } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getContainers.mockRejectedValue(errnoError("403", "FORBIDDEN"));
+
+    await i.poll();
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Container fetch failed"));
+
+    i.log.warn.mockClear();
+    await i.poll();
+    expect(i.log.warn).not.toHaveBeenCalled();
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Container fetch failed"));
+  });
+
+  it("reports recovery once when the container fetch works again", async () => {
+    const { adapter, client } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    client.getContainers.mockRejectedValueOnce(errnoError("403", "FORBIDDEN"));
+    await i.poll();
+
+    i.log.info.mockClear();
+    await i.poll(); // fetch succeeds again
+    expect(i.log.info).toHaveBeenCalledWith("Container data is available again");
+
+    i.log.info.mockClear();
+    await i.poll(); // steady state — no repeat
+    expect(i.log.info).not.toHaveBeenCalledWith("Container data is available again");
+  });
+
+  it("does not touch the Hub when the container toggle is off (no failure state either)", async () => {
+    const { adapter, client, stateMgr } = await setupReady({ metrics_containers: false });
+    const i = internalOf(adapter);
+    stateMgr.updateSystem.mockClear();
+    await i.poll();
+    expect(client.getContainers).not.toHaveBeenCalled();
+    // Toggle-off is "nothing to show", not a failure → containersAvailable stays true.
+    expect(stateMgr.updateSystem.mock.calls[0][4]).toBe(true);
+  });
+});
+
+describe("BeszelAdapter poll — guards", () => {
+  it("does nothing when the adapter never finished booting (no client)", async () => {
+    const { adapter, client } = setup(); // onReady deliberately NOT run
+    const i = internalOf(adapter);
+    await i.poll();
+    expect(client.getSystems).not.toHaveBeenCalled();
+    expect(i.setStateChangedAsync).not.toHaveBeenCalled();
   });
 });
