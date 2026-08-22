@@ -761,6 +761,19 @@ describe("coerce", () => {
       const result = errText(a);
       expect(result).to.equal("[object Object]");
     });
+
+    it("returns a string for a thrown symbol (JSON.stringify yields undefined, it does NOT throw)", () => {
+      // Regression guard: the catch never runs for a symbol, so the old code
+      // returned `undefined` while declaring `string` — the log line read
+      // "… : undefined". Fleet-wide defect, found in parcelapp on 2026-08-22.
+      const result = errText(Symbol("boom"));
+      expect(typeof result).to.equal("string");
+      expect(result).to.contain("boom");
+    });
+
+    it("returns a string for a thrown function too", () => {
+      expect(errText(() => 42)).to.equal("[object Function]");
+    });
   });
 
   // -----------------------------------------------------------------------
