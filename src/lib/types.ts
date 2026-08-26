@@ -80,6 +80,9 @@ export interface AdapterConfig {
   metrics_networkPeak?: boolean;
   /** GPU detail states (package power + per-engine usage) */
   metrics_gpuDetails?: boolean;
+  // --- v0.11.0 additions (Beszel 0.18.8) ---
+  /** Per-fan RPM states (Beszel 0.18.8+, Linux hwmon) */
+  metrics_fans?: boolean;
 }
 
 /**
@@ -266,6 +269,19 @@ export interface SystemStats {
   cpus?: number[];
   /** Disk I/O stats [read time %, write time %, io util %, r_await ms, w_await ms, weighted io %] */
   dios?: number[];
+  // --- v0.18.8 additions (both absent on older Beszel versions) ---
+  /**
+   * Fan speeds: fan name -> RPM. Linux hwmon only; keys are
+   * `<chip>_<label-or-fanN>` and may contain spaces. 0 RPM is a real reading
+   * (stopped fan) — verified against beszel v0.18.8 agent/fans.go.
+   */
+  f?: Record<string, number>;
+  /**
+   * Per-battery charge: battery name -> percent (0–100). The aggregate `bat`
+   * tuple (primary battery) stays alongside. Names are OS-reported with a
+   * `Battery N` fallback — verified against beszel v0.18.8 agent/system.go.
+   */
+  bats?: Record<string, number>;
 }
 
 // Note: `b`/`bm` (Bandwidth) and `dio`/`diom` (DiskIO) are deliberately NOT in

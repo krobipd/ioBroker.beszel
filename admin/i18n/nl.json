@@ -154,7 +154,7 @@
   "help_metric_gpu": "GPU-gebruik, -geheugen en -vermogen.",
   "help_metric_gpuDetails": "Package-vermogen en gebruik per GPU-engine.",
   "help_metric_containers": "Per container: status, health, CPU, geheugen en netwerk.",
-  "help_metric_battery": "Batterijniveau en oplaadstatus.",
+  "help_metric_battery": "Batterijniveau en laadstatus, plus het niveau van elke afzonderlijke batterij (Beszel 0.18.8+).",
   "containerNetwork": "Netwerk",
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
@@ -162,5 +162,10 @@
   "help_username": "Het e-mailadres/de login die je gebruikt voor de Beszel-webinterface (PocketBase verifieert via e-mail).",
   "help_password": "Het wachtwoord voor die Beszel-login.",
   "connectionStatus": "Verbindingsstatus",
-  "channelSystems": "Gecontroleerde systemen"
+  "channelSystems": "Gecontroleerde systemen",
+  "header_fans": "Ventilatoren",
+  "metric_fans": "Ventilatortoerentallen",
+  "help_metric_fans": "Toerental in RPM voor elke door de agent gemelde ventilator (Beszel 0.18.8+, alleen Linux).",
+  "channelFans": "Ventilatoren",
+  "channelBatteries": "Batterijen"
 }

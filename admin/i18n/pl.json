@@ -154,7 +154,7 @@
   "help_metric_gpu": "Wykorzystanie, pamięć i pobór mocy GPU.",
   "help_metric_gpuDetails": "Pobór mocy pakietu i wykorzystanie na silnik GPU.",
   "help_metric_containers": "Na kontener: status, kondycja, CPU, pamięć i sieć.",
-  "help_metric_battery": "Poziom baterii i stan ładowania.",
+  "help_metric_battery": "Poziom naładowania i stan ładowania baterii oraz poziom każdej pojedynczej baterii (Beszel 0.18.8+).",
   "containerNetwork": "Sieć",
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
@@ -162,5 +162,10 @@
   "help_username": "E-mail/login używany do interfejsu webowego Beszel (PocketBase uwierzytelnia przez e-mail).",
   "help_password": "Hasło do tego loginu Beszel.",
   "connectionStatus": "Stan połączenia",
-  "channelSystems": "Monitorowane systemy"
+  "channelSystems": "Monitorowane systemy",
+  "header_fans": "Wentylatory",
+  "metric_fans": "Prędkości wentylatorów",
+  "help_metric_fans": "Prędkość w obr./min dla każdego wentylatora zgłoszonego przez agenta (Beszel 0.18.8+, tylko Linux).",
+  "channelFans": "Wentylatory",
+  "channelBatteries": "Baterie"
 }

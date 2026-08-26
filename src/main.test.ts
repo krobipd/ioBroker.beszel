@@ -52,6 +52,9 @@ interface FakeStateMgr {
   prepareForPoll: ReturnType<typeof vi.fn>;
   updateSystem: ReturnType<typeof vi.fn>;
   cleanupSystems: ReturnType<typeof vi.fn>;
+  snapshotExistingStates: ReturnType<typeof vi.fn>;
+  takeChangeCounts: ReturnType<typeof vi.fn>;
+  noteStatesCreated: ReturnType<typeof vi.fn>;
 }
 
 function makeSystem(overrides: Partial<BeszelSystem> = {}): BeszelSystem {
@@ -132,6 +135,11 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     prepareForPoll: vi.fn(),
     updateSystem: vi.fn(async () => {}),
     cleanupSystems: vi.fn(async () => {}),
+    snapshotExistingStates: vi.fn(async () => {}),
+    noteStatesCreated: vi.fn(),
+    // v0.11.0: default "nothing changed" so the datapoint line stays silent in
+    // tests that don't exercise it; the counter tests override this.
+    takeChangeCounts: vi.fn(() => ({ created: 0, removed: 0 })),
   };
   const clientArgs: unknown[][] = [];
   const internal = adapter as unknown as {
@@ -215,6 +223,25 @@ describe("BeszelAdapter onReady", () => {
     expect(client.getSystems).toHaveBeenCalledTimes(1); // first poll ran
     expect(i.setInterval).toHaveBeenCalledTimes(1);
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("polling every 60s"));
+  });
+
+  it("v0.11.0: snapshots the existing states BEFORE the first cleanup or poll", async () => {
+    const { adapter, stateMgr } = setup();
+    const i = internalOf(adapter);
+    const order: string[] = [];
+    stateMgr.snapshotExistingStates.mockImplementation(async () => {
+      order.push("snapshot");
+    });
+    stateMgr.cleanupMetrics.mockImplementation(async () => {
+      order.push("cleanup");
+    });
+    stateMgr.updateSystem.mockImplementation(async () => {
+      order.push("poll");
+    });
+    stateMgr.getExistingSystemNames.mockResolvedValue(["server_a"]);
+    await i.onReady();
+    // Anything created or removed before the snapshot would be miscounted.
+    expect(order).toEqual(["snapshot", "cleanup", "poll"]);
   });
 
   it("F3: fetches existing system names once and hands them to migrateLegacyStates", async () => {
@@ -408,6 +435,55 @@ describe("BeszelAdapter poll — happy path", () => {
     client.getSystems.mockResolvedValue([makeSystem(), makeSystem({ id: "sys002", name: "Server B" })]);
     await i.poll();
     expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsAllUp", { val: true, ack: true });
+  });
+
+  it("v0.11.0: reports the datapoints a poll created and removed", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.takeChangeCounts.mockReturnValue({ created: 12, removed: 3 });
+    i.log.info.mockClear();
+    await i.poll();
+    expect(i.log.info).toHaveBeenCalledWith("Object tree updated: created 12 datapoint(s), removed 3 datapoint(s)");
+  });
+
+  it("v0.11.0: names only the side that actually changed", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+
+    stateMgr.takeChangeCounts.mockReturnValue({ created: 4, removed: 0 });
+    i.log.info.mockClear();
+    await i.poll();
+    expect(i.log.info).toHaveBeenCalledWith("Object tree updated: created 4 datapoint(s)");
+
+    stateMgr.takeChangeCounts.mockReturnValue({ created: 0, removed: 7 });
+    i.log.info.mockClear();
+    await i.poll();
+    expect(i.log.info).toHaveBeenCalledWith("Object tree updated: removed 7 datapoint(s)");
+  });
+
+  it("v0.11.0: stays silent when the object tree did not change", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.takeChangeCounts.mockReturnValue({ created: 0, removed: 0 });
+    i.log.info.mockClear();
+    await i.poll();
+    // A plain restart must not add a line to the user's log every minute.
+    expect(i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("Object tree updated"));
+  });
+
+  it("v0.11.0: the fleet rollup states count towards the datapoint total too", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    // They are created via setObjectNotExistsAsync, outside createAndSetState —
+    // without this hand-off the first-ever start would under-report by three.
+    expect(stateMgr.noteStatesCreated).toHaveBeenCalledWith([
+      "info.systemsTotal",
+      "info.systemsOnline",
+      "info.systemsAllUp",
+    ]);
+    const i = internalOf(adapter);
+    stateMgr.noteStatesCreated.mockClear();
+    await i.poll();
+    expect(stateMgr.noteStatesCreated).not.toHaveBeenCalled(); // only on the create pass
   });
 
   it("DP4: creates the three rollup objects once, then only writes values", async () => {

@@ -154,7 +154,7 @@
   "help_metric_gpu": "GPU usage, memory and power.",
   "help_metric_gpuDetails": "Package power and usage per GPU engine.",
   "help_metric_containers": "Per container: status, health, CPU, memory, image and network.",
-  "help_metric_battery": "Battery level and charging state.",
+  "help_metric_battery": "Battery level and charging state, plus the level of each individual battery (Beszel 0.18.8+).",
   "containerNetwork": "Network",
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
@@ -162,5 +162,10 @@
   "help_username": "The email/login you use for the Beszel web UI (PocketBase authenticates by email).",
   "help_password": "The password for that Beszel login.",
   "connectionStatus": "Connection status",
-  "channelSystems": "Monitored Systems"
+  "channelSystems": "Monitored Systems",
+  "header_fans": "Fans",
+  "metric_fans": "Fan Speeds",
+  "help_metric_fans": "Speed in RPM for each fan reported by the agent (Beszel 0.18.8+, Linux only).",
+  "channelFans": "Fans",
+  "channelBatteries": "Batteries"
 }

@@ -154,7 +154,7 @@
   "help_metric_gpu": "Загрузка, память и энергопотребление GPU.",
   "help_metric_gpuDetails": "Энергопотребление пакета и загрузка по каждому движку GPU.",
   "help_metric_containers": "По каждому контейнеру: статус, состояние, ЦП, память и сеть.",
-  "help_metric_battery": "Уровень заряда батареи и состояние зарядки.",
+  "help_metric_battery": "Уровень заряда и состояние зарядки, а также уровень каждой отдельной батареи (Beszel 0.18.8+).",
   "containerNetwork": "Сеть",
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
@@ -162,5 +162,10 @@
   "help_username": "Электронная почта/логин, который вы используете для веб-интерфейса Beszel (PocketBase аутентифицирует по email).",
   "help_password": "Пароль для этого входа в Beszel.",
   "connectionStatus": "Статус подключения",
-  "channelSystems": "Отслеживаемые системы"
+  "channelSystems": "Отслеживаемые системы",
+  "header_fans": "Вентиляторы",
+  "metric_fans": "Скорость вентиляторов",
+  "help_metric_fans": "Скорость в об/мин для каждого вентилятора, о котором сообщает агент (Beszel 0.18.8+, только Linux).",
+  "channelFans": "Вентиляторы",
+  "channelBatteries": "Батареи"
 }

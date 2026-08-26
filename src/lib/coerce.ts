@@ -523,6 +523,17 @@ export function coerceSystemStats(value: unknown): SystemStats {
   if (dios) {
     s.dios = dios;
   }
+  // v0.18.8: fan RPM map + per-battery percent map. Same lenient map coercion
+  // as the temperature sensors — a single bad reading is dropped, not the map.
+  // 0 is a valid fan reading (stopped fan), coerceFiniteNumber keeps it.
+  const f = coerceNumberMap(obj.f);
+  if (f) {
+    s.f = f;
+  }
+  const bats = coerceNumberMap(obj.bats);
+  if (bats) {
+    s.bats = bats;
+  }
   // v0.18.7: per-interface [up, down, total up, total down] bytes.
   const niObj = coerceObject(obj.ni);
   if (niObj) {

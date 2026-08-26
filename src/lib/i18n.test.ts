@@ -55,6 +55,34 @@ describe("i18n completeness", () => {
     expect(missing, `channel keys missing from en.json: ${missing.join(", ")}`).toEqual([]);
   });
 
+  it("every label/help/text key of the admin config exists in en.json", () => {
+    // v0.11.0: a new metric toggle needs a header, a label and a help text. When
+    // one is forgotten, the admin page shows the raw key instead of a caption —
+    // invisible in tsc/lint and easy to miss by eye across 11 languages.
+    const jsonConfig = JSON.parse(readFileSync(join(__dirname, "../../admin/jsonConfig.json"), "utf8")) as unknown;
+    const used = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (["label", "help", "text"].includes(key) && typeof value === "string") {
+          used.add(value);
+        } else {
+          walk(value);
+        }
+      }
+    };
+    walk(jsonConfig);
+    // Only keys that LOOK like i18n keys — plain sentences are used verbatim.
+    const missing = [...used].filter(k => /^[a-z][A-Za-z0-9_]*$/.test(k) && !enKeys.includes(k));
+    expect(missing, `jsonConfig keys missing from en.json: ${missing.join(", ")}`).toEqual([]);
+  });
+
   it("the hand-written state keys used outside the registry exist too", () => {
     // These are passed to tName() directly in state-manager (not via a MetricDef).
     const inlineKeys = [

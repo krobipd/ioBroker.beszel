@@ -434,6 +434,26 @@
           "lg": 6,
           "xl": 6
         },
+        "header_fans": {
+          "type": "header",
+          "text": "header_fans",
+          "size": 5,
+          "xs": 12,
+          "sm": 12,
+          "lg": 12,
+          "xl": 12
+        },
+        "metrics_fans": {
+          "type": "checkbox",
+          "label": "metric_fans",
+          "help": "help_metric_fans",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
         "header_gpu": {
           "type": "header",
           "text": "header_gpu",

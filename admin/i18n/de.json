@@ -154,7 +154,7 @@
   "help_metric_gpu": "GPU-Auslastung, -Speicher und -Leistung.",
   "help_metric_gpuDetails": "Package-Leistung und Auslastung je GPU-Engine.",
   "help_metric_containers": "Pro Container: Status, Health, CPU, Speicher, Image und Netzwerk.",
-  "help_metric_battery": "Akkustand und Ladezustand.",
+  "help_metric_battery": "Akkustand und Ladezustand, dazu der Stand jedes einzelnen Akkus (Beszel 0.18.8+).",
   "containerNetwork": "Netzwerk",
   "systemsTotal": "Systeme gesamt",
   "systemsOnline": "Systeme online",
@@ -162,5 +162,10 @@
   "help_username": "Die E-Mail/Login, die du für die Beszel-Web-UI verwendest (PocketBase meldet per E-Mail an).",
   "help_password": "Das Passwort für dieses Beszel-Login.",
   "connectionStatus": "Verbindungsstatus",
-  "channelSystems": "Überwachte Systeme"
+  "channelSystems": "Überwachte Systeme",
+  "header_fans": "Lüfter",
+  "metric_fans": "Lüfterdrehzahlen",
+  "help_metric_fans": "Drehzahl in U/min für jeden vom Agenten gemeldeten Lüfter (Beszel 0.18.8+, nur Linux).",
+  "channelFans": "Lüfter",
+  "channelBatteries": "Akkus"
 }

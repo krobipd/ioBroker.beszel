@@ -393,6 +393,29 @@ describe("coerce", () => {
       expect(s.bat).to.be.undefined;
     });
 
+    // --- v0.18.8 fields ---
+
+    it("coerces the fan map and keeps a 0 rpm reading (stopped fan is data)", () => {
+      const s = coerceSystemStats({ f: { "nct6798_CPU Fan": 1250, case_fan: 0 } });
+      expect(s.f).to.deep.equal({ "nct6798_CPU Fan": 1250, case_fan: 0 });
+    });
+
+    it("filters bad fan readings but keeps the valid ones", () => {
+      const s = coerceSystemStats({ f: { cpu_fan: 900, broken: NaN, text: "fast" } });
+      expect(s.f).to.deep.equal({ cpu_fan: 900 });
+    });
+
+    it("coerces the per-battery map", () => {
+      const s = coerceSystemStats({ bats: { BAT0: 85, BAT1: 42 } });
+      expect(s.bats).to.deep.equal({ BAT0: 85, BAT1: 42 });
+    });
+
+    it("leaves both v0.18.8 maps undefined on an older Beszel that omits them", () => {
+      const s = coerceSystemStats({ cpu: 10 });
+      expect(s.f).to.be.undefined;
+      expect(s.bats).to.be.undefined;
+    });
+
     it("coerces cpub breakdown array", () => {
       const s = coerceSystemStats({ cpub: [10, 5, 2, 1, 82] });
       expect(s.cpub).to.deep.equal([10, 5, 2, 1, 82]);

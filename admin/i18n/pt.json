@@ -154,7 +154,7 @@
   "help_metric_gpu": "Uso, memória e consumo da GPU.",
   "help_metric_gpuDetails": "Consumo do pacote e uso por mecanismo da GPU.",
   "help_metric_containers": "Por contêiner: status, integridade, CPU, memória e rede.",
-  "help_metric_battery": "Nível da bateria e estado de carga.",
+  "help_metric_battery": "Nível e estado de carga da bateria, mais o nível de cada bateria individual (Beszel 0.18.8+).",
   "containerNetwork": "Rede",
   "systemsTotal": "Systems total",
   "systemsOnline": "Systems online",
@@ -162,5 +162,10 @@
   "help_username": "O email/login que usa para a interface web do Beszel (o PocketBase autentica por email).",
   "help_password": "A palavra-passe desse login do Beszel.",
   "connectionStatus": "Estado da ligação",
-  "channelSystems": "Sistemas monitorizados"
+  "channelSystems": "Sistemas monitorizados",
+  "header_fans": "Ventoinhas",
+  "metric_fans": "Velocidades das ventoinhas",
+  "help_metric_fans": "Velocidade em RPM de cada ventoinha reportada pelo agente (Beszel 0.18.8+, apenas Linux).",
+  "channelFans": "Ventoinhas",
+  "channelBatteries": "Baterias"
 }

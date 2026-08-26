@@ -135,6 +135,7 @@ class BeszelAdapter extends utils.Adapter {
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
       this.stateManager = this.makeStateManager();
+      await this.stateManager.snapshotExistingStates();
       const existingNames = await this.stateManager.getExistingSystemNames();
       await this.stateManager.migrateLegacyStates(existingNames);
       await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
@@ -270,6 +271,7 @@ class BeszelAdapter extends utils.Adapter {
    * @param online Number of those reporting status "up".
    */
   async writeRollup(total, online) {
+    var _a;
     if (!this.rollupCreated) {
       await this.setObjectNotExistsAsync("info.systemsTotal", {
         type: "state",
@@ -304,11 +306,33 @@ class BeszelAdapter extends utils.Adapter {
         },
         native: {}
       });
+      (_a = this.stateManager) == null ? void 0 : _a.noteStatesCreated(["info.systemsTotal", "info.systemsOnline", "info.systemsAllUp"]);
       this.rollupCreated = true;
     }
     await this.setStateChangedAsync("info.systemsTotal", { val: total, ack: true });
     await this.setStateChangedAsync("info.systemsOnline", { val: online, ack: true });
     await this.setStateChangedAsync("info.systemsAllUp", { val: total > 0 && online === total, ack: true });
+  }
+  /**
+   * v0.11.0: report how many datapoints this batch created or removed, then
+   * reset the counters. Stays silent when nothing changed — the interesting
+   * moments are a flipped metric toggle (the startup cleanup's removals and the
+   * first poll's creations land in the SAME line), a system added or dropped on
+   * the Hub, and hardware appearing/disappearing (fan, GPU, filesystem).
+   */
+  logDatapointChanges() {
+    const { created, removed } = this.stateManager.takeChangeCounts();
+    if (created === 0 && removed === 0) {
+      return;
+    }
+    const parts = [];
+    if (created > 0) {
+      parts.push(`created ${created} datapoint(s)`);
+    }
+    if (removed > 0) {
+      parts.push(`removed ${removed} datapoint(s)`);
+    }
+    this.log.info(`Object tree updated: ${parts.join(", ")}`);
   }
   async poll() {
     if (this.isPolling) {
@@ -387,6 +411,7 @@ class BeszelAdapter extends utils.Adapter {
         }
         await this.writeRollup(systems.length, systems.filter((s) => s.status === "up").length);
       }
+      this.logDatapointChanges();
       this.lastSystemCount = systems.length;
       this.authFailCount = 0;
       if (this.lastErrorCode) {

@@ -277,6 +277,7 @@
     "metrics_diskPeak": false,
     "metrics_networkInterfaces": false,
     "metrics_networkPeak": false,
-    "metrics_gpuDetails": false
+    "metrics_gpuDetails": false,
+    "metrics_fans": false
   }
 }

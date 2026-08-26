@@ -153,6 +153,7 @@ function allMetricsConfig(overrides: Partial<AdapterConfig> = {}): AdapterConfig
     metrics_gpu: true,
     metrics_containers: true,
     metrics_battery: true,
+    metrics_fans: true,
     ...overrides,
   };
 }
@@ -181,6 +182,7 @@ function noMetricsConfig(): AdapterConfig {
     metrics_gpu: false,
     metrics_containers: false,
     metrics_battery: false,
+    metrics_fans: false,
   };
 }
 
@@ -866,6 +868,124 @@ describe("StateManager", () => {
     it("should NOT create battery states when disabled", async () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig({ metrics_battery: false }));
       expect(adapter.states.has("systems.my_server.battery.percent")).to.be.false;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // updateSystem — fan speeds (v0.11.0, Beszel 0.18.8)
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — fan speeds (v0.11.0)", () => {
+    // Keys as the agent builds them: `<chip>_<label-or-fanN>`, label may contain
+    // spaces (beszel v0.18.8 agent/fans.go discoverHwmonFans).
+    const fanStats: SystemStats = {
+      ...testStats,
+      f: { "nct6798_CPU Fan": 1250, nct6798_fan2: 800, coretemp_pump: 2100 },
+    };
+
+    it("creates a fans channel with one state per fan, in rpm", async () => {
+      await manager.updateSystem(testSystem, fanStats, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.fans")?.type).to.equal("channel");
+      expect(adapter.states.get("systems.my_server.fans.nct6798_cpu_fan")?.val).to.equal(1250);
+      expect(adapter.states.get("systems.my_server.fans.nct6798_fan2")?.val).to.equal(800);
+      expect(adapter.states.get("systems.my_server.fans.coretemp_pump")?.val).to.equal(2100);
+      const common = adapter.objects.get("systems.my_server.fans.nct6798_cpu_fan")?.common;
+      expect(common?.unit).to.equal("rpm");
+      expect(common?.type).to.equal("number");
+      expect(common?.write).to.be.false;
+    });
+
+    it("keeps the agent's fan label as the display name", async () => {
+      await manager.updateSystem(testSystem, fanStats, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.fans.nct6798_cpu_fan")?.common.name).to.equal("nct6798_CPU Fan");
+    });
+
+    it("keeps a 0 rpm reading — a stopped fan is data, not a missing value", async () => {
+      await manager.updateSystem(testSystem, { ...testStats, f: { case_fan: 0 } }, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.fans.case_fan")?.val).to.equal(0);
+    });
+
+    it("does not create fan states when the toggle is off", async () => {
+      await manager.updateSystem(testSystem, fanStats, [], allMetricsConfig({ metrics_fans: false }));
+      expect(adapter.objects.has("systems.my_server.fans")).to.be.false;
+    });
+
+    it("creates nothing on an older Beszel that never sends the field", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.fans")).to.be.false;
+    });
+
+    it("prunes a fan that disappeared while others remain (no debounce needed)", async () => {
+      await manager.updateSystem(testSystem, fanStats, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.fans.coretemp_pump")).to.be.true;
+      await manager.updateSystem(
+        testSystem,
+        { ...testStats, f: { "nct6798_CPU Fan": 1300 } },
+        [],
+        allMetricsConfig(),
+      );
+      expect(adapter.states.has("systems.my_server.fans.coretemp_pump")).to.be.false;
+      expect(adapter.states.get("systems.my_server.fans.nct6798_cpu_fan")?.val).to.equal(1300);
+    });
+
+    it("H2: all fans vanishing is debounced — pruned only on the second empty poll", async () => {
+      await manager.updateSystem(testSystem, fanStats, [], allMetricsConfig());
+      await manager.updateSystem(testSystem, { ...testStats, f: {} }, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.fans.nct6798_cpu_fan")).to.be.true; // debounced
+      await manager.updateSystem(testSystem, { ...testStats, f: {} }, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.fans.nct6798_cpu_fan")).to.be.false; // pruned
+      expect(adapter.objects.has("systems.my_server.fans")).to.be.false; // empty parent gone too
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // updateSystem — per-battery charge (v0.11.0, Beszel 0.18.8)
+  // -----------------------------------------------------------------------
+
+  describe("updateSystem — per-battery charge (v0.11.0)", () => {
+    const multiBat: SystemStats = { ...testStats, bats: { BAT0: 85, BAT1: 42 } };
+
+    it("creates one percent state per battery under the battery channel", async () => {
+      await manager.updateSystem(testSystem, multiBat, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.battery.batteries")?.type).to.equal("channel");
+      expect(adapter.states.get("systems.my_server.battery.batteries.bat0")?.val).to.equal(85);
+      expect(adapter.states.get("systems.my_server.battery.batteries.bat1")?.val).to.equal(42);
+      const common = adapter.objects.get("systems.my_server.battery.batteries.bat0")?.common;
+      expect(common?.unit).to.equal("%");
+      expect(common?.role).to.equal("value.battery");
+    });
+
+    it("keeps the aggregate battery states alongside the per-battery ones", async () => {
+      await manager.updateSystem(testSystem, multiBat, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.battery.percent")?.val).to.equal(85);
+      expect(adapter.states.get("systems.my_server.battery.charging")?.val).to.be.true;
+    });
+
+    it("also creates the state for a SINGLE battery — no threshold that would delete it later", async () => {
+      await manager.updateSystem(testSystem, { ...testStats, bats: { BAT0: 90 } }, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.battery.batteries.bat0")?.val).to.equal(90);
+    });
+
+    it("does not create per-battery states when the battery toggle is off", async () => {
+      await manager.updateSystem(testSystem, multiBat, [], allMetricsConfig({ metrics_battery: false }));
+      expect(adapter.objects.has("systems.my_server.battery.batteries")).to.be.false;
+    });
+
+    it("creates nothing on an older Beszel that never sends the field", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.battery.batteries")).to.be.false;
+    });
+
+    it("clamps an out-of-range percentage", async () => {
+      await manager.updateSystem(testSystem, { ...testStats, bats: { BAT0: 140 } }, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.battery.batteries.bat0")?.val).to.equal(100);
+    });
+
+    it("prunes a battery that was removed while another remains", async () => {
+      await manager.updateSystem(testSystem, multiBat, [], allMetricsConfig());
+      await manager.updateSystem(testSystem, { ...testStats, bats: { BAT0: 80 } }, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.battery.batteries.bat1")).to.be.false;
+      expect(adapter.states.get("systems.my_server.battery.batteries.bat0")?.val).to.equal(80);
     });
   });
 
@@ -2607,6 +2727,139 @@ describe("StateManager", () => {
         paused: "Paused",
         pending: "Pending",
       });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Datapoint change counters (v0.11.0) — the numbers behind the
+  // "Object tree updated: created N, removed M datapoint(s)" log line.
+  // -----------------------------------------------------------------------
+
+  describe("datapoint change counters (v0.11.0)", () => {
+    /** Simulate an adapter restart: fresh manager over the SAME object store. */
+    async function restart(): Promise<StateManager> {
+      const fresh = new StateManager(adapter as never);
+      await fresh.snapshotExistingStates();
+      return fresh;
+    }
+
+    it("counts every state of a first-ever run as created", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      const { created, removed } = manager.takeChangeCounts();
+      expect(created).to.equal(adapter.states.size);
+      expect(created).to.be.greaterThan(0);
+      expect(removed).to.equal(0);
+    });
+
+    it("counts nothing on a second poll — the states already exist", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      manager.takeChangeCounts();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
+    });
+
+    it("counts nothing after a plain restart, despite the every-restart role retrofit", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      manager.takeChangeCounts();
+
+      // The retrofit extendObject runs again on a fresh process (createdIds is
+      // empty) — it must NOT be reported as newly created datapoints.
+      const afterRestart = await restart();
+      await afterRestart.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
+    });
+
+    it("counts only the genuinely new datapoints when a toggle is switched on", async () => {
+      const off = allMetricsConfig({ metrics_fans: false });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, { ...testStats, f: { cpu_fan: 900, case_fan: 700 } }, [], off);
+      manager.takeChangeCounts();
+
+      const afterRestart = await restart();
+      await afterRestart.updateSystem(
+        testSystem,
+        { ...testStats, f: { cpu_fan: 900, case_fan: 700 } },
+        [],
+        allMetricsConfig(),
+      );
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 2, removed: 0 });
+    });
+
+    it("counts the datapoints a switched-off toggle removes at startup", async () => {
+      await manager.snapshotExistingStates();
+      const twoFans: SystemStats = { ...testStats, f: { cpu_fan: 900, case_fan: 700 } };
+      await manager.updateSystem(testSystem, twoFans, [], allMetricsConfig());
+      manager.takeChangeCounts();
+
+      // Toggle off → restart → the startup cleanup removes the fan channel.
+      const afterRestart = await restart();
+      await afterRestart.cleanupMetrics("my_server", allMetricsConfig({ metrics_fans: false }));
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 2 });
+    });
+
+    it("counts every datapoint lost with a system that disappeared from the Hub", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      const created = manager.takeChangeCounts().created;
+
+      await manager.cleanupSystems([]);
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 0, removed: created });
+    });
+
+    it("counts a pruned dynamic child (a fan that vanished)", async () => {
+      await manager.snapshotExistingStates();
+      const twoFans: SystemStats = { ...testStats, f: { cpu_fan: 900, case_fan: 700 } };
+      await manager.updateSystem(testSystem, twoFans, [], allMetricsConfig());
+      manager.takeChangeCounts();
+
+      await manager.updateSystem(testSystem, { ...testStats, f: { cpu_fan: 900 } }, [], allMetricsConfig());
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 0, removed: 1 });
+    });
+
+    it("counts a re-appearing datapoint as created again", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, { ...testStats, f: { cpu_fan: 900 } }, [], allMetricsConfig());
+      await manager.updateSystem(testSystem, { ...testStats, f: {} }, [], allMetricsConfig());
+      await manager.updateSystem(testSystem, { ...testStats, f: {} }, [], allMetricsConfig()); // pruned now
+      manager.takeChangeCounts();
+
+      await manager.updateSystem(testSystem, { ...testStats, f: { cpu_fan: 950 } }, [], allMetricsConfig());
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 1, removed: 0 });
+    });
+
+    it("takeChangeCounts resets, so each log line reports one batch only", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(manager.takeChangeCounts().created).to.be.greaterThan(0);
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
+    });
+
+    it("leaves the legacy REMOVALS out — the migration reports its own total", async () => {
+      // A pre-0.3.0 install: flat states plus the old `temperatures` channel.
+      adapter.objects.set("systems.my_server", { type: "device", common: {}, native: {} });
+      adapter.objects.set("systems.my_server.cpu_usage", { type: "state", common: {}, native: {} });
+      adapter.objects.set("systems.my_server.temperatures", { type: "channel", common: {}, native: {} });
+      adapter.objects.set("systems.my_server.temperatures.core_0", { type: "state", common: {}, native: {} });
+
+      const fresh = await restart();
+      await fresh.migrateLegacyStates(["my_server"]);
+      // The two legacy states it deleted are NOT in the counter (they belong to
+      // the migration's own "removed N legacy state(s)" line). The one datapoint
+      // reported is the migration marker, which really is new.
+      expect(fresh.takeChangeCounts()).to.deep.equal({ created: 1, removed: 0 });
+    });
+
+    it("counts the migration marker only once, not on every later start", async () => {
+      await manager.snapshotExistingStates();
+      await manager.migrateLegacyStates([]);
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 1, removed: 0 });
+
+      const afterRestart = await restart();
+      await afterRestart.migrateLegacyStates([]);
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
     });
   });
 });

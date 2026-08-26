@@ -218,6 +218,12 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- New: Fan speeds — a new "Fans" switch creates one datapoint per fan, in rpm (needs Beszel 0.18.8 or newer, Linux hosts).
+- New: Systems with several batteries now show the level of each battery separately (needs Beszel 0.18.8 or newer).
+- New: After changing the metric settings, the log reports how many datapoints were added or removed.
+
 ### 0.10.1 (2026-08-22)
 
 - Changed: Internal cleanup. No user-facing changes.

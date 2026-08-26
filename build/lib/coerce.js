@@ -381,6 +381,14 @@ function coerceSystemStats(value) {
   if (dios) {
     s.dios = dios;
   }
+  const f = coerceNumberMap(obj.f);
+  if (f) {
+    s.f = f;
+  }
+  const bats = coerceNumberMap(obj.bats);
+  if (bats) {
+    s.bats = bats;
+  }
   const niObj = coerceObject(obj.ni);
   if (niObj) {
     const ni = {};

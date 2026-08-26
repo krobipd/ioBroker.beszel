@@ -67,10 +67,109 @@ export class StateManager {
   private readonly deviceWritten = new Map<string, string>();
 
   /**
+   * v0.11.0: datapoint-change bookkeeping behind the user-facing "created /
+   * removed N datapoint(s)" log line. `knownStateIds` starts as a snapshot of
+   * every state that already existed at adapter start and is kept in sync from
+   * then on, so the every-restart `extendObject` retrofit in `createAndSetState`
+   * is NOT miscounted as a creation — only a state that did not exist before
+   * counts. Removed ids leave the set again, so a later re-appearance counts as
+   * a genuine new creation.
+   */
+  private readonly knownStateIds = new Set<string>();
+  private createdStatesCount = 0;
+  private removedStatesCount = 0;
+
+  /**
    * @param adapter The ioBroker adapter instance
    */
   constructor(adapter: utils.AdapterInstance) {
     this.adapter = adapter;
+  }
+
+  /**
+   * v0.11.0: snapshot every existing state id of this instance once at startup
+   * (one object view). Must run before the first cleanup/poll — anything created
+   * or deleted before it would be miscounted.
+   */
+  public async snapshotExistingStates(): Promise<void> {
+    const view = await this.adapter.getObjectViewAsync("system", "state", {
+      startkey: `${this.adapter.namespace}.`,
+      endkey: `${this.adapter.namespace}.\uFFFF`,
+    });
+    for (const row of view?.rows ?? []) {
+      this.knownStateIds.add(this.stripNamespace(row.id));
+    }
+  }
+
+  /**
+   * v0.11.0: return and reset the created/removed datapoint counters, so each
+   * log line reports exactly one batch of changes.
+   */
+  public takeChangeCounts(): { created: number; removed: number } {
+    const counts = { created: this.createdStatesCount, removed: this.removedStatesCount };
+    this.createdStatesCount = 0;
+    this.removedStatesCount = 0;
+    return counts;
+  }
+
+  /**
+   * v0.11.0: record that a state object was just created. A state that was
+   * already there (restart retrofit) does not count.
+   *
+   * @param id State id, namespace-relative.
+   */
+  private noteStateCreated(id: string): void {
+    if (!this.knownStateIds.has(id)) {
+      this.knownStateIds.add(id);
+      this.createdStatesCount++;
+    }
+  }
+
+  /**
+   * v0.11.0: same, for states created OUTSIDE `createAndSetState` — the fleet
+   * rollup states in main. Without this the first-ever start would report four
+   * datapoints fewer than it actually created. Ids that already exist are
+   * ignored, so calling it on every start is safe.
+   *
+   * @param ids State ids, namespace-relative.
+   */
+  public noteStatesCreated(ids: string[]): void {
+    for (const id of ids) {
+      this.noteStateCreated(id);
+    }
+  }
+
+  /**
+   * v0.11.0: record that a single state object was just deleted.
+   *
+   * @param id State id, namespace-relative.
+   */
+  private noteStateRemoved(id: string): void {
+    this.knownStateIds.delete(id);
+    this.removedStatesCount++;
+  }
+
+  /**
+   * v0.11.0: record the states removed by a RECURSIVE delete (channel, device,
+   * dynamic-group child). Counts from the object view — the honest number of
+   * datapoints the user loses — and drops them from `knownStateIds` so a later
+   * re-appearance counts as a creation. Must be called BEFORE the delete.
+   *
+   * @param id Object id whose subtree is about to be removed.
+   */
+  private async noteStatesRemovedUnder(id: string): Promise<void> {
+    const view = await this.adapter.getObjectViewAsync("system", "state", {
+      startkey: `${this.adapter.namespace}.${id}`,
+      endkey: `${this.adapter.namespace}.${id}.\uFFFF`,
+    });
+    for (const row of view?.rows ?? []) {
+      const local = this.stripNamespace(row.id);
+      // The view range can only over-reach into siblings sharing the prefix
+      // (`foo` → `foo_bar`), so filter to the subtree explicitly.
+      if (local === id || local.startsWith(`${id}.`)) {
+        this.noteStateRemoved(local);
+      }
+    }
   }
 
   /**
@@ -432,6 +531,7 @@ export class StateManager {
     await Promise.all(
       stale.map(async name => {
         this.adapter.log.debug(`Removing stale system: systems.${name}`);
+        await this.noteStatesRemovedUnder(`systems.${name}`);
         await this.adapter.delObjectAsync(`systems.${name}`, { recursive: true });
         this.dropCacheUnder(`systems.${name}`);
       }),
@@ -504,6 +604,7 @@ export class StateManager {
         if (obj) {
           await this.adapter.delObjectAsync(id);
           this.createdIds.delete(id);
+          this.noteStateRemoved(id);
         }
       }),
     );
@@ -569,6 +670,7 @@ export class StateManager {
         if (ppObj) {
           await this.adapter.delObjectAsync(ppId);
           this.createdIds.delete(ppId);
+          this.noteStateRemoved(ppId);
         }
         await this.deleteChannelIfExists(`${sysId}.gpu.${child}.engines`);
       }
@@ -661,10 +763,16 @@ export class StateManager {
           if (obj && obj.type === "state") {
             await this.adapter.delObjectAsync(fullId);
             this.createdIds.delete(fullId);
+            // Not counted (see the countRemoval=false note below) but dropped
+            // from the id set so the bookkeeping stays truthful.
+            this.knownStateIds.delete(fullId);
             local++;
           }
         }
-        await this.deleteChannelIfExists(`${sysId}.temperatures`);
+        // countRemoval=false: the legacy sweep reports its own total below —
+        // letting it also feed the datapoint counter would report the same
+        // removals twice, in two differently-scoped lines.
+        await this.deleteChannelIfExists(`${sysId}.temperatures`, false);
         return local;
       }),
     );
@@ -689,6 +797,7 @@ export class StateManager {
       },
       native: {},
     });
+    this.noteStateCreated("info.legacyMigrated");
     await this.adapter.setStateChangedAsync("info.legacyMigrated", { val: true, ack: true });
   }
 
@@ -718,6 +827,50 @@ export class StateManager {
             `${sysId}.temperature.sensors.${safeSensor}`,
             numCommon(sanitizeDisplayName(sensor), "°C", "value.temperature"),
             temp,
+          );
+        },
+      );
+    }
+
+    // Fan speeds (v0.11.0, Beszel 0.18.8+). Fan names come from the agent's
+    // hwmon walk (`<chip>_<label-or-fanN>`, may contain spaces) and have no
+    // fixed translation — shown as-is. 0 RPM is a real reading (stopped fan).
+    // Role: plain `value` — the catalog has no measured-RPM role (`value.speed`
+    // is wind, `level.speed` is a writable fan setpoint).
+    if (config.metrics_fans) {
+      await this.syncDynamicGroup(
+        `${sysId}.fans`,
+        stats.f ? Object.entries(stats.f) : [],
+        "state",
+        async () => {
+          await this.ensureChannel(`${sysId}.fans`, channelName("fans"));
+        },
+        async (safeFan, fan, rpm) => {
+          await this.createAndSetState(`${sysId}.fans.${safeFan}`, numCommon(sanitizeDisplayName(fan), "rpm"), rpm);
+        },
+      );
+    }
+
+    // Per-battery charge (v0.11.0, Beszel 0.18.8+). Battery names come from the
+    // OS (fallback `Battery N`) — shown as-is. Every reported battery gets a
+    // state, deliberately without a "only if >= 2" threshold: such a threshold
+    // would make a docked laptop dropping from two batteries to one DELETE the
+    // children, which reads as a bug. Same shape as temperature.sensors. Rides
+    // on the battery toggle (itself opt-in) — no config switch of its own.
+    if (config.metrics_battery) {
+      await this.syncDynamicGroup(
+        `${sysId}.battery.batteries`,
+        stats.bats ? Object.entries(stats.bats) : [],
+        "state",
+        async () => {
+          await this.ensureChannel(`${sysId}.battery`, channelName("battery"));
+          await this.ensureChannel(`${sysId}.battery.batteries`, channelName("batteries"));
+        },
+        async (safeBat, bat, percent) => {
+          await this.createAndSetState(
+            `${sysId}.battery.batteries.${safeBat}`,
+            percentCommon(sanitizeDisplayName(bat), "value.battery"),
+            clampPercent(percent),
           );
         },
       );
@@ -1087,6 +1240,7 @@ export class StateManager {
     await Promise.all(
       stale.map(async cId => {
         this.adapter.log.debug(`Removing stale ${childType} ${base}.${cId} (no longer reported)`);
+        await this.noteStatesRemovedUnder(`${base}.${cId}`);
         await this.adapter.delObjectAsync(`${base}.${cId}`, { recursive: true });
         this.dropCacheUnder(`${base}.${cId}`);
       }),
@@ -1118,10 +1272,18 @@ export class StateManager {
     this.createdIds.add(id);
   }
 
-  private async deleteChannelIfExists(id: string): Promise<void> {
+  /**
+   * @param id Channel id to delete (recursively) if it exists.
+   * @param countRemoval Whether the removed states feed the datapoint counter.
+   *   `false` only for the legacy migration, which reports its own total.
+   */
+  private async deleteChannelIfExists(id: string, countRemoval = true): Promise<void> {
     try {
       const obj = await this.adapter.getObjectAsync(id);
       if (obj) {
+        if (countRemoval) {
+          await this.noteStatesRemovedUnder(id);
+        }
         await this.adapter.delObjectAsync(id, { recursive: true });
         this.dropCacheUnder(id);
       }
@@ -1149,6 +1311,7 @@ export class StateManager {
       // startup cost. Don't "optimize" it into that regression.
       await this.adapter.extendObject(id, { type: "state", common, native: {} }, { preserve: { common: ["name"] } });
       this.createdIds.add(id);
+      this.noteStateCreated(id);
     }
     await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
   }

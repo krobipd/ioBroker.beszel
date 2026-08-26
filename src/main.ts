@@ -134,6 +134,11 @@ export class BeszelAdapter extends utils.Adapter {
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
       this.stateManager = this.makeStateManager();
 
+      // v0.11.0: snapshot the existing states BEFORE any cleanup or poll — it is
+      // the baseline for the "created / removed N datapoint(s)" line, so every
+      // change from here on is attributable.
+      await this.stateManager.snapshotExistingStates();
+
       // F3: enumerate the existing system devices once and reuse the list for both
       // the legacy migration and the metric cleanup, instead of two object views.
       const existingNames = await this.stateManager.getExistingSystemNames();
@@ -338,11 +343,37 @@ export class BeszelAdapter extends utils.Adapter {
         },
         native: {},
       });
+      // v0.11.0: these three are created outside createAndSetState, so the
+      // datapoint counter has to be told about them explicitly. Ids that
+      // already exist are ignored, so a restart adds nothing.
+      this.stateManager?.noteStatesCreated(["info.systemsTotal", "info.systemsOnline", "info.systemsAllUp"]);
       this.rollupCreated = true;
     }
     await this.setStateChangedAsync("info.systemsTotal", { val: total, ack: true });
     await this.setStateChangedAsync("info.systemsOnline", { val: online, ack: true });
     await this.setStateChangedAsync("info.systemsAllUp", { val: total > 0 && online === total, ack: true });
+  }
+
+  /**
+   * v0.11.0: report how many datapoints this batch created or removed, then
+   * reset the counters. Stays silent when nothing changed — the interesting
+   * moments are a flipped metric toggle (the startup cleanup's removals and the
+   * first poll's creations land in the SAME line), a system added or dropped on
+   * the Hub, and hardware appearing/disappearing (fan, GPU, filesystem).
+   */
+  private logDatapointChanges(): void {
+    const { created, removed } = this.stateManager!.takeChangeCounts();
+    if (created === 0 && removed === 0) {
+      return;
+    }
+    const parts: string[] = [];
+    if (created > 0) {
+      parts.push(`created ${created} datapoint(s)`);
+    }
+    if (removed > 0) {
+      parts.push(`removed ${removed} datapoint(s)`);
+    }
+    this.log.info(`Object tree updated: ${parts.join(", ")}`);
   }
 
   private async poll(): Promise<void> {
@@ -464,6 +495,11 @@ export class BeszelAdapter extends utils.Adapter {
         // DP4: fleet rollup for dashboards (non-empty poll only, like the cleanup).
         await this.writeRollup(systems.length, systems.filter(s => s.status === "up").length);
       }
+
+      // v0.11.0: one line per poll telling the user how the object tree changed.
+      // Silent when nothing changed, so a plain restart stays quiet — it speaks
+      // up exactly when a metric toggle was flipped or hardware appeared/vanished.
+      this.logDatapointChanges();
 
       this.lastSystemCount = systems.length;
       this.authFailCount = 0;

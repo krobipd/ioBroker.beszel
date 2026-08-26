@@ -50,9 +50,11 @@ const CHANNEL_NAME_KEY = {
   network: "channelNetwork",
   temperature: "channelTemperature",
   battery: "channelBattery",
+  fans: "channelFans",
   // dynamic-group parents + sub-channels
   cores: "channelCores",
   sensors: "channelSensors",
+  batteries: "channelBatteries",
   interfaces: "channelInterfaces",
   gpu: "channelGpu",
   engines: "channelEngines",
@@ -62,7 +64,10 @@ const CHANNEL_NAME_KEY = {
 const DYNAMIC_CHANNEL_TOGGLES = {
   cpu: ["metrics_cpuCores"],
   network: ["metrics_networkInterfaces"],
-  temperature: ["metrics_temperatureDetails"]
+  temperature: ["metrics_temperatureDetails"],
+  // v0.11.0: the fans channel holds ONLY the dynamic per-fan states — this
+  // entry is what makes cleanupMetrics delete the channel when the toggle is off.
+  fans: ["metrics_fans"]
 };
 const METRIC_DEPENDENCIES = {
   metrics_loadAvg: "metrics_cpu",
