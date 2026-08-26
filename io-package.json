@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.10.1",
+    "version": "0.11.0",
     "news": {
+      "0.11.0": {
+        "en": "Fan speeds are now available, and systems with several batteries show the level of each battery (needs Beszel 0.18.8 or newer). Switching metrics on or off also shows how many datapoints appeared or disappeared.",
+        "de": "Lüfterdrehzahlen sind jetzt verfügbar, und Systeme mit mehreren Akkus zeigen den Stand jedes einzelnen Akkus (benötigt Beszel 0.18.8 oder neuer). Beim Umschalten von Metriken siehst du außerdem, wie viele Datenpunkte dazugekommen oder weggefallen sind.",
+        "es": "Ya están disponibles las velocidades de los ventiladores y los sistemas con varias baterías muestran el nivel de cada una (requiere Beszel 0.18.8 o posterior). Al activar o desactivar métricas también se indica cuántos puntos de datos se han añadido o eliminado.",
+        "fr": "Les vitesses des ventilateurs sont désormais disponibles et les systèmes à plusieurs batteries affichent le niveau de chacune (nécessite Beszel 0.18.8 ou plus récent). L'activation ou la désactivation de métriques indique aussi combien de points de données ont été ajoutés ou supprimés.",
+        "it": "Le velocità delle ventole sono ora disponibili e i sistemi con più batterie mostrano il livello di ciascuna (richiede Beszel 0.18.8 o successivo). Attivando o disattivando le metriche viene anche indicato quanti punti dati sono stati aggiunti o rimossi.",
+        "nl": "Ventilatortoerentallen zijn nu beschikbaar en systemen met meerdere batterijen tonen het niveau van elke batterij (vereist Beszel 0.18.8 of nieuwer). Bij het in- of uitschakelen van metingen zie je ook hoeveel datapunten erbij zijn gekomen of zijn verdwenen.",
+        "pl": "Dostępne są teraz prędkości wentylatorów, a systemy z kilkoma bateriami pokazują poziom każdej z nich (wymaga Beszel 0.18.8 lub nowszego). Przy włączaniu i wyłączaniu metryk widać też, ile punktów danych przybyło lub ubyło.",
+        "pt": "As velocidades das ventoinhas já estão disponíveis e os sistemas com várias baterias mostram o nível de cada uma (requer Beszel 0.18.8 ou mais recente). Ao ligar ou desligar métricas também é indicado quantos pontos de dados foram acrescentados ou removidos.",
+        "ru": "Теперь доступны скорости вентиляторов, а системы с несколькими батареями показывают уровень каждой из них (требуется Beszel 0.18.8 или новее). При включении и отключении метрик также видно, сколько точек данных добавилось или исчезло.",
+        "uk": "Тепер доступні швидкості вентиляторів, а системи з кількома батареями показують рівень кожної з них (потрібен Beszel 0.18.8 або новіший). Під час вмикання та вимикання метрик також видно, скільки точок даних додалося або зникло.",
+        "zh-cn": "现在可以查看风扇转速，配备多块电池的系统会分别显示每块电池的电量（需要 Beszel 0.18.8 或更高版本）。开启或关闭指标时，还会显示新增或移除了多少个数据点。"
+      },
       "0.10.1": {
         "en": "Internal cleanup. No user-facing changes.",
         "de": "Interne Aufräumarbeiten. Keine Änderungen für Nutzer.",
@@ -80,19 +93,6 @@
         "pl": "Ulepszone zachowanie w trybie compact: beszel nie rejestruje już globalnych obsług błędów procesu, które mogły zakłócać inne adaptery w tym samym procesie.",
         "uk": "Покращено поведінку в compact-режимі: beszel більше не реєструє глобальні обробники помилок процесу, які могли заважати іншим адаптерам у тому ж процесі.",
         "zh-cn": "改进了 compact 模式下的行为：beszel 不再注册可能干扰同一进程中其他适配器的全局进程错误处理程序。"
-      },
-      "0.7.0": {
-        "en": "Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.",
-        "de": "Optionale Fehlermeldung über Sentry hinzugefügt: Abstürze werden an den Entwickler gesendet, damit Probleme schneller behoben werden. Nur aktiv bei eingeschalteter ioBroker-Diagnose; anonym.",
-        "ru": "Добавлена необязательная отправка ошибок через Sentry: сбои отправляются разработчику, чтобы быстрее их устранять. Работает только при включённой диагностике ioBroker; анонимно.",
-        "pt": "Adicionado relatório de erros opcional via Sentry: as falhas são enviadas ao programador para corrigir problemas mais rápido. Ativo apenas com o diagnóstico do ioBroker ligado; anónimo.",
-        "nl": "Optionele foutrapportage via Sentry toegevoegd: crashes worden naar de ontwikkelaar gestuurd om problemen sneller op te lossen. Alleen actief met ioBroker-diagnostiek ingeschakeld; anoniem.",
-        "fr": "Rapport d'erreurs optionnel via Sentry ajouté : les plantages sont envoyés au développeur pour corriger plus vite. Actif seulement si le diagnostic ioBroker est activé ; anonyme.",
-        "it": "Aggiunta segnalazione errori opzionale via Sentry: gli arresti vengono inviati allo sviluppatore per risolvere prima i problemi. Attivo solo con la diagnostica ioBroker attiva; anonimo.",
-        "es": "Añadido informe de errores opcional mediante Sentry: los fallos se envían al desarrollador para solucionar problemas más rápido. Activo solo con el diagnóstico de ioBroker activado; anónimo.",
-        "pl": "Dodano opcjonalne raportowanie błędów przez Sentry: awarie są wysyłane do dewelopera, aby szybciej rozwiązywać problemy. Aktywne tylko przy włączonej diagnostyce ioBroker; anonimowo.",
-        "uk": "Додано необов'язкову відправку помилок через Sentry: збої надсилаються розробнику, щоб швидше їх виправляти. Працює лише з увімкненою діагностикою ioBroker; анонімно.",
-        "zh-cn": "新增可选的 Sentry 错误上报：崩溃信息会发送给开发者以更快修复问题。仅在启用 ioBroker 诊断时生效；匿名。"
       }
     },
     "plugins": {

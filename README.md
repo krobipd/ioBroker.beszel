@@ -218,11 +218,11 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.11.0 (2026-08-26)
 
 - New: Fan speeds — a new "Fans" switch creates one datapoint per fan, in rpm (needs Beszel 0.18.8 or newer, Linux hosts).
 - New: Systems with several batteries now show the level of each battery separately (needs Beszel 0.18.8 or newer).
-- New: After changing the metric settings, the log reports how many datapoints were added or removed.
+- New: After switching metrics on or off you can see straight away how many datapoints appeared or disappeared, instead of searching the object tree.
 
 ### 0.10.1 (2026-08-22)
 
@@ -249,12 +249,6 @@ beszel.0.
 - Two systems, filesystems, network interfaces or containers whose names shorten to the same id no longer overwrite each other's values.
 - A malformed or oversized response from the Hub can no longer exhaust memory and crash the adapter.
 - The adapter now warns when the Hub is reached over an unencrypted http connection to another machine, so you can switch to https.
-
-### 0.7.2 (2026-06-12) — stable
-
-- Much lighter polling: the adapter no longer pages through hours of stats history on every poll and only rewrites device objects when something actually changed
-- Disappeared sensors, network interfaces, GPUs, filesystems and CPU cores are now cleaned up automatically instead of keeping frozen values forever
-- Turning off "GPU details" now removes the package-power and engine states it created
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
