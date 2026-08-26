@@ -14,7 +14,7 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 
 - Fetches metrics from all systems registered in your Beszel Hub
 - Per-system states: CPU, memory, disk, network, temperature, load average
-- Optional detail: per-core CPU, peak values, disk I/O load, per-interface traffic, GPU details, hardware/OS info, Docker/Podman containers, battery, extra filesystems, CPU breakdown, systemd services
+- Optional detail: per-core CPU, peak values, disk I/O load, per-interface traffic, fan speeds, GPU details, hardware/OS info, Docker/Podman containers, battery (incl. per-battery level), extra filesystems, CPU breakdown, systemd services
 - Each option has a help text explaining the states it creates; detail options stay greyed out until their category is enabled
 - Configurable poll interval (10–300 seconds)
 - Automatic re-authentication when the token expires (including mid-poll)
@@ -84,10 +84,11 @@ Detail options stay greyed out until their category's main metric is enabled, an
 |                 | Peak values                                           | off     |
 | **Temperature** | Temperature (hottest sensors avg + hottest single)    | on      |
 |                 | Individual Temperature Sensors                        | off     |
+| **Fans**        | Fan Speeds (rpm, Beszel 0.18.8+, Linux hosts)         | off     |
 | **GPU**         | GPU Metrics (Usage, Memory, Power)                    | off     |
 |                 | GPU details (engines, package power)                  | off     |
 | **Containers**  | Container Monitoring incl. network (Docker / Podman)  | off     |
-| **Battery**     | Battery Status                                        | off     |
+| **Battery**     | Battery Status (incl. level per battery)              | off     |
 
 ---
 
@@ -159,9 +160,11 @@ beszel.0.
         │   ├── average              — Avg of top 3 sensors (°C)
         │   ├── max                  — Hottest single sensor (°C)
         │   └── sensors/ *           — Individual sensor readings
+        ├── fans/ *                   — Fan speeds (rpm), one state per fan
         ├── battery/ *                — Battery metrics
         │   ├── percent              — Battery level (%)
-        │   └── charging             — Is charging? (bool)
+        │   ├── charging             — Is charging? (bool)
+        │   └── batteries/ *         — Level per battery (%), on multi-battery systems
         ├── gpu/ *                    — GPU metrics (per GPU)
         │   └── {gpu_name}/
         │       ├── usage            — GPU usage (%)
