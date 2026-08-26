@@ -42,8 +42,8 @@ export class StateManager {
   /**
    * v0.7.2: per dynamic group (`<sysId>.<group>` → set of child segments seen
    * in the last poll). Used by {@link pruneDynamicChildren} to delete states
-   * of disappeared members (renamed interface, removed GPU/sensor/filesystem,
-   * stopped container) without a DB round-trip per poll — the object view is
+   * of disappeared members (renamed interface, removed GPU/sensor/fan/battery/
+   * filesystem, stopped container) without a DB round-trip per poll — the object view is
    * queried only once per group after adapter start (reconciles zombies from
    * previous runs), afterwards the in-memory diff does the work.
    */
@@ -325,9 +325,9 @@ export class StateManager {
   // (`cleanupMetrics`) iterate this list, so a metric's toggle → state-id
   // mapping can never drift between "create" and "delete".
   //
-  // Dynamic groups (per-sensor temperature, per-GPU, per-filesystem,
-  // per-container) are NOT in here — they fan out to N items and stay in
-  // their dedicated handlers (`updateDynamicStats`, `updateContainers`).
+  // Dynamic groups (per-sensor temperature, per-fan, per-battery, per-GPU,
+  // per-filesystem, per-container) are NOT in here — they fan out to N items
+  // and stay in their dedicated handlers (`updateDynamicStats`, `updateContainers`).
   // -------------------------------------------------------------------------
 
   /**
@@ -1198,7 +1198,8 @@ export class StateManager {
   /**
    * v0.7.2 (generalised F1): remove children of a dynamic group that are no
    * longer reported by Beszel — stopped container, removed GPU, renamed
-   * network interface or sensor, unmounted filesystem, shrunk core count.
+   * network interface or sensor, vanished fan or battery, unmounted filesystem,
+   * shrunk core count.
    * Before this only containers were pruned; every other dynamic group left
    * zombie states with frozen values behind forever.
    *

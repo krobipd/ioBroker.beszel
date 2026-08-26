@@ -137,7 +137,7 @@ export function sanitizeForLog(value: unknown, maxLength = 200): string {
  * `common.name`. Same normalization as {@link sanitizeForLog} (collapse CR/LF/Tab,
  * cap length), but named for intent — a reader shouldn't be told a display name is
  * being "sanitized for a log". Used for dynamic channel/state display names
- * (sensor / interface / GPU / filesystem / container names from the Hub).
+ * (sensor / fan / battery / interface / GPU / filesystem / container names from the Hub).
  *
  * @param value Untrusted display name.
  * @param maxLength Maximum length before truncation (default 200).
