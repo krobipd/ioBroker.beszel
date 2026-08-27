@@ -108,9 +108,38 @@ class BeszelAdapter extends utils.Adapter {
     this.on("unload", this.onUnload.bind(this));
     this.on("message", this.onMessage.bind(this));
   }
+  /**
+   * Switch off `supportedMessages.stopInstance` on this instance's own object.
+   *
+   * The entry was dropped from the manifest, which only helps a FRESH install: an
+   * upgrade merges the manifest into the existing instance object and never removes
+   * a key, so the old `true` survives in the database — and that is what the host
+   * reads. With it the host kills the process one second after asking it to stop,
+   * `onUnload` never runs, and every state written while shutting down is dead code
+   * (measured on a live js-controller 7.2.2, 2026-08-27).
+   *
+   * Only written when it is actually still on: an instance-object write restarts the
+   * instance, so doing it unconditionally would restart on every single start.
+   */
+  async clearStopInstanceFlag() {
+    var _a;
+    const id = `system.adapter.${this.namespace}`;
+    try {
+      const obj = await this.getForeignObjectAsync(id);
+      const supported = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.supportedMessages;
+      if ((supported == null ? void 0 : supported.stopInstance) !== true) {
+        return;
+      }
+      this.log.debug("Switching off the leftover stopInstance flag \u2014 the instance restarts once");
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+    } catch (err) {
+      this.log.debug(`Could not check the stopInstance flag on ${id}: ${(0, import_coerce.errText)(err)}`);
+    }
+  }
   async onReady() {
     try {
       await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
+      await this.clearStopInstanceFlag();
       const config = this.config;
       this.log.debug(
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`
@@ -170,6 +199,10 @@ class BeszelAdapter extends utils.Adapter {
       for (const sysId of (_c = (_b = this.stateManager) == null ? void 0 : _b.knownSystemIds()) != null ? _c : []) {
         writes.push(this.setState(`${sysId}.info.online`, { val: false, ack: true }));
         writes.push(this.setState(`${sysId}.info.status`, { val: import_metric_registry.SYSTEM_STATUS_UNKNOWN, ack: true }));
+      }
+      if (this.rollupCreated) {
+        writes.push(this.setState("info.systemsOnline", { val: 0, ack: true }));
+        writes.push(this.setState("info.systemsAllUp", { val: false, ack: true }));
       }
       void Promise.all(writes).catch((err) => {
         this.log.debug(`onUnload: final states rejected: ${(0, import_coerce.errText)(err)}`);

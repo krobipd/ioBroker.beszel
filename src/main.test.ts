@@ -23,6 +23,7 @@ vi.mock("@iobroker/adapter-core", () => {
     public delay = vi.fn(async () => {});
     public sendTo = vi.fn();
     public extendForeignObjectAsync = vi.fn(async () => {});
+    public getForeignObjectAsync = vi.fn(async () => null as unknown);
     constructor(_opts: unknown) {}
   }
   return {
@@ -98,6 +99,7 @@ function internalOf(adapter: BeszelAdapter): {
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   extendForeignObjectAsync: ReturnType<typeof vi.fn>;
+  getForeignObjectAsync: ReturnType<typeof vi.fn>;
   sendTo: ReturnType<typeof vi.fn>;
   classifyError: (err: unknown) => string;
   onReady: () => Promise<void>;
@@ -1080,5 +1082,71 @@ describe("BeszelAdapter stale online indicators", () => {
     i.onUnload(vi.fn());
 
     expect(i.setState).toHaveBeenCalledWith("systems.server_a.info.status", { val: "unknown", ack: true });
+  });
+});
+
+describe("BeszelAdapter clears the stopInstance flag it used to ship with", () => {
+  // Measured on the live server 2026-08-27: dropping the entry from the manifest only
+  // helps FRESH installs. An upgrade merges the manifest into the existing instance
+  // object and never removes a key, so `stopInstance: true` survives — the host keeps
+  // killing the process and every shutdown write stays dead code.
+  it("switches the flag off when the instance object still carries it", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({
+      common: { supportedMessages: { stopInstance: true, checkConnection: true } },
+    });
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.beszel.0", {
+      common: { supportedMessages: { stopInstance: false } },
+    });
+  });
+
+  it("writes nothing when the flag is already off — an object write restarts the instance", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({
+      common: { supportedMessages: { stopInstance: false, checkConnection: true } },
+    });
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing on a fresh install that never had the entry", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({ common: { name: "beszel" } });
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalled();
+  });
+
+  it("starts up normally when the instance object cannot be read", async () => {
+    const { adapter, client } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockRejectedValue(new Error("objects db unreachable"));
+
+    await i.onReady();
+
+    expect(client.getSystems).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes the fleet rollup down on shutdown too, not just the single systems", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
+    i.setState.mockClear();
+    const callback = vi.fn();
+
+    i.onUnload(callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+
+    expect(i.setState).toHaveBeenCalledWith("info.systemsOnline", { val: 0, ack: true });
+    expect(i.setState).toHaveBeenCalledWith("info.systemsAllUp", { val: false, ack: true });
   });
 });

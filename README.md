@@ -221,6 +221,11 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.12.1 (2026-08-27)
+
+- Fixed: on an installation that was updated rather than freshly installed, the systems kept showing as online when the adapter was stopped — they now go offline there as well.
+- Fixed: the count of systems currently online no longer keeps its last value while the adapter is stopped — it drops to zero along with the individual systems.
+
 ### 0.12.0 (2026-08-27)
 
 - Fixed: a system no longer shows as online while the adapter is stopped or cannot reach the Hub — its status then reads "Unknown" instead of keeping the last value it had.
@@ -239,16 +244,6 @@ beszel.0.
 ### 0.10.0 (2026-07-13) — stable
 
 - Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.
-
-### 0.9.0 (2026-07-07)
-
-- The "Test connection" button now correctly reports a failure when the URL, username or password is wrong — it previously showed a green "Ok" even for bad credentials.
-- States for a sensor, GPU, filesystem or network interface that disappears from a system are now removed instead of freezing at their last value forever.
-- Battery, GPU-power and status states now carry proper roles so VIS widgets and the type detector recognize them correctly; existing states are upgraded on the next start.
-- New fleet-overview states (systems total, systems online, all-systems-online) for building a multi-server dashboard at a glance.
-- Per-interface network speeds are now shown in MB/s (and totals in GB), matching the overall network values instead of raw bytes.
-- A user account without permission to read containers no longer freezes all other system states — container data is skipped with a warning instead.
-- The connection settings are reordered and gained help texts explaining that the "Username" is your Beszel web login, plus a hint that polling faster than 60s brings no fresher data.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

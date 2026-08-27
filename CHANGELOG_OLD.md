@@ -1,4 +1,14 @@
 # Older Changes
+## 0.9.0 (2026-07-07)
+
+- The "Test connection" button now correctly reports a failure when the URL, username or password is wrong — it previously showed a green "Ok" even for bad credentials.
+- States for a sensor, GPU, filesystem or network interface that disappears from a system are now removed instead of freezing at their last value forever.
+- Battery, GPU-power and status states now carry proper roles so VIS widgets and the type detector recognize them correctly; existing states are upgraded on the next start.
+- New fleet-overview states (systems total, systems online, all-systems-online) for building a multi-server dashboard at a glance.
+- Per-interface network speeds are now shown in MB/s (and totals in GB), matching the overall network values instead of raw bytes.
+- A user account without permission to read containers no longer freezes all other system states — container data is skipped with a warning instead.
+- The connection settings are reordered and gained help texts explaining that the "Username" is your Beszel web login, plus a hint that polling faster than 60s brings no fresher data.
+
 ## 0.8.0 (2026-06-24) — stable
 
 - A brief empty response from the Hub no longer deletes your devices or containers — for example right after a restart — so monitored systems and their history stay intact.

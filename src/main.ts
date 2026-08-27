@@ -98,9 +98,39 @@ export class BeszelAdapter extends utils.Adapter {
     this.on("message", this.onMessage.bind(this));
   }
 
+  /**
+   * Switch off `supportedMessages.stopInstance` on this instance's own object.
+   *
+   * The entry was dropped from the manifest, which only helps a FRESH install: an
+   * upgrade merges the manifest into the existing instance object and never removes
+   * a key, so the old `true` survives in the database — and that is what the host
+   * reads. With it the host kills the process one second after asking it to stop,
+   * `onUnload` never runs, and every state written while shutting down is dead code
+   * (measured on a live js-controller 7.2.2, 2026-08-27).
+   *
+   * Only written when it is actually still on: an instance-object write restarts the
+   * instance, so doing it unconditionally would restart on every single start.
+   */
+  private async clearStopInstanceFlag(): Promise<void> {
+    const id = `system.adapter.${this.namespace}`;
+    try {
+      const obj = await this.getForeignObjectAsync(id);
+      const supported = obj?.common?.supportedMessages as Record<string, unknown> | undefined;
+      if (supported?.stopInstance !== true) {
+        return;
+      }
+      this.log.debug("Switching off the leftover stopInstance flag — the instance restarts once");
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+    } catch (err: unknown) {
+      // Objects DB unreachable — not worth failing the start over; the next start retries.
+      this.log.debug(`Could not check the stopInstance flag on ${id}: ${errText(err)}`);
+    }
+  }
+
   private async onReady(): Promise<void> {
     try {
       await I18n.init(join(this.adapterDir, "admin"), this);
+      await this.clearStopInstanceFlag();
       const config = this.config as unknown as AdapterConfig;
 
       this.log.debug(
@@ -198,6 +228,14 @@ export class BeszelAdapter extends utils.Adapter {
       for (const sysId of this.stateManager?.knownSystemIds() ?? []) {
         writes.push(this.setState(`${sysId}.info.online`, { val: false, ack: true }));
         writes.push(this.setState(`${sysId}.info.status`, { val: SYSTEM_STATUS_UNKNOWN, ack: true }));
+      }
+      // The fleet rollup makes the same claim one level up — "3 of 5 online" while the
+      // adapter is switched off. Only once the states exist (they are created lazily on
+      // the first successful poll). systemsTotal stays: how many systems there are did
+      // not change just because nobody is reading them.
+      if (this.rollupCreated) {
+        writes.push(this.setState("info.systemsOnline", { val: 0, ack: true }));
+        writes.push(this.setState("info.systemsAllUp", { val: false, ack: true }));
       }
       void Promise.all(writes)
         .catch((err: unknown) => {

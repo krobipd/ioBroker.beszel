@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.12.0",
+    "version": "0.12.1",
     "news": {
+      "0.12.1": {
+        "en": "On an upgraded installation the systems now really do stop showing as online when the adapter is stopped, and the online count drops to zero with them.",
+        "de": "Auf einer aktualisierten Installation stehen die Systeme beim Stoppen des Adapters jetzt tatsächlich nicht mehr auf online, und die Anzahl fällt mit ihnen auf null.",
+        "ru": "В обновлённой установке системы теперь действительно перестают отображаться как работающие при остановке адаптера, а их счётчик падает до нуля.",
+        "pt": "Numa instalação atualizada, os sistemas deixam mesmo de aparecer como online quando o adaptador é parado, e a contagem desce a zero com eles.",
+        "nl": "Op een bijgewerkte installatie worden de systemen bij het stoppen van de adapter nu echt niet meer als online getoond, en de teller valt met hen terug naar nul.",
+        "fr": "Sur une installation mise à jour, les systèmes cessent réellement d'apparaître en ligne à l'arrêt de l'adaptateur, et leur compteur tombe à zéro avec eux.",
+        "it": "Su un'installazione aggiornata i sistemi smettono davvero di risultare online quando l'adapter viene fermato e il conteggio scende a zero con loro.",
+        "es": "En una instalación actualizada, los sistemas dejan realmente de aparecer en línea al detener el adaptador, y su recuento baja a cero con ellos.",
+        "pl": "W zaktualizowanej instalacji systemy naprawdę przestają być pokazywane jako online po zatrzymaniu adaptera, a ich licznik spada do zera.",
+        "uk": "В оновленій інсталяції системи справді перестають показуватися як онлайн після зупинки адаптера, а їхній лічильник падає до нуля.",
+        "zh-cn": "在已升级的安装中，停止适配器后系统确实不再显示为在线，其在线数量也随之归零。"
+      },
       "0.12.0": {
         "en": "A system stopped claiming to be online while the adapter is stopped or cannot reach the Hub — its status then reads \"Unknown\".",
         "de": "Ein System behauptet nicht mehr, online zu sein, während der Adapter gestoppt ist oder den Hub nicht erreicht — der Status steht dann auf „Unknown\".",
@@ -80,19 +93,6 @@
         "pl": "Chwilowa pusta odpowiedź Huba nie usuwa już monitorowanych urządzeń ani kontenerów, na przykład zaraz po ponownym uruchomieniu.",
         "uk": "Короткочасна порожня відповідь хаба більше не видаляє ваші відстежувані пристрої чи контейнери, наприклад одразу після перезапуску.",
         "zh-cn": "Hub 短暂返回空响应不再删除您监控的设备或容器，例如刚重启之后。"
-      },
-      "0.7.2": {
-        "en": "Much lighter polling: no more paging through hours of stats history each poll. Vanished sensors, interfaces, GPUs and filesystems are now cleaned up instead of keeping frozen values.",
-        "de": "Deutlich leichteres Polling: keine stundenlange Statistik-Historie mehr pro Abfrage. Verschwundene Sensoren, Interfaces, GPUs und Dateisysteme werden jetzt aufgeräumt statt eingefroren zu bleiben.",
-        "ru": "Опрос стал заметно легче: история статистики больше не листается часами при каждом цикле. Исчезнувшие датчики, интерфейсы, GPU и файловые системы теперь удаляются, а не остаются замороженными.",
-        "pt": "Sondagem muito mais leve: o histórico de estatísticas não é mais percorrido a cada ciclo. Sensores, interfaces, GPUs e sistemas de arquivos desaparecidos agora são limpos em vez de ficarem congelados.",
-        "nl": "Veel lichtere polling: er wordt niet langer urenlange statistiekgeschiedenis doorlopen per cyclus. Verdwenen sensoren, interfaces, GPU's en bestandssystemen worden nu opgeruimd in plaats van bevroren.",
-        "fr": "Interrogation bien plus légère : l'historique des stats n'est plus parcouru à chaque cycle. Capteurs, interfaces, GPU et systèmes de fichiers disparus sont désormais nettoyés au lieu de rester figés.",
-        "it": "Polling molto più leggero: la cronologia delle statistiche non viene più scorsa a ogni ciclo. Sensori, interfacce, GPU e filesystem scomparsi ora vengono ripuliti invece di restare congelati.",
-        "es": "Sondeo mucho más ligero: ya no se recorre el historial de estadísticas en cada ciclo. Sensores, interfaces, GPU y sistemas de archivos desaparecidos ahora se limpian en vez de quedar congelados.",
-        "pl": "Znacznie lżejsze odpytywanie: historia statystyk nie jest już przeglądana w każdym cyklu. Zniknięte czujniki, interfejsy, GPU i systemy plików są teraz sprzątane zamiast pozostawać zamrożone.",
-        "uk": "Опитування стало значно легшим: історія статистики більше не гортається щоциклу. Зниклі датчики, інтерфейси, GPU та файлові системи тепер прибираються, а не лишаються замороженими.",
-        "zh-cn": "轮询大幅减负：每次轮询不再翻阅数小时的统计历史。消失的传感器、网卡、GPU 和文件系统现在会被自动清理，而不是永远保留冻结的数值。"
       }
     },
     "plugins": {
