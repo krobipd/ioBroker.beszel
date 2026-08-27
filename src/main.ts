@@ -12,6 +12,7 @@ import {
   validateHubUrl,
 } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
+import { SYSTEM_STATUS_UNKNOWN } from "./lib/metric-registry";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails } from "./lib/types";
 
@@ -139,6 +140,11 @@ export class BeszelAdapter extends utils.Adapter {
       // change from here on is attributable.
       await this.stateManager.snapshotExistingStates();
 
+      // Nothing has been read yet, so no system may still claim to be online from
+      // the previous run — least of all when the Hub is unreachable and no poll
+      // ever gets to overwrite it. Runs off the snapshot above, no extra object view.
+      await this.stateManager.markAllOffline();
+
       // F3: enumerate the existing system devices once and reuse the list for both
       // the legacy migration and the metric cleanup, instead of two object views.
       const existingNames = await this.stateManager.getExistingSystemNames();
@@ -178,11 +184,28 @@ export class BeszelAdapter extends utils.Adapter {
         tc.cancelAll();
       }
       this.testClients.clear();
-      // v0.4.3 (X2): explicit catch — broker-already-down should not leak
-      // as an unhandled rejection.
-      void this.setState("info.connection", { val: false, ack: true }).catch(() => {
-        /* broker is shutting down */
-      });
+
+      // A stopped adapter reads nothing, so no system may keep claiming to be online —
+      // that state backs the device object's online indicator (statusStates.onlineId),
+      // and info.connection alone would leave every device green.
+      //
+      // The callback goes LAST, after the writes: firing them off and reporting "done"
+      // straight away loses them — the host tears the process down as soon as it is
+      // told, measured 2026-08-27. No own timeout guard either: `this.setTimeout`
+      // refuses during shutdown and a bare `setTimeout` is a repochecker finding; the
+      // host's own deadline (`common.stopTimeout`) is the only one needed.
+      const writes: Promise<unknown>[] = [this.setState("info.connection", { val: false, ack: true })];
+      for (const sysId of this.stateManager?.knownSystemIds() ?? []) {
+        writes.push(this.setState(`${sysId}.info.online`, { val: false, ack: true }));
+        writes.push(this.setState(`${sysId}.info.status`, { val: SYSTEM_STATUS_UNKNOWN, ack: true }));
+      }
+      void Promise.all(writes)
+        .catch((err: unknown) => {
+          // States DB already going down — nothing left to report to.
+          this.log.debug(`onUnload: final states rejected: ${errText(err)}`);
+        })
+        .finally(callback);
+      return;
     } catch (err) {
       // v0.4.4 (I4): replace silent `// ignore` with a trace so shutdown
       // errors leave a debug breadcrumb. Broker-already-down errors here
@@ -617,6 +640,33 @@ export class BeszelAdapter extends utils.Adapter {
     void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
       /* broker shutting down / states unreachable */
     });
+
+    // The poll failed as a whole (Hub unreachable, auth rejected, …), so this run
+    // learned nothing about any system. Leaving `info.online` on its last value
+    // keeps every device green in the object tree while `info.connection` next to
+    // it already says the Hub is gone — the same contradiction on one screen.
+    // Immediate, not debounced, for exactly that reason.
+    //
+    // `info.status` says "unknown" rather than one of the Hub's four values: the
+    // adapter did not observe the system going down, it just cannot ask any more.
+    for (const sysId of this.stateManager?.knownSystemIds() ?? []) {
+      void this.setStateChangedAsync(`${sysId}.info.online`, { val: false, ack: true }).catch(() => {
+        /* broker shutting down / states unreachable */
+      });
+      void this.setStateChangedAsync(`${sysId}.info.status`, { val: SYSTEM_STATUS_UNKNOWN, ack: true }).catch(() => {
+        /* broker shutting down / states unreachable */
+      });
+    }
+    // Same claim one level up. Only once the rollup states actually exist —
+    // before the first successful poll they have no object behind them.
+    if (this.rollupCreated) {
+      void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
+        /* broker shutting down / states unreachable */
+      });
+      void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
+        /* broker shutting down / states unreachable */
+      });
+    }
   }
 }
 

@@ -22,6 +22,8 @@ __export(metric_registry_exports, {
   CHANNEL_NAME_KEY: () => CHANNEL_NAME_KEY,
   DYNAMIC_CHANNEL_TOGGLES: () => DYNAMIC_CHANNEL_TOGGLES,
   METRIC_DEPENDENCIES: () => METRIC_DEPENDENCIES,
+  SYSTEM_STATUS_STATES: () => SYSTEM_STATUS_STATES,
+  SYSTEM_STATUS_UNKNOWN: () => SYSTEM_STATUS_UNKNOWN,
   boolCommon: () => boolCommon,
   buildMetricDefs: () => buildMetricDefs,
   bytesToGib: () => bytesToGib,
@@ -41,6 +43,14 @@ __export(metric_registry_exports, {
 });
 module.exports = __toCommonJS(metric_registry_exports);
 var import_i18n = require("./i18n");
+const SYSTEM_STATUS_UNKNOWN = "unknown";
+const SYSTEM_STATUS_STATES = {
+  up: "Online",
+  down: "Offline",
+  paused: "Paused",
+  pending: "Pending",
+  [SYSTEM_STATUS_UNKNOWN]: "Unknown"
+};
 const BATTERY_STATE_CHARGING = 3;
 const CHANNEL_NAME_KEY = {
   info: "channelInfo",
@@ -876,6 +886,8 @@ function buildMetricDefs() {
   CHANNEL_NAME_KEY,
   DYNAMIC_CHANNEL_TOGGLES,
   METRIC_DEPENDENCIES,
+  SYSTEM_STATUS_STATES,
+  SYSTEM_STATUS_UNKNOWN,
   boolCommon,
   buildMetricDefs,
   bytesToGib,

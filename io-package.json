@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.11.0",
+    "version": "0.12.0",
     "news": {
+      "0.12.0": {
+        "en": "A system stopped claiming to be online while the adapter is stopped or cannot reach the Hub — its status then reads \"Unknown\".",
+        "de": "Ein System behauptet nicht mehr, online zu sein, während der Adapter gestoppt ist oder den Hub nicht erreicht — der Status steht dann auf „Unknown\".",
+        "ru": "Система больше не выдаёт себя за работающую, пока адаптер остановлен или не может связаться с хабом — её статус тогда показывает «Unknown».",
+        "pt": "Um sistema deixa de afirmar que está online enquanto o adaptador está parado ou não alcança o Hub — o estado passa então a \"Unknown\".",
+        "nl": "Een systeem beweert niet langer online te zijn terwijl de adapter is gestopt of de Hub niet bereikt — de status staat dan op \"Unknown\".",
+        "fr": "Un système ne prétend plus être en ligne pendant que l'adaptateur est arrêté ou n'atteint pas le Hub — son état passe alors à « Unknown ».",
+        "it": "Un sistema non dichiara più di essere online mentre l'adapter è fermo o non raggiunge l'Hub: lo stato passa quindi a \"Unknown\".",
+        "es": "Un sistema ya no afirma estar en línea mientras el adaptador está detenido o no alcanza el Hub: su estado pasa entonces a \"Unknown\".",
+        "pl": "System nie twierdzi już, że jest online, gdy adapter jest zatrzymany lub nie łączy się z Hubem — jego stan wskazuje wtedy „Unknown\".",
+        "uk": "Система більше не стверджує, що вона онлайн, поки адаптер зупинено або він не може зв'язатися з хабом — її стан тоді показує «Unknown».",
+        "zh-cn": "当适配器已停止或无法连接 Hub 时，系统不再声称自己在线——其状态此时显示为“Unknown”。"
+      },
       "0.11.0": {
         "en": "Fan speeds are now available, and systems with several batteries show the level of each battery (needs Beszel 0.18.8 or newer). Switching metrics on or off also shows how many datapoints appeared or disappeared.",
         "de": "Lüfterdrehzahlen sind jetzt verfügbar, und Systeme mit mehreren Akkus zeigen den Stand jedes einzelnen Akkus (benötigt Beszel 0.18.8 oder neuer). Beim Umschalten von Metriken siehst du außerdem, wie viele Datenpunkte dazugekommen oder weggefallen sind.",
@@ -80,19 +93,6 @@
         "pl": "Znacznie lżejsze odpytywanie: historia statystyk nie jest już przeglądana w każdym cyklu. Zniknięte czujniki, interfejsy, GPU i systemy plików są teraz sprzątane zamiast pozostawać zamrożone.",
         "uk": "Опитування стало значно легшим: історія статистики більше не гортається щоциклу. Зниклі датчики, інтерфейси, GPU та файлові системи тепер прибираються, а не лишаються замороженими.",
         "zh-cn": "轮询大幅减负：每次轮询不再翻阅数小时的统计历史。消失的传感器、网卡、GPU 和文件系统现在会被自动清理，而不是永远保留冻结的数值。"
-      },
-      "0.7.1": {
-        "en": "Improved compact-mode behavior: beszel no longer registers global process error handlers that could interfere with other adapters in the same process.",
-        "de": "Verbessertes Verhalten im Compact-Modus: beszel registriert keine globalen Prozess-Fehlerbehandler mehr, die andere Adapter im selben Prozess stören konnten.",
-        "ru": "Улучшено поведение в compact-режиме: beszel больше не регистрирует глобальные обработчики ошибок процесса, которые могли мешать другим адаптерам в том же процессе.",
-        "pt": "Comportamento melhorado no modo compact: o beszel já não regista manipuladores globais de erros de processo que podiam interferir com outros adaptadores no mesmo processo.",
-        "nl": "Verbeterd gedrag in compact-modus: beszel registreert geen globale procesfoutafhandelaars meer die andere adapters in hetzelfde proces konden verstoren.",
-        "fr": "Comportement amélioré en mode compact : beszel n'enregistre plus de gestionnaires d'erreurs de processus globaux pouvant perturber d'autres adaptateurs dans le même processus.",
-        "it": "Comportamento migliorato in modalità compact: beszel non registra più gestori di errori di processo globali che potevano interferire con altri adattatori nello stesso processo.",
-        "es": "Comportamiento mejorado en modo compact: beszel ya no registra manejadores de errores de proceso globales que podían interferir con otros adaptadores en el mismo proceso.",
-        "pl": "Ulepszone zachowanie w trybie compact: beszel nie rejestruje już globalnych obsług błędów procesu, które mogły zakłócać inne adaptery w tym samym procesie.",
-        "uk": "Покращено поведінку в compact-режимі: beszel більше не реєструє глобальні обробники помилок процесу, які могли заважати іншим адаптерам у тому ж процесі.",
-        "zh-cn": "改进了 compact 模式下的行为：beszel 不再注册可能干扰同一进程中其他适配器的全局进程错误处理程序。"
       }
     },
     "plugins": {
@@ -155,9 +155,6 @@
     "dataSource": "poll",
     "adminUI": {
       "config": "json"
-    },
-    "supportedMessages": {
-      "stopInstance": true
     },
     "dependencies": [
       {

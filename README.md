@@ -221,6 +221,11 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.12.0 (2026-08-27)
+
+- Fixed: a system no longer shows as online while the adapter is stopped or cannot reach the Hub — its status then reads "Unknown" instead of keeping the last value it had.
+- Fixed: systems or containers could stay missing from the object tree when the Hub sent a record the adapter could not read — everything the Hub reports now shows up again.
+
 ### 0.11.0 (2026-08-26)
 
 - New: Fan speeds — a new "Fans" switch creates one datapoint per fan, in rpm (needs Beszel 0.18.8 or newer, Linux hosts).
@@ -244,14 +249,6 @@ beszel.0.
 - Per-interface network speeds are now shown in MB/s (and totals in GB), matching the overall network values instead of raw bytes.
 - A user account without permission to read containers no longer freezes all other system states — container data is skipped with a warning instead.
 - The connection settings are reordered and gained help texts explaining that the "Username" is your Beszel web login, plus a hint that polling faster than 60s brings no fresher data.
-
-### 0.8.0 (2026-06-24) — stable
-
-- A brief empty response from the Hub no longer deletes your devices or containers — for example right after a restart — so monitored systems and their history stay intact.
-- Server hardware and OS details now recover on their own after a short network problem, instead of staying empty until the adapter is restarted.
-- Two systems, filesystems, network interfaces or containers whose names shorten to the same id no longer overwrite each other's values.
-- A malformed or oversized response from the Hub can no longer exhaust memory and crash the adapter.
-- The adapter now warns when the Hub is reached over an unencrypted http connection to another machine, so you can switch to https.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

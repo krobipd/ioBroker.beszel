@@ -277,6 +277,61 @@ class StateManager {
     return cached !== void 0 ? cached : this.sanitize(system.name);
   }
   /**
+   * State prefixes (`systems.<safeName>`) of the systems resolved for the current poll.
+   * Synchronous and in-memory on purpose: `onUnload` must not await an object view.
+   * Empty until the first poll got far enough to call {@link prepareForPoll}.
+   */
+  knownSystemIds() {
+    const out = [];
+    for (const safe of this.resolvedSafeNames.values()) {
+      if (safe) {
+        out.push(`systems.${safe}`);
+      }
+    }
+    return out;
+  }
+  /**
+   * Reset every system's `info.online` (and the fleet rollup) to "not online".
+   *
+   * The device object points its `statusStates.onlineId` at `info.online`, and ioBroker
+   * keeps a state's last value forever — so a system stays green in the object tree
+   * whenever nothing overwrites it. That happens at startup (the previous run's value
+   * survives, and a Hub that is unreachable means no poll ever writes one) as well as
+   * after an adapter stop. Called at startup and on shutdown; the poll's failure path
+   * uses {@link knownSystemIds} instead, which needs no object view.
+   *
+   * Only states that actually exist are written — `knownStateIds` is the startup
+   * snapshot of the object tree, so an id in it always has an object behind it.
+   * `info.status` goes to {@link SYSTEM_STATUS_UNKNOWN} alongside: the Hub's own
+   * up/down/paused/pending has no member for "nobody is reading right now", so the
+   * datapoint carries a fifth value of its own rather than claiming one of the four.
+   * The enum is re-written with the value because an install upgrading from an
+   * earlier version still has the four-value list on the object.
+   */
+  async markAllOffline() {
+    for (const id of this.knownStateIds) {
+      if (!id.startsWith("systems.")) {
+        continue;
+      }
+      if (id.endsWith(".info.online")) {
+        await this.adapter.setStateChangedAsync(id, { val: false, ack: true });
+      } else if (id.endsWith(".info.status")) {
+        await this.adapter.extendObject(
+          id,
+          { type: "state", common: { states: import_metric_registry.SYSTEM_STATUS_STATES }, native: {} },
+          { preserve: { common: ["name"] } }
+        );
+        await this.adapter.setStateChangedAsync(id, { val: import_metric_registry.SYSTEM_STATUS_UNKNOWN, ack: true });
+      }
+    }
+    if (this.knownStateIds.has("info.systemsOnline")) {
+      await this.adapter.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true });
+    }
+    if (this.knownStateIds.has("info.systemsAllUp")) {
+      await this.adapter.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true });
+    }
+  }
+  /**
    * Return sanitized names of all existing system devices.
    */
   async getExistingSystemNames() {
@@ -426,7 +481,7 @@ class StateManager {
       `${sysId}.info.status`,
       {
         ...(0, import_metric_registry.textCommon)((0, import_i18n.tName)("status"), "info.status"),
-        states: { up: "Online", down: "Offline", paused: "Paused", pending: "Pending" }
+        states: import_metric_registry.SYSTEM_STATUS_STATES
       },
       system.status
     );

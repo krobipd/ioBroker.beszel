@@ -317,7 +317,10 @@ export class BeszelClient {
       if (page > 1) {
         this.log?.debug(`fetchAllPages: page ${page}/${totalPages} for ${path}`);
       }
-      if (list.items.length === 0) {
+      // Raw count, not the coerced one: a page whose records all failed coercion
+      // (a malformed row on the Hub) still means "there is more behind this" —
+      // ending the walk there would silently truncate every later page.
+      if (list.rawCount === 0) {
         break;
       }
       if (consumePage && !consumePage(list.items)) {

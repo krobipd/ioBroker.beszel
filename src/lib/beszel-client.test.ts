@@ -1578,4 +1578,56 @@ describe("BeszelClient", () => {
       expect(threw).to.equal(true);
     }, 10000);
   });
+
+  // -----------------------------------------------------------------------
+  // Pagination — a page of only-unusable records must not end the walk
+  // -----------------------------------------------------------------------
+
+  describe("pagination past an unusable page", () => {
+    it("keeps paging when one page holds only records that fail coercion", async () => {
+      let pageRequests = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          pageRequests++;
+          // Page 2 carries records without a name — every one is dropped by the
+          // coercer, so the coerced list is empty while the raw page is not.
+          const items =
+            pageRequests === 2
+              ? [{ id: "broken1" }, { id: "broken2" }]
+              : [{ id: `sys${pageRequests}`, name: `Server ${pageRequests}`, status: "up", host: "h", info: {} }];
+          return {
+            status: 200,
+            body: JSON.stringify({ page: pageRequests, perPage: 2, totalItems: 3, totalPages: 3, items }),
+          };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const systems = await client.getSystems();
+      expect(pageRequests).to.equal(3);
+      expect(systems.map(s => s.id)).to.deep.equal(["sys1", "sys3"]);
+    });
+
+    it("still stops on a genuinely empty page", async () => {
+      let pageRequests = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          pageRequests++;
+          const items =
+            pageRequests === 1
+              ? [{ id: "sys1", name: "Server 1", status: "up", host: "h", info: {} }]
+              : [];
+          return {
+            status: 200,
+            body: JSON.stringify({ page: pageRequests, perPage: 1, totalItems: 1, totalPages: 5, items }),
+          };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const systems = await client.getSystems();
+      expect(pageRequests).to.equal(2);
+      expect(systems).to.have.length(1);
+    });
+  });
 });

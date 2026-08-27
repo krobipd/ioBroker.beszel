@@ -43,6 +43,27 @@ export interface MetricDef {
 }
 
 /**
+ * Value written into `info.status` while the adapter has no current word from the
+ * Hub — stopped, or the Hub unreachable. The Hub's own enum knows only
+ * up/down/paused/pending, so claiming one of those would assert something the
+ * adapter did not observe; this is the datapoint's own fifth value.
+ */
+export const SYSTEM_STATUS_UNKNOWN = "unknown";
+
+/**
+ * `common.states` of `info.status`: the Hub's four values plus {@link SYSTEM_STATUS_UNKNOWN}.
+ * One definition — the update path and the offline reset both write it, so the enum
+ * can never drift between them.
+ */
+export const SYSTEM_STATUS_STATES: Record<string, string> = {
+  up: "Online",
+  down: "Offline",
+  paused: "Paused",
+  pending: "Pending",
+  [SYSTEM_STATUS_UNKNOWN]: "Unknown",
+};
+
+/**
  * Beszel battery charge-state value that means "actively charging"
  * (agent/battery/battery.go enum: 0=unknown 1=empty 2=full 3=charging
  * 4=discharging 5=idle). Used to map `bat[1]` to the `charging` boolean.

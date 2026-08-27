@@ -2726,6 +2726,9 @@ describe("StateManager", () => {
         down: "Offline",
         paused: "Paused",
         pending: "Pending",
+        // The adapter's own fifth value — the Hub never sends it; it is what the
+        // datapoint says while nobody is reading (adapter stopped / Hub unreachable).
+        unknown: "Unknown",
       });
     });
   });
@@ -2861,5 +2864,119 @@ describe("StateManager", () => {
       await afterRestart.migrateLegacyStates([]);
       expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
     });
+  });
+});
+
+describe("markAllOffline / knownSystemIds", () => {
+  it("resets every known system's info.online to false", async () => {
+    const adapter = createMockAdapter();
+    const { objects, states } = adapter;
+    const sm = new StateManager(adapter as never);
+    objects.set("systems.server_a.info.online", { type: "state", common: {}, native: {} });
+    objects.set("systems.server_b.info.online", { type: "state", common: {}, native: {} });
+    states.set("systems.server_a.info.online", { val: true, ack: true });
+    states.set("systems.server_b.info.online", { val: true, ack: true });
+    await sm.snapshotExistingStates();
+
+    await sm.markAllOffline();
+
+    expect(states.get("systems.server_a.info.online")).toEqual({ val: false, ack: true });
+    expect(states.get("systems.server_b.info.online")).toEqual({ val: false, ack: true });
+  });
+
+  it("never writes an online state that has no object behind it", async () => {
+    const adapter = createMockAdapter();
+    const { states } = adapter;
+    const sm = new StateManager(adapter as never);
+    await sm.snapshotExistingStates();
+
+    await sm.markAllOffline();
+
+    expect(states.size).to.equal(0);
+  });
+
+  it("takes the fleet rollup down with it, but only where the states exist", async () => {
+    const adapter = createMockAdapter();
+    const { objects, states } = adapter;
+    const sm = new StateManager(adapter as never);
+    objects.set("info.systemsOnline", { type: "state", common: {}, native: {} });
+    objects.set("info.systemsAllUp", { type: "state", common: {}, native: {} });
+    await sm.snapshotExistingStates();
+
+    await sm.markAllOffline();
+
+    expect(states.get("info.systemsOnline")).toEqual({ val: 0, ack: true });
+    expect(states.get("info.systemsAllUp")).toEqual({ val: false, ack: true });
+    // systemsTotal stays: the last known count is still the best estimate.
+    expect(states.has("info.systemsTotal")).toBe(false);
+  });
+
+  it("leaves every other state untouched", async () => {
+    const adapter = createMockAdapter();
+    const { objects, states } = adapter;
+    const sm = new StateManager(adapter as never);
+    objects.set("systems.server_a.info.online", { type: "state", common: {}, native: {} });
+    objects.set("systems.server_a.cpu.usage", { type: "state", common: {}, native: {} });
+    states.set("systems.server_a.cpu.usage", { val: 42, ack: true });
+    await sm.snapshotExistingStates();
+
+    await sm.markAllOffline();
+
+    expect(states.get("systems.server_a.cpu.usage")).toEqual({ val: 42, ack: true });
+  });
+
+  it("knownSystemIds returns the state prefixes resolved for the current poll", () => {
+    const adapter = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    sm.prepareForPoll([
+      { id: "s1", name: "Server A", status: "up", host: "h1", info: {} },
+      { id: "s2", name: "Server B", status: "up", host: "h2", info: {} },
+    ]);
+
+    expect(sm.knownSystemIds().sort()).toEqual(["systems.server_a", "systems.server_b"]);
+  });
+
+  it("knownSystemIds skips a system whose name sanitizes to nothing", () => {
+    const adapter = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    sm.prepareForPoll([{ id: "s1", name: "***", status: "up", host: "h1", info: {} }]);
+
+    expect(sm.knownSystemIds()).toEqual([]);
+  });
+});
+
+describe("info.status carries its own 'unknown'", () => {
+  it("resets the status of every known system and retrofits the enum", async () => {
+    const adapter = createMockAdapter();
+    const { objects, states } = adapter;
+    const sm = new StateManager(adapter as never);
+    objects.set("systems.server_a.info.status", {
+      type: "state",
+      // The four-value enum an install from an earlier version still carries.
+      common: { states: { up: "Online", down: "Offline", paused: "Paused", pending: "Pending" } },
+      native: {},
+    });
+    states.set("systems.server_a.info.status", { val: "up", ack: true });
+    await sm.snapshotExistingStates();
+
+    await sm.markAllOffline();
+
+    expect(states.get("systems.server_a.info.status")).toEqual({ val: "unknown", ack: true });
+    expect(objects.get("systems.server_a.info.status")?.common.states).to.have.property("unknown");
+  });
+
+  it("offers the value on the states the update path creates", async () => {
+    const adapter = createMockAdapter();
+    const { objects } = adapter;
+    const sm = new StateManager(adapter as never);
+
+    await sm.updateSystem(
+      { id: "s1", name: "Server A", status: "up", host: "h", info: {} },
+      undefined,
+      [],
+      noMetricsConfig(),
+    );
+
+    expect(objects.get("systems.server_a.info.status")?.common.states).to.have.property("unknown");
   });
 });

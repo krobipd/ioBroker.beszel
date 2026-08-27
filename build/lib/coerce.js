@@ -496,7 +496,7 @@ function coercePocketBaseList(value, itemCoercer) {
   var _a, _b;
   const obj = coerceObject(value);
   if (!obj) {
-    return { totalPages: 0, items: [] };
+    return { totalPages: 0, items: [], rawCount: 0 };
   }
   const rawItems = (_a = coerceArray(obj.items)) != null ? _a : [];
   const items = [];
@@ -508,7 +508,12 @@ function coercePocketBaseList(value, itemCoercer) {
   }
   return {
     totalPages: (_b = coerceFiniteNumber(obj.totalPages)) != null ? _b : 0,
-    items
+    items,
+    // How many records the page actually carried, BEFORE coercion dropped any.
+    // The pagination walk needs this to tell "past the last page" (raw 0) from
+    // "a page whose records were all unusable" (raw > 0, coerced 0) — treating
+    // the latter as the end silently truncated everything behind it.
+    rawCount: rawItems.length
   };
 }
 function coerceAuthResponse(value) {

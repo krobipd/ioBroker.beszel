@@ -336,8 +336,14 @@ export interface BeszelContainer {
 export interface PocketBaseList<T> {
   /** Total number of pages */
   totalPages: number;
-  /** Records on this page */
+  /** Records on this page that survived coercion */
   items: T[];
+  /**
+   * Records the page carried before coercion dropped any. Distinguishes the
+   * genuinely empty page (past the last one) from a page whose records were all
+   * unusable — only the former ends the pagination walk.
+   */
+  rawCount: number;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { vi } from "vitest";
 
 // Stub the adapter-core base so BeszelAdapter can be instantiated without the
@@ -55,6 +57,8 @@ interface FakeStateMgr {
   snapshotExistingStates: ReturnType<typeof vi.fn>;
   takeChangeCounts: ReturnType<typeof vi.fn>;
   noteStatesCreated: ReturnType<typeof vi.fn>;
+  markAllOffline: ReturnType<typeof vi.fn>;
+  knownSystemIds: ReturnType<typeof vi.fn>;
 }
 
 function makeSystem(overrides: Partial<BeszelSystem> = {}): BeszelSystem {
@@ -137,6 +141,8 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     cleanupSystems: vi.fn(async () => {}),
     snapshotExistingStates: vi.fn(async () => {}),
     noteStatesCreated: vi.fn(),
+    markAllOffline: vi.fn(async () => {}),
+    knownSystemIds: vi.fn(() => ["systems.server_a"]),
     // v0.11.0: default "nothing changed" so the datapoint line stays silent in
     // tests that don't exercise it; the counter tests override this.
     takeChangeCounts: vi.fn(() => ({ created: 0, removed: 0 })),
@@ -322,6 +328,7 @@ describe("BeszelAdapter onUnload", () => {
 
     const callback = vi.fn();
     i.onUnload(callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
 
     expect(i.clearInterval).toHaveBeenCalled();
     expect(i.pollTimer).toBeUndefined();
@@ -339,8 +346,58 @@ describe("BeszelAdapter onUnload", () => {
     });
     const callback = vi.fn();
     i.onUnload(callback);
-    expect(callback).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
     expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("onUnload error"));
+  });
+
+  it("the manifest must not declare stopInstance, or none of this runs at all", () => {
+    // Measured against the live js-controller 7.2.2 on 2026-08-27: with
+    // `supportedMessages.stopInstance` the host sends a message and then kills the
+    // process unconditionally — `onUnload` never runs and every state written while
+    // shutting down is dead code. This is a property of the MANIFEST, so no amount
+    // of shutdown code can defend it — only this test can.
+    const manifest = JSON.parse(readFileSync(join(__dirname, "..", "io-package.json"), "utf8")) as {
+      common: { supportedMessages?: Record<string, unknown> };
+    };
+    expect(manifest.common.supportedMessages?.stopInstance).toBeUndefined();
+  });
+
+  it("tells the controller we are done only AFTER the last state was written", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
+    const order: string[] = [];
+    // Resolves on a LATER turn of the event loop, like a real database round trip —
+    // an `async () => push()` would record the write synchronously and the test
+    // would pass even with the callback fired first.
+    i.setState.mockImplementation(
+      (id: string) =>
+        new Promise<void>(resolve =>
+          setTimeout(() => {
+            order.push(`write:${id}`);
+            resolve();
+          }, 0),
+        ),
+    );
+    const callback = vi.fn(() => order.push("callback"));
+
+    i.onUnload(callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+
+    expect(order[order.length - 1]).toBe("callback");
+    expect(order).toContain("write:systems.server_a.info.online");
+    expect(order).toContain("write:systems.server_a.info.status");
+    expect(order).toContain("write:info.connection");
+  });
+
+  it("calls back even when a shutdown write is rejected by a dying states database", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.setState.mockRejectedValue(new Error("states db is gone"));
+    const callback = vi.fn();
+
+    i.onUnload(callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -911,5 +968,117 @@ describe("BeszelAdapter poll — guards", () => {
     await i.poll();
     expect(client.getSystems).not.toHaveBeenCalled();
     expect(i.setStateChangedAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("BeszelAdapter stale online indicators", () => {
+  it("clears the online indicators at startup, after the snapshot and before the first poll", async () => {
+    const { adapter, stateMgr, client } = setup();
+    const order: string[] = [];
+    stateMgr.snapshotExistingStates.mockImplementation(async () => {
+      order.push("snapshot");
+    });
+    stateMgr.markAllOffline.mockImplementation(async () => {
+      order.push("markAllOffline");
+    });
+    client.getSystems.mockImplementation(async () => {
+      order.push("poll");
+      return [makeSystem()];
+    });
+
+    await internalOf(adapter).onReady();
+
+    expect(order).toEqual(["snapshot", "markAllOffline", "poll"]);
+  });
+
+  it("marks every known system offline when the adapter stops", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a", "systems.server_b"]);
+    i.setState.mockClear();
+
+    i.onUnload(vi.fn());
+
+    expect(i.setState).toHaveBeenCalledWith("systems.server_a.info.online", { val: false, ack: true });
+    expect(i.setState).toHaveBeenCalledWith("systems.server_b.info.online", { val: false, ack: true });
+  });
+
+  it("still completes the shutdown when there is no system yet", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue([]);
+    const callback = vi.fn();
+
+    i.onUnload(callback);
+
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+  });
+
+  it("marks the systems offline when the Hub cannot be reached", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
+    client.getSystems.mockRejectedValue(errnoError("refused", "ECONNREFUSED"));
+    i.setStateChangedAsync.mockClear();
+
+    await i.poll();
+
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("systems.server_a.info.online", { val: false, ack: true });
+  });
+
+  it("takes the fleet rollup offline with it once the rollup states exist", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
+    client.getSystems.mockRejectedValue(errnoError("refused", "ECONNREFUSED"));
+    i.setStateChangedAsync.mockClear();
+
+    await i.poll();
+
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsOnline", { val: 0, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsAllUp", { val: false, ack: true });
+  });
+
+  it("does not write rollup states that were never created", async () => {
+    const { adapter, client, stateMgr } = setup();
+    const i = internalOf(adapter);
+    // Hub is down from the very first poll → writeRollup never ran, so the
+    // rollup objects do not exist yet.
+    client.getSystems.mockRejectedValue(errnoError("refused", "ECONNREFUSED"));
+    stateMgr.knownSystemIds.mockReturnValue([]);
+    await i.onReady();
+
+    expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.systemsOnline", { val: 0, ack: true });
+  });
+
+  it("says 'unknown' in info.status instead of claiming one of the Hub's four values", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
+    client.getSystems.mockRejectedValue(errnoError("refused", "ECONNREFUSED"));
+    i.setStateChangedAsync.mockClear();
+
+    await i.poll();
+
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("systems.server_a.info.status", {
+      val: "unknown",
+      ack: true,
+    });
+    const claimedDown = i.setStateChangedAsync.mock.calls.some(
+      (c: unknown[]) => String(c[0]).endsWith(".info.status") && (c[1] as { val: unknown }).val === "down",
+    );
+    expect(claimedDown).toBe(false);
+  });
+
+  it("also marks the status unknown when the adapter stops", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
+    i.setState.mockClear();
+
+    i.onUnload(vi.fn());
+
+    expect(i.setState).toHaveBeenCalledWith("systems.server_a.info.status", { val: "unknown", ack: true });
   });
 });

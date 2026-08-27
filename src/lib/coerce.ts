@@ -728,7 +728,7 @@ export function coerceTimeoutMs(raw: unknown): number {
 export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unknown) => T | null): PocketBaseList<T> {
   const obj = coerceObject(value);
   if (!obj) {
-    return { totalPages: 0, items: [] };
+    return { totalPages: 0, items: [], rawCount: 0 };
   }
   const rawItems = coerceArray(obj.items) ?? [];
   const items: T[] = [];
@@ -741,6 +741,11 @@ export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unkno
   return {
     totalPages: coerceFiniteNumber(obj.totalPages) ?? 0,
     items,
+    // How many records the page actually carried, BEFORE coercion dropped any.
+    // The pagination walk needs this to tell "past the last page" (raw 0) from
+    // "a page whose records were all unusable" (raw > 0, coerced 0) — treating
+    // the latter as the end silently truncated everything behind it.
+    rawCount: rawItems.length,
   };
 }
 

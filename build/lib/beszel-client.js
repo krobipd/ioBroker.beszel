@@ -260,7 +260,7 @@ class BeszelClient {
       if (page > 1) {
         (_a = this.log) == null ? void 0 : _a.debug(`fetchAllPages: page ${page}/${totalPages} for ${path}`);
       }
-      if (list.items.length === 0) {
+      if (list.rawCount === 0) {
         break;
       }
       if (consumePage && !consumePage(list.items)) {

@@ -37,6 +37,7 @@ var import_node_path = require("node:path");
 var import_beszel_client = require("./lib/beszel-client");
 var import_coerce = require("./lib/coerce");
 var import_message_router = require("./lib/message-router");
+var import_metric_registry = require("./lib/metric-registry");
 var import_state_manager = require("./lib/state-manager");
 class BeszelAdapter extends utils.Adapter {
   client = null;
@@ -136,6 +137,7 @@ class BeszelAdapter extends utils.Adapter {
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
       this.stateManager = this.makeStateManager();
       await this.stateManager.snapshotExistingStates();
+      await this.stateManager.markAllOffline();
       const existingNames = await this.stateManager.getExistingSystemNames();
       await this.stateManager.migrateLegacyStates(existingNames);
       await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
@@ -153,7 +155,7 @@ class BeszelAdapter extends utils.Adapter {
     }
   }
   onUnload(callback) {
-    var _a;
+    var _a, _b, _c;
     try {
       if (this.pollTimer) {
         this.clearInterval(this.pollTimer);
@@ -164,8 +166,15 @@ class BeszelAdapter extends utils.Adapter {
         tc.cancelAll();
       }
       this.testClients.clear();
-      void this.setState("info.connection", { val: false, ack: true }).catch(() => {
-      });
+      const writes = [this.setState("info.connection", { val: false, ack: true })];
+      for (const sysId of (_c = (_b = this.stateManager) == null ? void 0 : _b.knownSystemIds()) != null ? _c : []) {
+        writes.push(this.setState(`${sysId}.info.online`, { val: false, ack: true }));
+        writes.push(this.setState(`${sysId}.info.status`, { val: import_metric_registry.SYSTEM_STATUS_UNKNOWN, ack: true }));
+      }
+      void Promise.all(writes).catch((err) => {
+        this.log.debug(`onUnload: final states rejected: ${(0, import_coerce.errText)(err)}`);
+      }).finally(callback);
+      return;
     } catch (err) {
       this.log.debug(`onUnload error (ignored): ${(0, import_coerce.errText)(err)}`);
     }
@@ -478,7 +487,7 @@ class BeszelAdapter extends utils.Adapter {
    * @param err The error thrown by the poll body.
    */
   handlePollError(err) {
-    var _a;
+    var _a, _b, _c;
     const errMsg = (0, import_coerce.errText)(err);
     const errorCode = this.classifyError(err);
     const isRepeat = errorCode === this.lastErrorCode;
@@ -509,6 +518,18 @@ class BeszelAdapter extends utils.Adapter {
     }
     void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
     });
+    for (const sysId of (_c = (_b = this.stateManager) == null ? void 0 : _b.knownSystemIds()) != null ? _c : []) {
+      void this.setStateChangedAsync(`${sysId}.info.online`, { val: false, ack: true }).catch(() => {
+      });
+      void this.setStateChangedAsync(`${sysId}.info.status`, { val: import_metric_registry.SYSTEM_STATUS_UNKNOWN, ack: true }).catch(() => {
+      });
+    }
+    if (this.rollupCreated) {
+      void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
+      });
+      void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
+      });
+    }
   }
 }
 if (require.main !== module) {
