@@ -221,6 +221,10 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.12.2 (2026-08-27)
+
+- Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.
+
 ### 0.12.1 (2026-08-27)
 
 - Fixed: on an installation that was updated rather than freshly installed, the systems kept showing as online when the adapter was stopped — they now go offline there as well.
@@ -240,10 +244,6 @@ beszel.0.
 ### 0.10.1 (2026-08-22)
 
 - Changed: Internal cleanup. No user-facing changes.
-
-### 0.10.0 (2026-07-13) — stable
-
-- Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

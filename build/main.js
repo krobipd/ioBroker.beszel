@@ -120,6 +120,11 @@ class BeszelAdapter extends utils.Adapter {
    *
    * Only written when it is actually still on: an instance-object write restarts the
    * instance, so doing it unconditionally would restart on every single start.
+   *
+   * @returns true when the correction was written and the restart is coming — the
+   *   caller has to stop right there. Carrying on would keep working against a
+   *   process the host is already shutting down, which surfaces in the user's log
+   *   as failed writes and a closed database (measured on the live server).
    */
   async clearStopInstanceFlag() {
     var _a;
@@ -127,19 +132,23 @@ class BeszelAdapter extends utils.Adapter {
     try {
       const obj = await this.getForeignObjectAsync(id);
       const supported = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.supportedMessages;
-      if ((supported == null ? void 0 : supported.stopInstance) !== true) {
-        return;
+      if (!(supported == null ? void 0 : supported.stopInstance)) {
+        return false;
       }
-      this.log.debug("Switching off the leftover stopInstance flag \u2014 the instance restarts once");
+      this.log.info("Correcting a leftover setting from an earlier version \u2014 this instance restarts once");
       await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      return true;
     } catch (err) {
-      this.log.debug(`Could not check the stopInstance flag on ${id}: ${(0, import_coerce.errText)(err)}`);
+      this.log.debug(`Could not check the instance object ${id}: ${(0, import_coerce.errText)(err)}`);
+      return false;
     }
   }
   async onReady() {
     try {
+      if (await this.clearStopInstanceFlag()) {
+        return;
+      }
       await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
-      await this.clearStopInstanceFlag();
       const config = this.config;
       this.log.debug(
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`

@@ -110,27 +110,38 @@ export class BeszelAdapter extends utils.Adapter {
    *
    * Only written when it is actually still on: an instance-object write restarts the
    * instance, so doing it unconditionally would restart on every single start.
+   *
+   * @returns true when the correction was written and the restart is coming — the
+   *   caller has to stop right there. Carrying on would keep working against a
+   *   process the host is already shutting down, which surfaces in the user's log
+   *   as failed writes and a closed database (measured on the live server).
    */
-  private async clearStopInstanceFlag(): Promise<void> {
+  private async clearStopInstanceFlag(): Promise<boolean> {
     const id = `system.adapter.${this.namespace}`;
     try {
       const obj = await this.getForeignObjectAsync(id);
-      const supported = obj?.common?.supportedMessages as Record<string, unknown> | undefined;
-      if (supported?.stopInstance !== true) {
-        return;
+      const supported = obj?.common?.supportedMessages as { stopInstance?: unknown } | undefined;
+      if (!supported?.stopInstance) {
+        return false;
       }
-      this.log.debug("Switching off the leftover stopInstance flag — the instance restarts once");
+      this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
       await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      return true;
     } catch (err: unknown) {
       // Objects DB unreachable — not worth failing the start over; the next start retries.
-      this.log.debug(`Could not check the stopInstance flag on ${id}: ${errText(err)}`);
+      this.log.debug(`Could not check the instance object ${id}: ${errText(err)}`);
+      return false;
     }
   }
 
   private async onReady(): Promise<void> {
     try {
+      // First: without this the whole shutdown path stays dead on an updated install.
+      // A correction means the host is restarting us — no point setting anything up.
+      if (await this.clearStopInstanceFlag()) {
+        return;
+      }
       await I18n.init(join(this.adapterDir, "admin"), this);
-      await this.clearStopInstanceFlag();
       const config = this.config as unknown as AdapterConfig;
 
       this.log.debug(

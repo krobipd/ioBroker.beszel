@@ -1104,6 +1104,22 @@ describe("BeszelAdapter clears the stopInstance flag it used to ship with", () =
     });
   });
 
+  it("stops the start right there — the host is already restarting the instance", async () => {
+    const { adapter, client, stateMgr } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({
+      common: { supportedMessages: { stopInstance: true } },
+    });
+
+    await i.onReady();
+
+    // Carrying on would work against a process that is already going down: failed
+    // state writes and a closed objects database in the user's log (live-measured).
+    expect(client.getSystems).not.toHaveBeenCalled();
+    expect(stateMgr.snapshotExistingStates).not.toHaveBeenCalled();
+    expect(i.setInterval).not.toHaveBeenCalled();
+  });
+
   it("writes nothing when the flag is already off — an object write restarts the instance", async () => {
     const { adapter } = setup();
     const i = internalOf(adapter);

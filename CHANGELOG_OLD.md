@@ -1,4 +1,8 @@
 # Older Changes
+## 0.10.0 (2026-07-13) — stable
+
+- Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.
+
 ## 0.9.0 (2026-07-07)
 
 - The "Test connection" button now correctly reports a failure when the URL, username or password is wrong — it previously showed a green "Ok" even for bad credentials.

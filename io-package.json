@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.12.1",
+    "version": "0.12.2",
     "news": {
+      "0.12.2": {
+        "en": "The first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.",
+        "de": "Der erste Start nach einem Update schreibt keine Warnungen und keinen Fehler mehr ins Protokoll, während sich die Instanz korrigiert und neu startet.",
+        "ru": "Первый запуск после обновления больше не пишет предупреждения и ошибку в журнал, пока экземпляр исправляется и перезапускается.",
+        "pt": "O primeiro arranque após uma atualização já não coloca avisos e um erro no registo enquanto a instância se corrige e reinicia.",
+        "nl": "De eerste start na een update zet geen waarschuwingen en fout meer in het logboek terwijl de instantie zichzelf corrigeert en herstart.",
+        "fr": "Le premier démarrage après une mise à jour n'inscrit plus d'avertissements ni d'erreur dans le journal pendant que l'instance se corrige et redémarre.",
+        "it": "Il primo avvio dopo un aggiornamento non scrive più avvisi e un errore nel registro mentre l'istanza si corregge e si riavvia.",
+        "es": "El primer arranque tras una actualización ya no escribe avisos ni un error en el registro mientras la instancia se corrige y reinicia.",
+        "pl": "Pierwszy start po aktualizacji nie zapisuje już ostrzeżeń ani błędu w dzienniku, gdy instancja sama się poprawia i restartuje.",
+        "uk": "Перший запуск після оновлення більше не записує попередження та помилку до журналу, поки екземпляр виправляється й перезапускається.",
+        "zh-cn": "更新后的首次启动不再在日志中写入警告和错误，实例会自行更正并重启。"
+      },
       "0.12.1": {
         "en": "On an upgraded installation the systems now really do stop showing as online when the adapter is stopped, and the online count drops to zero with them.",
         "de": "Auf einer aktualisierten Installation stehen die Systeme beim Stoppen des Adapters jetzt tatsächlich nicht mehr auf online, und die Anzahl fällt mit ihnen auf null.",
@@ -80,19 +93,6 @@
         "pl": "Test połączenia poprawnie zgłasza teraz błąd przy złym logowaniu, a stany znikniętego czujnika, dysku lub interfejsu są usuwane zamiast zamrażane na starej wartości.",
         "uk": "Перевірка з'єднання тепер правильно повідомляє про помилку при невірному вході, а стани зниклого датчика, диска або інтерфейсу видаляються, а не залишаються замороженими.",
         "zh-cn": "登录信息错误时，连接测试现在能正确报告失败；消失的传感器、磁盘或接口的状态会被移除，而不是冻结在最后的数值。"
-      },
-      "0.8.0": {
-        "en": "A brief empty response from the Hub no longer deletes your monitored devices or containers, for example right after a restart.",
-        "de": "Eine kurz leere Antwort des Hubs löscht nicht mehr deine überwachten Geräte oder Container, zum Beispiel direkt nach einem Neustart.",
-        "ru": "Кратковременный пустой ответ хаба больше не удаляет ваши отслеживаемые устройства или контейнеры, например сразу после перезапуска.",
-        "pt": "Uma resposta vazia momentânea do Hub já não apaga os seus dispositivos ou contentores monitorizados, por exemplo logo após um reinício.",
-        "nl": "Een kortstondig leeg antwoord van de Hub verwijdert je gemonitorde apparaten of containers niet meer, bijvoorbeeld direct na een herstart.",
-        "fr": "Une réponse vide passagère du Hub ne supprime plus vos appareils ou conteneurs surveillés, par exemple juste après un redémarrage.",
-        "it": "Una risposta vuota momentanea dell'Hub non elimina più i dispositivi o i container monitorati, ad esempio subito dopo un riavvio.",
-        "es": "Una respuesta vacía momentánea del Hub ya no elimina tus dispositivos o contenedores monitorizados, por ejemplo justo tras un reinicio.",
-        "pl": "Chwilowa pusta odpowiedź Huba nie usuwa już monitorowanych urządzeń ani kontenerów, na przykład zaraz po ponownym uruchomieniu.",
-        "uk": "Короткочасна порожня відповідь хаба більше не видаляє ваші відстежувані пристрої чи контейнери, наприклад одразу після перезапуску.",
-        "zh-cn": "Hub 短暂返回空响应不再删除您监控的设备或容器，例如刚重启之后。"
       }
     },
     "plugins": {
