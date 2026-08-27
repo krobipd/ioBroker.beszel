@@ -103,7 +103,7 @@ beszel.0.
     └── {system_name}/                — Device (sanitized name)
         ├── info/                     — System info
         │   ├── online               — Is system up? (bool, used as device indicator)
-        │   ├── status               — Status string (up/down/paused/pending)
+        │   ├── status               — Status string (up/down/paused/pending, or unknown while the adapter is not reading)
         │   ├── uptime               — Uptime in seconds
         │   ├── uptime_text          — Human-readable uptime (e.g. "14d 6h")
         │   ├── agent_version *      — Beszel agent version
