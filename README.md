@@ -221,7 +221,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### 0.12.2 (2026-08-27)
+### 0.12.2 (2026-08-27) — stable
 
 - Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.
 
