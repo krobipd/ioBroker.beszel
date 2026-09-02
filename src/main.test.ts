@@ -57,7 +57,6 @@ interface FakeStateMgr {
   cleanupSystems: ReturnType<typeof vi.fn>;
   snapshotExistingStates: ReturnType<typeof vi.fn>;
   takeChangeCounts: ReturnType<typeof vi.fn>;
-  noteStatesCreated: ReturnType<typeof vi.fn>;
   markAllOffline: ReturnType<typeof vi.fn>;
   knownSystemIds: ReturnType<typeof vi.fn>;
 }
@@ -150,7 +149,6 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     updateSystem: vi.fn(async () => {}),
     cleanupSystems: vi.fn(async () => {}),
     snapshotExistingStates: vi.fn(async () => {}),
-    noteStatesCreated: vi.fn(),
     markAllOffline: vi.fn(async () => {}),
     knownSystemIds: vi.fn(() => ["systems.server_a"]),
     // v0.11.0: default "nothing changed" so the datapoint line stays silent in
@@ -622,27 +620,23 @@ describe("BeszelAdapter poll — happy path", () => {
     expect(i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("Object tree updated"));
   });
 
-  it("v0.11.0: the fleet rollup states count towards the datapoint total too", async () => {
-    const { adapter, stateMgr } = await setupReady();
-    // They are created via setObjectNotExistsAsync, outside createAndSetState —
-    // without this hand-off the first-ever start would under-report by three.
-    expect(stateMgr.noteStatesCreated).toHaveBeenCalledWith([
-      "info.systemsTotal",
-      "info.systemsOnline",
-      "info.systemsAllUp",
-    ]);
-    const i = internalOf(adapter);
-    stateMgr.noteStatesCreated.mockClear();
-    await i.poll();
-    expect(stateMgr.noteStatesCreated).not.toHaveBeenCalled(); // only on the create pass
+  it("the three fleet rollup states are instance objects — they exist from the install on", () => {
+    // Created lazily on the first successful poll until v0.12.x: a fresh install with
+    // the Hub unreachable had none of them, and the shutdown/error paths had to guard
+    // on "were they created yet". nut2 ships its summary states in the manifest; so
+    // does beszel now. The property lives in io-package.json — only this test can hold it.
+    const manifest = JSON.parse(readFileSync(join(__dirname, "..", "io-package.json"), "utf8")) as {
+      instanceObjects: Array<{ _id: string; type: string; common: Record<string, unknown> }>;
+    };
+    const byId = new Map(manifest.instanceObjects.map(o => [o._id, o]));
+    expect(byId.get("info.systemsTotal")?.common).toMatchObject({ type: "number", role: "value", def: 0 });
+    expect(byId.get("info.systemsOnline")?.common).toMatchObject({ type: "number", role: "value", def: 0 });
+    expect(byId.get("info.systemsAllUp")?.common).toMatchObject({ type: "boolean", role: "indicator", def: false });
   });
 
-  it("DP4: creates the three rollup objects once, then only writes values", async () => {
+  it("DP4: never creates the rollup objects at runtime — the manifest owns them", async () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
-    const created = (): string[] => i.setObjectNotExistsAsync.mock.calls.map(c => c[0] as string);
-    expect(created()).toEqual(["info.systemsTotal", "info.systemsOnline", "info.systemsAllUp"]);
-    i.setObjectNotExistsAsync.mockClear();
     await i.poll();
     expect(i.setObjectNotExistsAsync).not.toHaveBeenCalled();
   });
@@ -1140,7 +1134,7 @@ describe("BeszelAdapter stale online indicators", () => {
     expect(i.setStateChangedAsync).toHaveBeenCalledWith("systems.server_a.info.online", { val: false, ack: true });
   });
 
-  it("takes the fleet rollup offline with it once the rollup states exist", async () => {
+  it("takes the fleet rollup offline with it", async () => {
     const { adapter, client, stateMgr } = await setupReady();
     const i = internalOf(adapter);
     stateMgr.knownSystemIds.mockReturnValue(["systems.server_a"]);
@@ -1153,16 +1147,17 @@ describe("BeszelAdapter stale online indicators", () => {
     expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsAllUp", { val: false, ack: true });
   });
 
-  it("does not write rollup states that were never created", async () => {
+  it("writes the rollup offline values on a failed FIRST poll too — the states exist from the install on", async () => {
     const { adapter, client, stateMgr } = setup();
     const i = internalOf(adapter);
-    // Hub is down from the very first poll → writeRollup never ran, so the
-    // rollup objects do not exist yet.
+    // Hub is down from the very first poll. The rollup states are instance objects,
+    // so there is no "not created yet" — the summary must say 0 / false right away.
     client.getSystems.mockRejectedValue(errnoError("refused", "ECONNREFUSED"));
     stateMgr.knownSystemIds.mockReturnValue([]);
     await i.onReady();
 
-    expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.systemsOnline", { val: 0, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsOnline", { val: 0, ack: true });
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.systemsAllUp", { val: false, ack: true });
   });
 
   it("says 'unknown' in info.status instead of claiming one of the Hub's four values", async () => {

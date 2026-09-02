@@ -4,17 +4,17 @@
     "version": "0.12.2",
     "news": {
       "NEXT": {
-        "en": "A Hub reachable only by IPv6 address now works; stopping the adapter during a poll no longer logs a false error; systems stay marked offline when the adapter cannot start.",
-        "de": "Ein nur per IPv6-Adresse erreichbarer Hub funktioniert jetzt; Stoppen während eines Abrufs erzeugt keine falsche Fehlerzeile; Systeme bleiben offline markiert, wenn der Adapter nicht starten kann.",
-        "ru": "Хаб, доступный только по IPv6-адресу, теперь работает; остановка во время опроса больше не пишет ложную ошибку; системы остаются офлайн, если адаптер не может запуститься.",
-        "pt": "Um Hub acessível apenas por endereço IPv6 agora funciona; parar durante uma consulta já não regista um erro falso; os sistemas ficam offline quando o adaptador não consegue arrancar.",
-        "nl": "Een Hub die alleen via een IPv6-adres bereikbaar is werkt nu; stoppen tijdens een poll logt geen valse fout meer; systemen blijven offline gemarkeerd als de adapter niet kan starten.",
-        "fr": "Un Hub joignable uniquement par adresse IPv6 fonctionne ; l'arrêt pendant une interrogation n'écrit plus de fausse erreur ; les systèmes restent hors ligne si l'adaptateur ne peut pas démarrer.",
-        "it": "Un Hub raggiungibile solo tramite indirizzo IPv6 ora funziona; l'arresto durante un polling non registra più un falso errore; i sistemi restano offline se l'adapter non riesce ad avviarsi.",
-        "es": "Un Hub accesible solo por dirección IPv6 ahora funciona; detener durante una consulta ya no registra un error falso; los sistemas quedan fuera de línea si el adaptador no puede iniciarse.",
-        "pl": "Hub dostępny tylko przez adres IPv6 teraz działa; zatrzymanie podczas odpytania nie zapisuje już fałszywego błędu; systemy pozostają offline, gdy adapter nie może się uruchomić.",
-        "uk": "Хаб, доступний лише за IPv6-адресою, тепер працює; зупинка під час опитування більше не пише хибну помилку; системи залишаються офлайн, якщо адаптер не може запуститися.",
-        "zh-cn": "现在可以连接仅通过 IPv6 地址访问的 Hub；轮询期间停止适配器不再记录错误的报错行；适配器无法启动时，各系统保持离线标记。"
+        "en": "IPv6 Hub addresses work; stopping during a poll logs no false error; systems stay offline when the adapter cannot start; the fleet summary states exist from the installation on.",
+        "de": "IPv6-Hub-Adressen funktionieren; Stoppen während eines Abrufs erzeugt keine falsche Fehlerzeile; Systeme bleiben offline, wenn der Adapter nicht startet; Zusammenfassung ab Installation vorhanden.",
+        "ru": "Адреса хаба IPv6 работают; остановка во время опроса не пишет ложную ошибку; системы остаются офлайн, если адаптер не запускается; сводные состояния существуют с момента установки.",
+        "pt": "Endereços IPv6 do Hub funcionam; parar durante uma consulta não regista erro falso; os sistemas ficam offline se o adaptador não arrancar; os estados de resumo existem desde a instalação.",
+        "nl": "IPv6-Hub-adressen werken; stoppen tijdens een poll logt geen valse fout; systemen blijven offline als de adapter niet start; de samenvattingsstates bestaan vanaf de installatie.",
+        "fr": "Les adresses IPv6 du Hub fonctionnent ; l'arrêt pendant une interrogation n'écrit plus de fausse erreur ; les systèmes restent hors ligne si l'adaptateur ne démarre pas ; synthèse dès l'installation.",
+        "it": "Gli indirizzi IPv6 del Hub funzionano; l'arresto durante un polling non registra falsi errori; i sistemi restano offline se l'adapter non si avvia; gli stati di riepilogo esistono dall'installazione.",
+        "es": "Las direcciones IPv6 del Hub funcionan; detener durante una consulta no registra un error falso; los sistemas quedan fuera de línea si el adaptador no inicia; estados de resumen desde la instalación.",
+        "pl": "Adresy IPv6 Huba działają; zatrzymanie podczas odpytania nie zapisuje fałszywego błędu; systemy pozostają offline, gdy adapter nie startuje; stany podsumowania istnieją od instalacji.",
+        "uk": "IPv6-адреси хаба працюють; зупинка під час опитування не пише хибну помилку; системи залишаються офлайн, якщо адаптер не запускається; зведені стани існують від моменту встановлення.",
+        "zh-cn": "支持 IPv6 Hub 地址；轮询期间停止不再记录错误的报错；适配器无法启动时各系统保持离线；汇总状态自安装起即存在。"
       },
       "0.12.2": {
         "en": "The first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.",
@@ -207,6 +207,81 @@
         },
         "type": "boolean",
         "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.systemsTotal",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "Systems total",
+          "de": "Systeme gesamt",
+          "ru": "Systems total",
+          "pt": "Systems total",
+          "nl": "Systems total",
+          "fr": "Systems total",
+          "it": "Systems total",
+          "es": "Systems total",
+          "pl": "Systems total",
+          "uk": "Systems total",
+          "zh-cn": "Systems total"
+        },
+        "type": "number",
+        "role": "value",
+        "read": true,
+        "write": false,
+        "def": 0
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.systemsOnline",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "Systems online",
+          "de": "Systeme online",
+          "ru": "Systems online",
+          "pt": "Systems online",
+          "nl": "Systems online",
+          "fr": "Systems online",
+          "it": "Systems online",
+          "es": "Systems online",
+          "pl": "Systems online",
+          "uk": "Systems online",
+          "zh-cn": "Systems online"
+        },
+        "type": "number",
+        "role": "value",
+        "read": true,
+        "write": false,
+        "def": 0
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.systemsAllUp",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "All systems online",
+          "de": "Alle Systeme online",
+          "ru": "All systems online",
+          "pt": "All systems online",
+          "nl": "All systems online",
+          "fr": "All systems online",
+          "it": "All systems online",
+          "es": "All systems online",
+          "pl": "All systems online",
+          "uk": "All systems online",
+          "zh-cn": "All systems online"
+        },
+        "type": "boolean",
+        "role": "indicator",
         "read": true,
         "write": false,
         "def": false

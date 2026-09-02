@@ -128,20 +128,6 @@ export class StateManager {
   }
 
   /**
-   * v0.11.0: same, for states created OUTSIDE `createAndSetState` — the fleet
-   * rollup states in main. Without this the first-ever start would report four
-   * datapoints fewer than it actually created. Ids that already exist are
-   * ignored, so calling it on every start is safe.
-   *
-   * @param ids State ids, namespace-relative.
-   */
-  public noteStatesCreated(ids: string[]): void {
-    for (const id of ids) {
-      this.noteStateCreated(id);
-    }
-  }
-
-  /**
    * v0.11.0: record that a single state object was just deleted.
    *
    * @param id State id, namespace-relative.

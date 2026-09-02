@@ -99,6 +99,9 @@ States are organized into channels per metric group. Optional channels (marked \
 ```
 beszel.0.
 ├── info.connection                   — Connection status (bool)
+├── info.systemsTotal                 — Systems registered on the Hub (number)
+├── info.systemsOnline                — Systems currently reporting "up" (number)
+├── info.systemsAllUp                 — All systems up? (bool)
 └── systems.
     └── {system_name}/                — Device (sanitized name)
         ├── info/                     — System info
@@ -226,6 +229,7 @@ beszel.0.
 - Fixed: a Beszel Hub configured by IPv6 address (for example `http://[fd00::1]:8090`) can now be reached — the connection used to fail with a name lookup error on the bracketed address
 - Fixed: stopping the adapter while a poll was still running no longer writes a false "Poll failed" error line to the log, and no longer sends that false error to the error reporting
 - Fixed: when the adapter cannot start — credentials to re-enter after an upgrade, or an invalid Hub URL — every system is now marked offline instead of keeping the previous run's green dot
+- Changed: the three fleet summary states (systems total / online / all up) now exist from the installation on — a fresh install with an unreachable Hub shows 0 and false instead of nothing
 - Changed: ioBroker Admin 8.0.11 or newer is required, in line with the current ioBroker stable repository — older Admin installations must be updated before installing this version
 
 ### 0.12.2 (2026-08-27) — stable

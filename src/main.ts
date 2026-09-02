@@ -67,8 +67,6 @@ export class BeszelAdapter extends utils.Adapter {
   private lastErrorCode = "";
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   private containersUnavailable = false;
-  /** DP4: whether the fleet-rollup state objects have been created this run. */
-  private rollupCreated = false;
   private authFailCount = 0;
   private failedSystems = new Set<string>();
   /**
@@ -252,13 +250,11 @@ export class BeszelAdapter extends utils.Adapter {
         writes.push(this.setState(`${sysId}.info.status`, { val: SYSTEM_STATUS_UNKNOWN, ack: true }));
       }
       // The fleet rollup makes the same claim one level up — "3 of 5 online" while the
-      // adapter is switched off. Only once the states exist (they are created lazily on
-      // the first successful poll). systemsTotal stays: how many systems there are did
-      // not change just because nobody is reading them.
-      if (this.rollupCreated) {
-        writes.push(this.setState("info.systemsOnline", { val: 0, ack: true }));
-        writes.push(this.setState("info.systemsAllUp", { val: false, ack: true }));
-      }
+      // adapter is switched off. The three states are instance objects (exist from the
+      // install on). systemsTotal stays: how many systems there are did not change just
+      // because nobody is reading them.
+      writes.push(this.setState("info.systemsOnline", { val: 0, ack: true }));
+      writes.push(this.setState("info.systemsAllUp", { val: false, ack: true }));
       void Promise.all(writes)
         .catch((err: unknown) => {
           // States DB already going down — nothing left to report to.
@@ -389,53 +385,15 @@ export class BeszelAdapter extends utils.Adapter {
 
   /**
    * DP4: write the fleet-level rollup states (total / online / all-up) so a
-   * dashboard can show "N of M up" without enumerating every system. Creates the
-   * objects lazily on the first write.
+   * dashboard can show "N of M up" without enumerating every system. The three
+   * states are static instance objects (io-package.json), so they exist from the
+   * install on — a fresh install with the Hub unreachable shows 0 / 0 / false
+   * instead of nothing, and the shutdown and error paths can always write them.
    *
    * @param total Number of systems in the current poll.
    * @param online Number of those reporting status "up".
    */
   private async writeRollup(total: number, online: number): Promise<void> {
-    if (!this.rollupCreated) {
-      await this.setObjectNotExistsAsync("info.systemsTotal", {
-        type: "state",
-        common: {
-          name: I18n.getTranslatedObject("systemsTotal"),
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        },
-        native: {},
-      });
-      await this.setObjectNotExistsAsync("info.systemsOnline", {
-        type: "state",
-        common: {
-          name: I18n.getTranslatedObject("systemsOnline"),
-          type: "number",
-          role: "value",
-          read: true,
-          write: false,
-        },
-        native: {},
-      });
-      await this.setObjectNotExistsAsync("info.systemsAllUp", {
-        type: "state",
-        common: {
-          name: I18n.getTranslatedObject("systemsAllUp"),
-          type: "boolean",
-          role: "indicator",
-          read: true,
-          write: false,
-        },
-        native: {},
-      });
-      // v0.11.0: these three are created outside createAndSetState, so the
-      // datapoint counter has to be told about them explicitly. Ids that
-      // already exist are ignored, so a restart adds nothing.
-      this.stateManager?.noteStatesCreated(["info.systemsTotal", "info.systemsOnline", "info.systemsAllUp"]);
-      this.rollupCreated = true;
-    }
     await this.setStateChangedAsync("info.systemsTotal", { val: total, ack: true });
     await this.setStateChangedAsync("info.systemsOnline", { val: online, ack: true });
     await this.setStateChangedAsync("info.systemsAllUp", { val: total > 0 && online === total, ack: true });
@@ -734,16 +692,14 @@ export class BeszelAdapter extends utils.Adapter {
         /* broker shutting down / states unreachable */
       });
     }
-    // Same claim one level up. Only once the rollup states actually exist —
-    // before the first successful poll they have no object behind them.
-    if (this.rollupCreated) {
-      void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
-        /* broker shutting down / states unreachable */
-      });
-      void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
-        /* broker shutting down / states unreachable */
-      });
-    }
+    // Same claim one level up — the rollup states are instance objects, so they
+    // exist even before the first successful poll.
+    void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
+      /* broker shutting down / states unreachable */
+    });
+    void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
+      /* broker shutting down / states unreachable */
+    });
   }
 }
 
