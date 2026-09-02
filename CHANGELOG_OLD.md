@@ -1,4 +1,8 @@
 # Older Changes
+## 0.10.1 (2026-08-22)
+
+- Changed: Internal cleanup. No user-facing changes.
+
 ## 0.10.0 (2026-07-13) — stable
 
 - Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.

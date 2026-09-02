@@ -68,12 +68,17 @@ class BeszelAdapter extends utils.Adapter {
   makeStateManager = () => new import_state_manager.StateManager(this);
   pollTimer = void 0;
   isPolling = false;
+  /**
+   * Set first thing in `onUnload`. A poll that is still in flight when the host stops
+   * us gets its requests aborted by `cancelAll()` — that rejection is not a Hub
+   * problem and must neither log an error (which Sentry would report) nor write
+   * states after the final shutdown writes.
+   */
+  unloaded = false;
   lastSystemCount = 0;
   lastErrorCode = "";
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   containersUnavailable = false;
-  /** DP4: whether the fleet-rollup state objects have been created this run. */
-  rollupCreated = false;
   authFailCount = 0;
   failedSystems = /* @__PURE__ */ new Set();
   /**
@@ -154,6 +159,9 @@ class BeszelAdapter extends utils.Adapter {
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`
       );
       await this.setStateChangedAsync("info.connection", { val: false, ack: true });
+      this.stateManager = this.makeStateManager();
+      await this.stateManager.snapshotExistingStates();
+      await this.stateManager.markAllOffline();
       if (!config.url || !config.username || !config.password) {
         this.log.error(
           "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once."
@@ -173,9 +181,6 @@ class BeszelAdapter extends utils.Adapter {
       const timeoutMs = (0, import_coerce.coerceTimeoutMs)(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
-      this.stateManager = this.makeStateManager();
-      await this.stateManager.snapshotExistingStates();
-      await this.stateManager.markAllOffline();
       const existingNames = await this.stateManager.getExistingSystemNames();
       await this.stateManager.migrateLegacyStates(existingNames);
       await Promise.all(existingNames.map((name) => this.stateManager.cleanupMetrics(name, config)));
@@ -195,6 +200,7 @@ class BeszelAdapter extends utils.Adapter {
   onUnload(callback) {
     var _a, _b, _c;
     try {
+      this.unloaded = true;
       if (this.pollTimer) {
         this.clearInterval(this.pollTimer);
         this.pollTimer = void 0;
@@ -209,10 +215,8 @@ class BeszelAdapter extends utils.Adapter {
         writes.push(this.setState(`${sysId}.info.online`, { val: false, ack: true }));
         writes.push(this.setState(`${sysId}.info.status`, { val: import_metric_registry.SYSTEM_STATUS_UNKNOWN, ack: true }));
       }
-      if (this.rollupCreated) {
-        writes.push(this.setState("info.systemsOnline", { val: 0, ack: true }));
-        writes.push(this.setState("info.systemsAllUp", { val: false, ack: true }));
-      }
+      writes.push(this.setState("info.systemsOnline", { val: 0, ack: true }));
+      writes.push(this.setState("info.systemsAllUp", { val: false, ack: true }));
       void Promise.all(writes).catch((err) => {
         this.log.debug(`onUnload: final states rejected: ${(0, import_coerce.errText)(err)}`);
       }).finally(callback);
@@ -302,6 +306,9 @@ class BeszelAdapter extends utils.Adapter {
       }
       return containers;
     } catch (err) {
+      if (this.unloaded) {
+        return null;
+      }
       const code = this.classifyError(err);
       const msg = `Container fetch failed (non-fatal, ${code}) \u2014 other metrics still update, existing container states are kept. Check the configured user's permission for the containers collection.`;
       if (this.containersUnavailable) {
@@ -315,51 +322,15 @@ class BeszelAdapter extends utils.Adapter {
   }
   /**
    * DP4: write the fleet-level rollup states (total / online / all-up) so a
-   * dashboard can show "N of M up" without enumerating every system. Creates the
-   * objects lazily on the first write.
+   * dashboard can show "N of M up" without enumerating every system. The three
+   * states are static instance objects (io-package.json), so they exist from the
+   * install on — a fresh install with the Hub unreachable shows 0 / 0 / false
+   * instead of nothing, and the shutdown and error paths can always write them.
    *
    * @param total Number of systems in the current poll.
    * @param online Number of those reporting status "up".
    */
   async writeRollup(total, online) {
-    var _a;
-    if (!this.rollupCreated) {
-      await this.setObjectNotExistsAsync("info.systemsTotal", {
-        type: "state",
-        common: {
-          name: import_adapter_core.I18n.getTranslatedObject("systemsTotal"),
-          type: "number",
-          role: "value",
-          read: true,
-          write: false
-        },
-        native: {}
-      });
-      await this.setObjectNotExistsAsync("info.systemsOnline", {
-        type: "state",
-        common: {
-          name: import_adapter_core.I18n.getTranslatedObject("systemsOnline"),
-          type: "number",
-          role: "value",
-          read: true,
-          write: false
-        },
-        native: {}
-      });
-      await this.setObjectNotExistsAsync("info.systemsAllUp", {
-        type: "state",
-        common: {
-          name: import_adapter_core.I18n.getTranslatedObject("systemsAllUp"),
-          type: "boolean",
-          role: "indicator",
-          read: true,
-          write: false
-        },
-        native: {}
-      });
-      (_a = this.stateManager) == null ? void 0 : _a.noteStatesCreated(["info.systemsTotal", "info.systemsOnline", "info.systemsAllUp"]);
-      this.rollupCreated = true;
-    }
     await this.setStateChangedAsync("info.systemsTotal", { val: total, ack: true });
     await this.setStateChangedAsync("info.systemsOnline", { val: online, ack: true });
     await this.setStateChangedAsync("info.systemsAllUp", { val: total > 0 && online === total, ack: true });
@@ -402,6 +373,9 @@ class BeszelAdapter extends utils.Adapter {
         this.fetchContainersSafe(config),
         this.client.getLatestStats()
       ]);
+      if (this.unloaded) {
+        return;
+      }
       await this.setStateChangedAsync("info.connection", { val: true, ack: true });
       const containersAvailable = containersResult !== null;
       const containersBySystem = /* @__PURE__ */ new Map();
@@ -530,6 +504,10 @@ class BeszelAdapter extends utils.Adapter {
    */
   handlePollError(err) {
     var _a, _b, _c;
+    if (this.unloaded) {
+      this.log.debug(`Poll ended by shutdown: ${(0, import_coerce.errText)(err)}`);
+      return;
+    }
     const errMsg = (0, import_coerce.errText)(err);
     const errorCode = this.classifyError(err);
     const isRepeat = errorCode === this.lastErrorCode;
@@ -566,12 +544,10 @@ class BeszelAdapter extends utils.Adapter {
       void this.setStateChangedAsync(`${sysId}.info.status`, { val: import_metric_registry.SYSTEM_STATUS_UNKNOWN, ack: true }).catch(() => {
       });
     }
-    if (this.rollupCreated) {
-      void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
-      });
-      void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
-      });
-    }
+    void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
+    });
+    void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
+    });
   }
 }
 if (require.main !== module) {

@@ -224,12 +224,12 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.13.0 (2026-09-02)
 
-- Fixed: a Beszel Hub configured by IPv6 address (for example `http://[fd00::1]:8090`) can now be reached — the connection used to fail with a name lookup error on the bracketed address
+- Fixed: a Beszel Hub configured by IPv6 address can now be reached — the connection used to fail with a name lookup error because the address kept its square brackets
 - Fixed: stopping the adapter while a poll was still running no longer writes a false "Poll failed" error line to the log, and no longer sends that false error to the error reporting
 - Fixed: when the adapter cannot start — credentials to re-enter after an upgrade, or an invalid Hub URL — every system is now marked offline instead of keeping the previous run's green dot
-- Changed: the three fleet summary states (systems total / online / all up) now exist from the installation on — a fresh install with an unreachable Hub shows 0 and false instead of nothing
+- Changed: the three fleet summary states for systems total, online and all-up now exist from the installation on — a fresh install with an unreachable Hub shows 0 and false instead of nothing
 - Changed: ioBroker Admin 8.0.11 or newer is required, in line with the current ioBroker stable repository — older Admin installations must be updated before installing this version
 
 ### 0.12.2 (2026-08-27) — stable
@@ -251,10 +251,6 @@ beszel.0.
 - New: Fan speeds — a new "Fans" switch creates one datapoint per fan, in rpm (needs Beszel 0.18.8 or newer, Linux hosts).
 - New: Systems with several batteries now show the level of each battery separately (needs Beszel 0.18.8 or newer).
 - New: After switching metrics on or off you can see straight away how many datapoints appeared or disappeared, instead of searching the object tree.
-
-### 0.10.1 (2026-08-22)
-
-- Changed: Internal cleanup. No user-facing changes.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

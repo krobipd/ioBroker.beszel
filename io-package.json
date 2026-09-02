@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.12.2",
+    "version": "0.13.0",
     "news": {
-      "NEXT": {
+      "0.13.0": {
         "en": "IPv6 Hub addresses work; stopping during a poll logs no false error; systems stay offline when the adapter cannot start; the fleet summary states exist from the installation on.",
         "de": "IPv6-Hub-Adressen funktionieren; Stoppen während eines Abrufs erzeugt keine falsche Fehlerzeile; Systeme bleiben offline, wenn der Adapter nicht startet; Zusammenfassung ab Installation vorhanden.",
         "ru": "Адреса хаба IPv6 работают; остановка во время опроса не пишет ложную ошибку; системы остаются офлайн, если адаптер не запускается; сводные состояния существуют с момента установки.",

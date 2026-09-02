@@ -28,7 +28,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var beszel_client_exports = {};
 __export(beszel_client_exports, {
-  BeszelClient: () => BeszelClient
+  BeszelClient: () => BeszelClient,
+  hostnameForRequest: () => hostnameForRequest
 });
 module.exports = __toCommonJS(beszel_client_exports);
 var http = __toESM(require("node:http"));
@@ -40,6 +41,9 @@ const DEFAULT_TIMEOUT_MS = 15e3;
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+function hostnameForRequest(hostname) {
+  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+}
 class BeszelClient {
   baseUrl;
   username;
@@ -328,7 +332,7 @@ class BeszelClient {
         headers["Content-Length"] = Buffer.byteLength(body).toString();
       }
       const options = {
-        hostname: parsedUrl.hostname,
+        hostname: hostnameForRequest(parsedUrl.hostname),
         port: parsedUrl.port || (isHttps ? 443 : 80),
         path: parsedUrl.pathname + parsedUrl.search,
         method,
@@ -422,6 +426,7 @@ class BeszelClient {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  BeszelClient
+  BeszelClient,
+  hostnameForRequest
 });
 //# sourceMappingURL=beszel-client.js.map
