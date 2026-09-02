@@ -64,32 +64,36 @@ function createMockAdapter(): MockAdapter {
       warn: (): void => {},
       error: (): void => {},
     },
-    extendObject: async (id: string, obj: Partial<ObjectDef>): Promise<void> => {
+    extendObject: (id: string, obj: Partial<ObjectDef>): Promise<void> => {
       const existing = objects.get(id) || { type: "", common: {}, native: {} };
       objects.set(id, {
         type: obj.type || existing.type,
         common: { ...existing.common, ...(obj.common || {}) },
         native: { ...existing.native, ...(obj.native || {}) },
       });
+      return Promise.resolve();
     },
-    setObjectNotExistsAsync: async (id: string, obj: ObjectDef): Promise<void> => {
+    setObjectNotExistsAsync: (id: string, obj: ObjectDef): Promise<void> => {
       if (!objects.has(id)) {
         objects.set(id, obj);
       }
+      return Promise.resolve();
     },
-    setStateAsync: async (id: string, state: StateValue): Promise<void> => {
+    setStateAsync: (id: string, state: StateValue): Promise<void> => {
       states.set(id, state);
+      return Promise.resolve();
     },
-    setStateChangedAsync: async (id: string, state: StateValue): Promise<void> => {
+    setStateChangedAsync: (id: string, state: StateValue): Promise<void> => {
       states.set(id, state);
+      return Promise.resolve();
     },
-    getObjectAsync: async (id: string): Promise<ObjectDef | null> => {
-      return objects.get(id) || null;
+    getObjectAsync: (id: string): Promise<ObjectDef | null> => {
+      return Promise.resolve(objects.get(id) || null);
     },
-    getStateAsync: async (id: string): Promise<StateValue | null> => {
-      return states.get(id) ?? null;
+    getStateAsync: (id: string): Promise<StateValue | null> => {
+      return Promise.resolve(states.get(id) ?? null);
     },
-    getObjectViewAsync: async (
+    getObjectViewAsync: (
       _design: string,
       search: string,
       params: { startkey: string; endkey: string },
@@ -103,9 +107,9 @@ function createMockAdapter(): MockAdapter {
           rows.push({ id: `beszel.0.${key}`, value });
         }
       }
-      return { rows };
+      return Promise.resolve({ rows });
     },
-    delObjectAsync: async (id: string, opts?: { recursive: boolean }): Promise<void> => {
+    delObjectAsync: (id: string, opts?: { recursive: boolean }): Promise<void> => {
       if (opts?.recursive) {
         for (const key of [...objects.keys()]) {
           if (key === id || key.startsWith(`${id}.`)) {
@@ -121,6 +125,7 @@ function createMockAdapter(): MockAdapter {
         objects.delete(id);
         states.delete(id);
       }
+      return Promise.resolve();
     },
   };
 }
@@ -918,12 +923,7 @@ describe("StateManager", () => {
     it("prunes a fan that disappeared while others remain (no debounce needed)", async () => {
       await manager.updateSystem(testSystem, fanStats, [], allMetricsConfig());
       expect(adapter.states.has("systems.my_server.fans.coretemp_pump")).to.be.true;
-      await manager.updateSystem(
-        testSystem,
-        { ...testStats, f: { "nct6798_CPU Fan": 1300 } },
-        [],
-        allMetricsConfig(),
-      );
+      await manager.updateSystem(testSystem, { ...testStats, f: { "nct6798_CPU Fan": 1300 } }, [], allMetricsConfig());
       expect(adapter.states.has("systems.my_server.fans.coretemp_pump")).to.be.false;
       expect(adapter.states.get("systems.my_server.fans.nct6798_cpu_fan")?.val).to.equal(1300);
     });
@@ -2449,7 +2449,7 @@ describe("StateManager", () => {
     });
 
     it("getExistingSystemNames survives an object view that returns nothing", async () => {
-      adapter.getObjectViewAsync = async (): Promise<null> => null;
+      adapter.getObjectViewAsync = (): Promise<null> => Promise.resolve(null);
       expect(await manager.getExistingSystemNames()).to.deep.equal([]);
     });
 
@@ -2460,7 +2460,7 @@ describe("StateManager", () => {
       const origView = adapter.getObjectViewAsync;
       adapter.getObjectViewAsync = async (design, search, params) => {
         const res = await origView(design, search, params);
-        return { rows: [...(res?.rows ?? []), { id: "beszel.0.somewhere.else", value: res!.rows[0]!.value }] };
+        return { rows: [...(res?.rows ?? []), { id: "beszel.0.somewhere.else", value: res!.rows[0].value }] };
       };
       // A second manager starts with an empty group cache → it reconciles via the view.
       const fresh = new StateManager(adapter as never);
@@ -2514,7 +2514,7 @@ describe("StateManager", () => {
       }
       for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
         if (key.startsWith("metrics_") && typeof value === "object" && value !== null) {
-          out.set(key, value as JsonConfigField);
+          out.set(key, value);
         }
         collectFields(value, out);
       }
@@ -2568,8 +2568,8 @@ describe("StateManager", () => {
       adapter.log.debug = (msg: string): void => {
         debugs.push(msg);
       };
-      adapter.delObjectAsync = async (): Promise<void> => {
-        throw new Error("broker is shutting down");
+      adapter.delObjectAsync = (): Promise<void> => {
+        return Promise.reject(new Error("broker is shutting down"));
       };
       // Must not reject — cleanupMetrics runs during startup and a broker hiccup
       // may not abort the whole boot.
@@ -2694,11 +2694,11 @@ describe("StateManager", () => {
           testSystem,
           { ...testStats, ...g.stats },
           containers,
-          allMetricsConfig({ [g.toggle]: true } as Partial<AdapterConfig>),
+          allMetricsConfig({ [g.toggle]: true }),
         );
         expect(adapter.objects.has(`systems.my_server.${g.channel}`), `${g.channel} should be created`).to.be.true;
 
-        await manager.cleanupMetrics("my_server", allMetricsConfig({ [g.toggle]: false } as Partial<AdapterConfig>));
+        await manager.cleanupMetrics("my_server", allMetricsConfig({ [g.toggle]: false }));
         expect(adapter.objects.has(`systems.my_server.${g.channel}`), `${g.channel} should be cleaned up`).to.be.false;
       });
     }

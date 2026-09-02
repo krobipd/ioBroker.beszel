@@ -16,14 +16,14 @@ vi.mock("@iobroker/adapter-core", () => {
     public setState = vi.fn(async () => {});
     public setStateChangedAsync = vi.fn(async () => {});
     public setObjectNotExistsAsync = vi.fn(async () => {});
-    public setInterval = vi.fn(() => ({}) as unknown);
+    public setInterval = vi.fn(() => ({}));
     public clearInterval = vi.fn();
-    public setTimeout = vi.fn(() => ({}) as unknown);
+    public setTimeout = vi.fn(() => ({}));
     public clearTimeout = vi.fn();
     public delay = vi.fn(async () => {});
     public sendTo = vi.fn();
     public extendForeignObjectAsync = vi.fn(async () => {});
-    public getForeignObjectAsync = vi.fn(async () => null as unknown);
+    public getForeignObjectAsync = vi.fn(() => Promise.resolve(null));
     constructor(_opts: unknown) {}
   }
   return {
@@ -72,7 +72,11 @@ function errnoError(message: string, code: string): NodeJS.ErrnoException {
   return err;
 }
 
-/** Typed access to the private fields/methods the orchestration tests drive. */
+/**
+ * Typed access to the private fields/methods the orchestration tests drive.
+ *
+ * @param adapter Adapter instance under test
+ */
 function internalOf(adapter: BeszelAdapter): {
   client: FakeClient | null;
   stateManager: FakeStateMgr | null;
@@ -110,7 +114,11 @@ function internalOf(adapter: BeszelAdapter): {
   return adapter as unknown as ReturnType<typeof internalOf>;
 }
 
-/** Build an adapter with fake client/stateManager factories + valid config. */
+/**
+ * Build an adapter with fake client/stateManager factories + valid config.
+ *
+ * @param configOverrides Instance settings that replace the valid defaults
+ */
 function setup(configOverrides: Record<string, unknown> = {}): {
   adapter: BeszelAdapter;
   client: FakeClient;
@@ -127,16 +135,16 @@ function setup(configOverrides: Record<string, unknown> = {}): {
   Object.assign(i.config, configOverrides);
 
   const client: FakeClient = {
-    getSystems: vi.fn(async () => [makeSystem()]),
-    getContainers: vi.fn(async () => []),
-    getLatestStats: vi.fn(async () => new Map<string, SystemStats>([["sys001", { cpu: 10 }]])),
-    getSystemDetails: vi.fn(async () => new Map<string, SystemDetails>()),
+    getSystems: vi.fn(() => Promise.resolve([makeSystem()])),
+    getContainers: vi.fn(() => Promise.resolve([])),
+    getLatestStats: vi.fn(() => Promise.resolve(new Map<string, SystemStats>([["sys001", { cpu: 10 }]]))),
+    getSystemDetails: vi.fn(() => Promise.resolve(new Map<string, SystemDetails>())),
     invalidateToken: vi.fn(),
     cancelAll: vi.fn(),
   };
   const stateMgr: FakeStateMgr = {
     migrateLegacyStates: vi.fn(async () => {}),
-    getExistingSystemNames: vi.fn(async () => []),
+    getExistingSystemNames: vi.fn(() => Promise.resolve([])),
     cleanupMetrics: vi.fn(async () => {}),
     prepareForPoll: vi.fn(),
     updateSystem: vi.fn(async () => {}),
@@ -162,7 +170,11 @@ function setup(configOverrides: Record<string, unknown> = {}): {
   return { adapter, client, stateMgr, clientArgs };
 }
 
-/** setup() + onReady() so client/stateManager are wired like in production. */
+/**
+ * setup() + onReady() so client/stateManager are wired like in production.
+ *
+ * @param configOverrides Instance settings that replace the valid defaults
+ */
 async function setupReady(configOverrides: Record<string, unknown> = {}): Promise<{
   adapter: BeszelAdapter;
   client: FakeClient;
@@ -237,14 +249,17 @@ describe("BeszelAdapter onReady", () => {
     const { adapter, stateMgr } = setup();
     const i = internalOf(adapter);
     const order: string[] = [];
-    stateMgr.snapshotExistingStates.mockImplementation(async () => {
+    stateMgr.snapshotExistingStates.mockImplementation(() => {
       order.push("snapshot");
+      return Promise.resolve();
     });
-    stateMgr.cleanupMetrics.mockImplementation(async () => {
+    stateMgr.cleanupMetrics.mockImplementation(() => {
       order.push("cleanup");
+      return Promise.resolve();
     });
-    stateMgr.updateSystem.mockImplementation(async () => {
+    stateMgr.updateSystem.mockImplementation(() => {
       order.push("poll");
+      return Promise.resolve();
     });
     stateMgr.getExistingSystemNames.mockResolvedValue(["server_a"]);
     await i.onReady();
@@ -615,10 +630,11 @@ describe("BeszelAdapter poll — per-system failure dedup", () => {
     const sysA = makeSystem();
     const sysB = makeSystem({ id: "sys002", name: "Server B" });
     client.getSystems.mockResolvedValue([sysA, sysB]);
-    stateMgr.updateSystem.mockImplementation(async (system: BeszelSystem) => {
+    stateMgr.updateSystem.mockImplementation((system: BeszelSystem) => {
       if (system.id === "sys001") {
-        throw new Error("bad records");
+        return Promise.reject(new Error("bad records"));
       }
+      return Promise.resolve();
     });
 
     await i.poll();
@@ -977,15 +993,17 @@ describe("BeszelAdapter stale online indicators", () => {
   it("clears the online indicators at startup, after the snapshot and before the first poll", async () => {
     const { adapter, stateMgr, client } = setup();
     const order: string[] = [];
-    stateMgr.snapshotExistingStates.mockImplementation(async () => {
+    stateMgr.snapshotExistingStates.mockImplementation(() => {
       order.push("snapshot");
+      return Promise.resolve();
     });
-    stateMgr.markAllOffline.mockImplementation(async () => {
+    stateMgr.markAllOffline.mockImplementation(() => {
       order.push("markAllOffline");
+      return Promise.resolve();
     });
-    client.getSystems.mockImplementation(async () => {
+    client.getSystems.mockImplementation(() => {
       order.push("poll");
-      return [makeSystem()];
+      return Promise.resolve([makeSystem()]);
     });
 
     await internalOf(adapter).onReady();

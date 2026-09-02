@@ -266,7 +266,7 @@ describe("BeszelClient", () => {
       }
     });
 
-    it("falls back to the default timeout for a non-positive value", async () => {
+    it("falls back to the default timeout for a non-positive value", () => {
       // A 0 / negative timeout would otherwise arm an immediate socket timeout.
       const client = new BeszelClient("http://127.0.0.1:1", "a", "b", 0);
       const timeout = (client as unknown as { timeoutMs: number }).timeoutMs;
@@ -1120,7 +1120,7 @@ describe("BeszelClient", () => {
       // L7: honest scope — this exercises the 429 → single-retry → success path.
       // The mock server does not set a Retry-After header, so the client uses its
       // default back-off; the header-parse branch is left to a hostile-Hub audit.
-      const instantDelay = () => Promise.resolve();
+      const instantDelay = (): Promise<void> => Promise.resolve();
       const client = new BeszelClient(
         `http://127.0.0.1:${port}`,
         "admin",
@@ -1144,7 +1144,7 @@ describe("BeszelClient", () => {
         }),
       });
       const port = await mock.start();
-      const instantDelay = () => Promise.resolve();
+      const instantDelay = (): Promise<void> => Promise.resolve();
       const client = new BeszelClient(
         `http://127.0.0.1:${port}`,
         "admin",
@@ -1613,10 +1613,7 @@ describe("BeszelClient", () => {
       mock = createMockServer({
         systemsHandler: () => {
           pageRequests++;
-          const items =
-            pageRequests === 1
-              ? [{ id: "sys1", name: "Server 1", status: "up", host: "h", info: {} }]
-              : [];
+          const items = pageRequests === 1 ? [{ id: "sys1", name: "Server 1", status: "up", host: "h", info: {} }] : [];
           return {
             status: 200,
             body: JSON.stringify({ page: pageRequests, perPage: 1, totalItems: 1, totalPages: 5, items }),

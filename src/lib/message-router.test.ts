@@ -19,7 +19,13 @@ interface TestHarness {
   deps: MessageRouterDeps;
 }
 
-/** Build a fresh test-harness with stub log/sendTo/createTestClient. */
+/**
+ * Build a fresh test-harness with stub log/sendTo/createTestClient.
+ *
+ * @param checkConnectionResult Canned answer of the connection check, omitted = not stubbed
+ * @param checkConnectionResult.success Whether the check reports success
+ * @param checkConnectionResult.message Message the check reports
+ */
 function makeHarness(checkConnectionResult?: { success: boolean; message: string }): TestHarness {
   const sends: SentMessage[] = [];
   const logs: { level: "debug" | "warn"; msg: string }[] = [];
@@ -38,7 +44,8 @@ function makeHarness(checkConnectionResult?: { success: boolean; message: string
     createTestClient: (url, username, password) => {
       createdClients.push({ url, username, password });
       return {
-        checkConnection: async () => checkConnectionResult ?? { success: true, message: "Connected successfully" },
+        checkConnection: () =>
+          Promise.resolve(checkConnectionResult ?? { success: true, message: "Connected successfully" }),
       } as unknown as BeszelClient;
     },
     onTestClientCreated: client => registered.push(client),
@@ -54,7 +61,7 @@ function buildMessage(overrides: Partial<ioBroker.Message>): ioBroker.Message {
     // SEC-3a: checkConnection is gated to the admin/web config UI; the default
     // sender mimics the real admin "Test Connection" button origin.
     from: "system.adapter.admin.0",
-    callback: { id: 1, message: "x", time: 0, ack: false } as ioBroker.MessageCallbackInfo,
+    callback: { id: 1, message: "x", time: 0, ack: false },
     message: undefined,
     ...overrides,
   } as ioBroker.Message;
@@ -156,7 +163,7 @@ describe("dispatchMessage", () => {
   describe("obj.message coercion (v0.5.0 S3)", () => {
     it("treats null obj.message like missing-fields (no throw on property access)", async () => {
       const h = makeHarness();
-      await dispatchMessage(buildMessage({ message: null as unknown as ioBroker.Message["message"] }), h.deps);
+      await dispatchMessage(buildMessage({ message: null }), h.deps);
 
       expect(h.sends).to.have.lengthOf(1);
       expect(h.sends[0].response).to.deep.equal({ error: "URL, username and password are required" });
@@ -165,7 +172,7 @@ describe("dispatchMessage", () => {
 
     it("treats string obj.message like missing-fields (no throw)", async () => {
       const h = makeHarness();
-      await dispatchMessage(buildMessage({ message: "junk" as unknown as ioBroker.Message["message"] }), h.deps);
+      await dispatchMessage(buildMessage({ message: "junk" }), h.deps);
 
       expect(h.sends).to.have.lengthOf(1);
       expect(h.sends[0].response).to.have.property("error");
@@ -174,7 +181,7 @@ describe("dispatchMessage", () => {
 
     it("treats array obj.message like missing-fields", async () => {
       const h = makeHarness();
-      await dispatchMessage(buildMessage({ message: [] as unknown as ioBroker.Message["message"] }), h.deps);
+      await dispatchMessage(buildMessage({ message: [] }), h.deps);
 
       expect(h.sends).to.have.lengthOf(1);
       expect(h.sends[0].response).to.have.property("error");
@@ -204,8 +211,8 @@ describe("dispatchMessage", () => {
       const registered: BeszelClient[] = [];
       const completed: BeszelClient[] = [];
       const failingClient = {
-        checkConnection: async () => {
-          throw new Error("boom");
+        checkConnection: () => {
+          return Promise.reject(new Error("boom"));
         },
       } as unknown as BeszelClient;
       const deps: MessageRouterDeps = {
@@ -273,7 +280,7 @@ describe("dispatchMessage", () => {
       const h = makeHarness({ success: true, message: "ok" });
       await dispatchMessage(
         buildMessage({
-          from: undefined as unknown as ioBroker.Message["from"],
+          from: undefined,
           message: { url: "http://h", username: "u", password: "p" },
         }),
         h.deps,
