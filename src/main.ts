@@ -56,6 +56,13 @@ export class BeszelAdapter extends utils.Adapter {
   private makeStateManager: () => StateManager = () => new StateManager(this);
   private pollTimer: ioBroker.Interval | undefined = undefined;
   private isPolling = false;
+  /**
+   * Set first thing in `onUnload`. A poll that is still in flight when the host stops
+   * us gets its requests aborted by `cancelAll()` — that rejection is not a Hub
+   * problem and must neither log an error (which Sentry would report) nor write
+   * states after the final shutdown writes.
+   */
+  private unloaded = false;
   private lastSystemCount = 0;
   private lastErrorCode = "";
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
@@ -151,6 +158,20 @@ export class BeszelAdapter extends utils.Adapter {
       // L1: setStateChanged (not the deprecated setStateAsync) — no needless event.
       await this.setStateChangedAsync("info.connection", { val: false, ack: true });
 
+      // v0.11.0: snapshot the existing states BEFORE any cleanup or poll — it is
+      // the baseline for the "created / removed N datapoint(s)" line, so every
+      // change from here on is attributable.
+      //
+      // Nothing has been read yet, so no system may still claim to be online from
+      // the previous run — least of all when the adapter cannot even start: the
+      // early returns below (credentials to re-enter after an upgrade, an invalid
+      // URL) used to leave every device green for good, with info.connection
+      // already saying "disconnected" next to it. Runs off the snapshot, no extra
+      // object view.
+      this.stateManager = this.makeStateManager();
+      await this.stateManager.snapshotExistingStates();
+      await this.stateManager.markAllOffline();
+
       if (!config.url || !config.username || !config.password) {
         this.log.error(
           "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once.",
@@ -174,17 +195,6 @@ export class BeszelAdapter extends utils.Adapter {
       const timeoutMs = coerceTimeoutMs(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
-      this.stateManager = this.makeStateManager();
-
-      // v0.11.0: snapshot the existing states BEFORE any cleanup or poll — it is
-      // the baseline for the "created / removed N datapoint(s)" line, so every
-      // change from here on is attributable.
-      await this.stateManager.snapshotExistingStates();
-
-      // Nothing has been read yet, so no system may still claim to be online from
-      // the previous run — least of all when the Hub is unreachable and no poll
-      // ever gets to overwrite it. Runs off the snapshot above, no extra object view.
-      await this.stateManager.markAllOffline();
 
       // F3: enumerate the existing system devices once and reuse the list for both
       // the legacy migration and the metric cleanup, instead of two object views.
@@ -210,6 +220,7 @@ export class BeszelAdapter extends utils.Adapter {
 
   private onUnload(callback: () => void): void {
     try {
+      this.unloaded = true;
       if (this.pollTimer) {
         this.clearInterval(this.pollTimer);
         this.pollTimer = undefined;
@@ -360,6 +371,10 @@ export class BeszelAdapter extends utils.Adapter {
       }
       return containers;
     } catch (err) {
+      if (this.unloaded) {
+        // Aborted by onUnload's cancelAll() — not a Hub problem, nothing to warn about.
+        return null;
+      }
       const code = this.classifyError(err);
       const msg = `Container fetch failed (non-fatal, ${code}) — other metrics still update, existing container states are kept. Check the configured user's permission for the containers collection.`;
       if (this.containersUnavailable) {
@@ -473,6 +488,12 @@ export class BeszelAdapter extends utils.Adapter {
         this.fetchContainersSafe(config),
         this.client.getLatestStats(),
       ]);
+      if (this.unloaded) {
+        // The host stopped us while the requests were in flight: onUnload has
+        // already written the final states and reported "done" — nothing from
+        // this run may land on top of that.
+        return;
+      }
 
       // Update connection state (L1: setStateChanged → no event when unchanged).
       await this.setStateChangedAsync("info.connection", { val: true, ack: true });
@@ -649,6 +670,13 @@ export class BeszelAdapter extends utils.Adapter {
    * @param err The error thrown by the poll body.
    */
   private handlePollError(err: unknown): void {
+    if (this.unloaded) {
+      // cancelAll() in onUnload aborted this poll's requests. That is the shutdown,
+      // not a Hub failure: no error line (Sentry would report it), no state writes
+      // on top of the final ones onUnload already made.
+      this.log.debug(`Poll ended by shutdown: ${errText(err)}`);
+      return;
+    }
     const errMsg = errText(err);
     const errorCode = this.classifyError(err);
     const isRepeat = errorCode === this.lastErrorCode;

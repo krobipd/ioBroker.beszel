@@ -2803,6 +2803,20 @@ describe("StateManager", () => {
       expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 2 });
     });
 
+    it("counts the SCALAR datapoints a switched-off toggle removes at startup", async () => {
+      // The fan test above exercises the recursive (channel) path; the per-state
+      // delete in cleanupMetrics has its own counter call — unguarded until now.
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      manager.takeChangeCounts();
+
+      const afterRestart = await restart();
+      // Uptime off: exactly the two scalar states info.uptime + info.uptime_text go,
+      // and the info channel itself is never deleted — no recursive removal involved.
+      await afterRestart.cleanupMetrics("my_server", allMetricsConfig({ metrics_uptime: false }));
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 2 });
+    });
+
     it("counts every datapoint lost with a system that disappeared from the Hub", async () => {
       await manager.snapshotExistingStates();
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());

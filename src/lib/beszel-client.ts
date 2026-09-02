@@ -46,6 +46,19 @@ const MAX_PAGES = 50;
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
 /**
+ * Host name to hand to the socket connect. `URL.hostname` keeps the brackets of an
+ * IPv6 literal (`http://[fd00::1]:8090` → `[fd00::1]`), and Node's http client passes
+ * that to the resolver verbatim — `getaddrinfo ENOTFOUND [fd00::1]` (measured on
+ * Node 22), so a Hub configured by IPv6 address was never reachable.
+ * `url.urlToHttpOptions` strips the brackets the same way.
+ *
+ * @param hostname `URL.hostname` of the Hub URL
+ */
+export function hostnameForRequest(hostname: string): string {
+  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+}
+
+/**
  * HTTP client for the Beszel PocketBase REST API.
  * Uses only Node.js built-in http/https — no extra dependencies.
  */
@@ -409,7 +422,7 @@ export class BeszelClient {
       }
 
       const options: http.RequestOptions = {
-        hostname: parsedUrl.hostname,
+        hostname: hostnameForRequest(parsedUrl.hostname),
         port: parsedUrl.port || (isHttps ? 443 : 80),
         path: parsedUrl.pathname + parsedUrl.search,
         method,

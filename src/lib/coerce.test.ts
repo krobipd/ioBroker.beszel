@@ -888,6 +888,8 @@ describe("coerce", () => {
       expect(validateHubUrl("http://localhost:8090")).to.be.null;
       expect(validateHubUrl("https://beszel.example.com")).to.be.null;
       expect(validateHubUrl("https://192.168.1.100:8090/")).to.be.null;
+      // An IPv6 literal is a valid Hub address too (the client strips the brackets).
+      expect(validateHubUrl("http://[fd00::1]:8090")).to.be.null;
     });
 
     it("rejects empty / non-string", () => {

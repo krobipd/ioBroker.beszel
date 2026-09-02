@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.12.2",
     "news": {
+      "NEXT": {
+        "en": "A Hub reachable only by IPv6 address now works; stopping the adapter during a poll no longer logs a false error; systems stay marked offline when the adapter cannot start.",
+        "de": "Ein nur per IPv6-Adresse erreichbarer Hub funktioniert jetzt; Stoppen während eines Abrufs erzeugt keine falsche Fehlerzeile; Systeme bleiben offline markiert, wenn der Adapter nicht starten kann.",
+        "ru": "Хаб, доступный только по IPv6-адресу, теперь работает; остановка во время опроса больше не пишет ложную ошибку; системы остаются офлайн, если адаптер не может запуститься.",
+        "pt": "Um Hub acessível apenas por endereço IPv6 agora funciona; parar durante uma consulta já não regista um erro falso; os sistemas ficam offline quando o adaptador não consegue arrancar.",
+        "nl": "Een Hub die alleen via een IPv6-adres bereikbaar is werkt nu; stoppen tijdens een poll logt geen valse fout meer; systemen blijven offline gemarkeerd als de adapter niet kan starten.",
+        "fr": "Un Hub joignable uniquement par adresse IPv6 fonctionne ; l'arrêt pendant une interrogation n'écrit plus de fausse erreur ; les systèmes restent hors ligne si l'adaptateur ne peut pas démarrer.",
+        "it": "Un Hub raggiungibile solo tramite indirizzo IPv6 ora funziona; l'arresto durante un polling non registra più un falso errore; i sistemi restano offline se l'adapter non riesce ad avviarsi.",
+        "es": "Un Hub accesible solo por dirección IPv6 ahora funciona; detener durante una consulta ya no registra un error falso; los sistemas quedan fuera de línea si el adaptador no puede iniciarse.",
+        "pl": "Hub dostępny tylko przez adres IPv6 teraz działa; zatrzymanie podczas odpytania nie zapisuje już fałszywego błędu; systemy pozostają offline, gdy adapter nie może się uruchomić.",
+        "uk": "Хаб, доступний лише за IPv6-адресою, тепер працює; зупинка під час опитування більше не пише хибну помилку; системи залишаються офлайн, якщо адаптер не може запуститися.",
+        "zh-cn": "现在可以连接仅通过 IPv6 地址访问的 Hub；轮询期间停止适配器不再记录错误的报错行；适配器无法启动时，各系统保持离线标记。"
+      },
       "0.12.2": {
         "en": "The first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.",
         "de": "Der erste Start nach einem Update schreibt keine Warnungen und keinen Fehler mehr ins Protokoll, während sich die Instanz korrigiert und neu startet.",
@@ -80,19 +93,6 @@
         "pl": "Stany kontenerów nie są już usuwane, gdy adapter na chwilę traci dostęp do danych kontenerów — pozostają, dopóki kontenery naprawdę nie znikną.",
         "uk": "Стани контейнерів більше не видаляються, коли адаптер ненадовго втрачає доступ до даних контейнерів — вони зберігаються, доки контейнери справді не зникнуть.",
         "zh-cn": "当适配器短暂无法访问容器数据时，容器状态不再被删除——它们会一直保留，直到容器真正消失。"
-      },
-      "0.9.0": {
-        "en": "The connection test now correctly reports a failure when your login is wrong, and states for a sensor, disk or interface that disappears are removed instead of frozen at their last value.",
-        "de": "Der Verbindungstest meldet jetzt korrekt einen Fehler, wenn die Anmeldung falsch ist, und Datenpunkte eines verschwundenen Sensors, einer Platte oder Schnittstelle werden entfernt statt eingefroren.",
-        "ru": "Проверка подключения теперь правильно сообщает об ошибке при неверном входе, а состояния исчезнувшего датчика, диска или интерфейса удаляются, а не остаются замороженными.",
-        "pt": "O teste de ligação comunica agora corretamente uma falha quando o início de sessão está errado, e os estados de um sensor, disco ou interface que desaparece são removidos em vez de congelados.",
-        "nl": "De verbindingstest meldt nu correct een fout bij verkeerde inloggegevens, en toestanden van een verdwenen sensor, schijf of interface worden verwijderd in plaats van bevroren.",
-        "fr": "Le test de connexion signale désormais correctement un échec quand l'identifiant est faux, et les états d'un capteur, disque ou interface disparu sont supprimés au lieu d'être figés.",
-        "it": "Il test di connessione ora segnala correttamente un errore quando le credenziali sono errate, e gli stati di un sensore, disco o interfaccia scomparso vengono rimossi invece di rimanere congelati.",
-        "es": "La prueba de conexión ahora informa correctamente de un fallo cuando el acceso es incorrecto, y los estados de un sensor, disco o interfaz que desaparece se eliminan en lugar de congelarse.",
-        "pl": "Test połączenia poprawnie zgłasza teraz błąd przy złym logowaniu, a stany znikniętego czujnika, dysku lub interfejsu są usuwane zamiast zamrażane na starej wartości.",
-        "uk": "Перевірка з'єднання тепер правильно повідомляє про помилку при невірному вході, а стани зниклого датчика, диска або інтерфейсу видаляються, а не залишаються замороженими.",
-        "zh-cn": "登录信息错误时，连接测试现在能正确报告失败；消失的传感器、磁盘或接口的状态会被移除，而不是冻结在最后的数值。"
       }
     },
     "plugins": {
@@ -163,7 +163,7 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.8.23"
+        "admin": ">=8.0.11"
       }
     ]
   },

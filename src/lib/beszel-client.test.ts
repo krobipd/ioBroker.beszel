@@ -1,5 +1,5 @@
 import * as http from "node:http";
-import { BeszelClient } from "./beszel-client";
+import { BeszelClient, hostnameForRequest } from "./beszel-client";
 
 // ---------------------------------------------------------------------------
 // Test HTTP server — simulates Beszel PocketBase API
@@ -273,6 +273,44 @@ describe("BeszelClient", () => {
       expect(timeout).to.equal(15_000);
       const negative = new BeszelClient("http://127.0.0.1:1", "a", "b", -5);
       expect((negative as unknown as { timeoutMs: number }).timeoutMs).to.equal(15_000);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // IPv6 Hub address
+  // -----------------------------------------------------------------------
+
+  describe("IPv6 Hub address", () => {
+    it("strips the URL brackets from an IPv6 literal before connecting", () => {
+      expect(hostnameForRequest("[::1]")).to.equal("::1");
+      expect(hostnameForRequest("[fd00::1]")).to.equal("fd00::1");
+      expect(hostnameForRequest("192.168.1.5")).to.equal("192.168.1.5");
+      expect(hostnameForRequest("beszel.lan")).to.equal("beszel.lan");
+    });
+
+    it("reaches a Hub configured by IPv6 address (was: getaddrinfo ENOTFOUND [::1])", async () => {
+      // URL.hostname keeps the brackets; handed to Node's http client verbatim, the
+      // resolver looks up the literal "[::1]" and fails. A real server on the IPv6
+      // loopback proves the connect, not just the helper.
+      const server = http.createServer((_req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ token: "v6-token" }));
+      });
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "::1", () => resolve());
+      });
+      const port = (server.address() as { port: number }).port;
+      try {
+        const client = new BeszelClient(`http://[::1]:${port}`, "admin", "secret");
+        const result = await client.checkConnection();
+        expect(result, "the IPv6 literal must be usable as a Hub address").to.deep.equal({
+          success: true,
+          message: "Connected successfully",
+        });
+      } finally {
+        await new Promise<void>(resolve => server.close(() => resolve()));
+      }
     });
   });
 

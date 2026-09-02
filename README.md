@@ -35,7 +35,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - **Node.js >= 22**
 - **ioBroker js-controller >= 7.2.2**
-- **ioBroker Admin >= 7.8.23**
+- **ioBroker Admin >= 8.0.11**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
 
 ---
@@ -221,6 +221,13 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Fixed: a Beszel Hub configured by IPv6 address (for example `http://[fd00::1]:8090`) can now be reached — the connection used to fail with a name lookup error on the bracketed address
+- Fixed: stopping the adapter while a poll was still running no longer writes a false "Poll failed" error line to the log, and no longer sends that false error to the error reporting
+- Fixed: when the adapter cannot start — credentials to re-enter after an upgrade, or an invalid Hub URL — every system is now marked offline instead of keeping the previous run's green dot
+- Changed: ioBroker Admin 8.0.11 or newer is required, in line with the current ioBroker stable repository — older Admin installations must be updated before installing this version
+
 ### 0.12.2 (2026-08-27) — stable
 
 - Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.

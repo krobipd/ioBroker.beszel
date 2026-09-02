@@ -418,6 +418,83 @@ describe("BeszelAdapter onUnload", () => {
   });
 });
 
+describe("BeszelAdapter shutdown while a poll is in flight", () => {
+  it("does not log the aborted poll as an error and writes nothing after onUnload", async () => {
+    // onUnload → cancelAll() aborts the request in flight; the poll's Promise.all
+    // rejects with a code-less "Request aborted". That used to reach handlePollError
+    // as "Poll failed (UNKNOWN)" at ERROR level (Sentry-reported) plus a round of
+    // offline writes on top of the final ones onUnload had just made.
+    const { adapter, client } = await setupReady();
+    const i = internalOf(adapter);
+    let rejectSystems!: (err: Error) => void;
+    client.getSystems.mockImplementationOnce(
+      () =>
+        new Promise<BeszelSystem[]>((_resolve, reject) => {
+          rejectSystems = reject;
+        }),
+    );
+    const running = i.poll();
+    client.cancelAll.mockImplementation(() => rejectSystems(new Error("Request aborted")));
+    i.log.error.mockClear();
+    i.log.warn.mockClear();
+    i.setStateChangedAsync.mockClear();
+    const callback = vi.fn();
+
+    i.onUnload(callback);
+    await running;
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+
+    expect(i.log.error).not.toHaveBeenCalled();
+    expect(i.log.warn).not.toHaveBeenCalled();
+    // onUnload's own final writes go through setState; the poll's error path used
+    // setStateChangedAsync — nothing of that may happen any more.
+    expect(i.setStateChangedAsync).not.toHaveBeenCalled();
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Poll ended by shutdown"));
+  });
+
+  it("drops the result of a poll that completes after onUnload instead of writing it", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    let resolveSystems!: (systems: BeszelSystem[]) => void;
+    client.getSystems.mockImplementationOnce(
+      () =>
+        new Promise<BeszelSystem[]>(resolve => {
+          resolveSystems = resolve;
+        }),
+    );
+    const running = i.poll();
+    stateMgr.updateSystem.mockClear();
+    i.setStateChangedAsync.mockClear();
+
+    i.onUnload(vi.fn());
+    resolveSystems([makeSystem()]); // the Hub answered a moment too late
+    await running;
+
+    expect(stateMgr.updateSystem).not.toHaveBeenCalled();
+    expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.connection", { val: true, ack: true });
+  });
+
+  it("a container fetch aborted by the shutdown is not a warning either", async () => {
+    const { adapter, client } = await setupReady({ metrics_containers: true });
+    const i = internalOf(adapter);
+    let rejectContainers!: (err: Error) => void;
+    client.getContainers.mockImplementationOnce(
+      () =>
+        new Promise<never>((_resolve, reject) => {
+          rejectContainers = reject;
+        }),
+    );
+    const running = i.poll();
+    client.cancelAll.mockImplementation(() => rejectContainers(new Error("Request aborted")));
+    i.log.warn.mockClear();
+
+    i.onUnload(vi.fn());
+    await running;
+
+    expect(i.log.warn).not.toHaveBeenCalled();
+  });
+});
+
 describe("BeszelAdapter poll — happy path", () => {
   it("updates every system, marks connected and resolves safeNames first", async () => {
     const { adapter, client, stateMgr } = await setupReady();
@@ -1009,6 +1086,22 @@ describe("BeszelAdapter stale online indicators", () => {
     await internalOf(adapter).onReady();
 
     expect(order).toEqual(["snapshot", "markAllOffline", "poll"]);
+  });
+
+  it("clears the online indicators even when the start is refused (credentials to re-enter after an upgrade)", async () => {
+    // The early return used to come BEFORE the offline marking: every system kept
+    // the previous run's green dot for good, next to info.connection = false.
+    const { adapter, stateMgr, client } = setup({ url: "" });
+    await internalOf(adapter).onReady();
+    expect(stateMgr.snapshotExistingStates).toHaveBeenCalledTimes(1);
+    expect(stateMgr.markAllOffline).toHaveBeenCalledTimes(1);
+    expect(client.getSystems).not.toHaveBeenCalled();
+  });
+
+  it("clears the online indicators on an invalid Hub URL too", async () => {
+    const { adapter, stateMgr } = setup({ url: "ftp://nope" });
+    await internalOf(adapter).onReady();
+    expect(stateMgr.markAllOffline).toHaveBeenCalledTimes(1);
   });
 
   it("marks every known system offline when the adapter stops", async () => {
