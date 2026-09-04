@@ -48,11 +48,11 @@
     "@tsconfig/node22": "^22.0.5",
     "@types/iobroker": "npm:@iobroker/types@^7.2.2",
     "@types/node": "^22.10.7",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "iobroker-adapter-checks": "^0.3.0",
     "rimraf": "^6.1.3",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "main": "build/main.js",
   "scripts": {
@@ -71,7 +71,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "translate": "translate-adapter",
-    "release": "release-script"
+    "release": "release-script",
+    "release-patch": "release-script patch --yes --all",
+    "release-minor": "release-script minor --yes --all",
+    "release-major": "release-script major --yes --all"
   },
   "bugs": {
     "url": "https://github.com/krobipd/ioBroker.beszel/issues"
