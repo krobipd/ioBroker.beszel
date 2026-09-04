@@ -96,9 +96,10 @@ const METRIC_DEPENDENCIES = {
   metrics_temperatureDetails: "metrics_temperature",
   metrics_gpuDetails: "metrics_gpu"
 };
-function percentCommon(name, role = "value") {
+function percentCommon(name, role = "value", desc) {
   return {
     name,
+    ...desc ? { desc } : {},
     type: "number",
     role,
     unit: "%",
@@ -108,9 +109,10 @@ function percentCommon(name, role = "value") {
     write: false
   };
 }
-function numCommon(name, unit, role = "value") {
+function numCommon(name, unit, role = "value", desc) {
   return {
     name,
+    ...desc ? { desc } : {},
     type: "number",
     role,
     unit,
@@ -118,18 +120,20 @@ function numCommon(name, unit, role = "value") {
     write: false
   };
 }
-function textCommon(name, role = "text") {
+function textCommon(name, role = "text", desc) {
   return {
     name,
+    ...desc ? { desc } : {},
     type: "string",
     role,
     read: true,
     write: false
   };
 }
-function boolCommon(name, role = "indicator") {
+function boolCommon(name, role = "indicator", desc) {
   return {
     name,
+    ...desc ? { desc } : {},
     type: "boolean",
     role,
     read: true,
@@ -208,15 +212,16 @@ function formatUptime(seconds) {
 function commonFor(def) {
   var _a;
   const name = (0, import_i18n.tName)(def.nameKey);
+  const desc = def.descKey ? (0, import_i18n.tDesc)(def.descKey) : void 0;
   switch (def.kind) {
     case "percent":
-      return percentCommon(name, def.role);
+      return percentCommon(name, def.role, desc);
     case "text":
-      return textCommon(name);
+      return textCommon(name, "text", desc);
     case "bool":
-      return boolCommon(name);
+      return boolCommon(name, "indicator", desc);
     default:
-      return numCommon(name, def.unit, (_a = def.role) != null ? _a : "value");
+      return numCommon(name, def.unit, (_a = def.role) != null ? _a : "value", desc);
   }
 }
 function buildMetricDefs() {
@@ -389,6 +394,7 @@ function buildMetricDefs() {
       channel: "info",
       id: "info.podman",
       nameKey: "podman",
+      descKey: "descPodman",
       kind: "bool",
       available: (_st, s) => {
         var _a;
@@ -404,6 +410,7 @@ function buildMetricDefs() {
       channel: "info",
       id: "info.services_total",
       nameKey: "servicesTotal",
+      descKey: "descServicesTotal",
       kind: "num",
       available: (_st, s) => s.info.sv != null,
       extract: (s) => {
@@ -416,6 +423,7 @@ function buildMetricDefs() {
       channel: "info",
       id: "info.services_failed",
       nameKey: "servicesFailed",
+      descKey: "descServicesFailed",
       kind: "num",
       available: (_st, s) => s.info.sv != null,
       extract: (s) => {
@@ -499,6 +507,7 @@ function buildMetricDefs() {
       channel: "cpu",
       id: "cpu.iowait",
       nameKey: "cpuIowait",
+      descKey: "descCpuIowait",
       kind: "percent",
       available: hasCpub,
       extract: (_s, st) => {
@@ -511,6 +520,7 @@ function buildMetricDefs() {
       channel: "cpu",
       id: "cpu.steal",
       nameKey: "cpuSteal",
+      descKey: "descCpuSteal",
       kind: "percent",
       available: hasCpub,
       extract: (_s, st) => {
@@ -573,6 +583,7 @@ function buildMetricDefs() {
       channel: "memory",
       id: "memory.buffers",
       nameKey: "memoryBuffers",
+      descKey: "descMemoryBuffers",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -586,6 +597,7 @@ function buildMetricDefs() {
       channel: "memory",
       id: "memory.zfs_arc",
       nameKey: "memoryZfsArc",
+      descKey: "descMemoryZfsArc",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -625,6 +637,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.percent",
       nameKey: "diskPercent",
+      descKey: "descRootDisk",
       kind: "percent",
       available: hasStats,
       extract: (_s, st) => {
@@ -637,6 +650,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.used",
       nameKey: "diskUsed",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -650,6 +664,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.total",
       nameKey: "diskTotal",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -663,6 +678,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.read",
       nameKey: "diskRead",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "MB/s",
       available: hasStats,
@@ -676,6 +692,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.write",
       nameKey: "diskWrite",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "MB/s",
       available: hasStats,
@@ -715,6 +732,7 @@ function buildMetricDefs() {
       channel: "temperature",
       id: "temperature.average",
       nameKey: "temperatureAvg",
+      descKey: "descTemperatureAvg",
       kind: "num",
       unit: "\xB0C",
       role: "value.temperature",
@@ -726,6 +744,7 @@ function buildMetricDefs() {
       channel: "temperature",
       id: "temperature.max",
       nameKey: "temperatureMax",
+      descKey: "descTemperatureMax",
       kind: "num",
       unit: "\xB0C",
       role: "value.temperature",
@@ -750,6 +769,7 @@ function buildMetricDefs() {
       channel: "battery",
       id: "battery.charging",
       nameKey: "batteryCharging",
+      descKey: "descBatteryCharging",
       kind: "bool",
       available: hasStats,
       extract: (s, st) => {
@@ -768,6 +788,7 @@ function buildMetricDefs() {
       channel: "cpu",
       id: "cpu.peak",
       nameKey: "cpuPeak",
+      descKey: "descPeak",
       kind: "percent",
       available: (st) => (st == null ? void 0 : st.cpum) != null,
       extract: (_s, st) => {
@@ -780,6 +801,7 @@ function buildMetricDefs() {
       channel: "memory",
       id: "memory.peak",
       nameKey: "memoryPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "GB",
       available: (st) => (st == null ? void 0 : st.mm) != null,
@@ -793,6 +815,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.read_peak",
       nameKey: "diskReadPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: (st) => (st == null ? void 0 : st.drm) != null,
@@ -806,6 +829,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.write_peak",
       nameKey: "diskWritePeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: (st) => (st == null ? void 0 : st.dwm) != null,
@@ -819,6 +843,7 @@ function buildMetricDefs() {
       channel: "network",
       id: "network.sent_peak",
       nameKey: "networkSentPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: (st) => (st == null ? void 0 : st.nsm) != null,
@@ -832,6 +857,7 @@ function buildMetricDefs() {
       channel: "network",
       id: "network.recv_peak",
       nameKey: "networkRecvPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: (st) => (st == null ? void 0 : st.nrm) != null,
@@ -845,6 +871,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.io_util",
       nameKey: "diskIoUtil",
+      descKey: "descDiskIoUtil",
       kind: "percent",
       available: (st) => hasDio(st, 3),
       extract: (_s, st) => {
@@ -857,6 +884,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.io_await_read",
       nameKey: "diskIoAwaitRead",
+      descKey: "descDiskIoAwaitRead",
       kind: "num",
       unit: "ms",
       available: (st) => hasDio(st, 5),
@@ -870,6 +898,7 @@ function buildMetricDefs() {
       channel: "disk",
       id: "disk.io_await_write",
       nameKey: "diskIoAwaitWrite",
+      descKey: "descDiskIoAwaitWrite",
       kind: "num",
       unit: "ms",
       available: (st) => hasDio(st, 5),

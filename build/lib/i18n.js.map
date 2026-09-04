@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/lib/i18n.ts"],
-  "sourcesContent": ["import { I18n } from \"@iobroker/adapter-core\";\nimport type translations from \"../../admin/i18n/en.json\";\n\ntype I18nKey = keyof typeof translations;\n\n/**\n * Translation object for the given i18n key.\n *\n * @param key Translation key from admin/i18n/en.json\n */\nexport function tName(key: I18nKey): ioBroker.StringOrTranslated {\n  return I18n.getTranslatedObject(key);\n}\n"],
-  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,0BAAqB;AAUd,SAAS,MAAM,KAA2C;AAC/D,SAAO,yBAAK,oBAAoB,GAAG;AACrC;",
+  "sourcesContent": ["import { I18n } from \"@iobroker/adapter-core\";\nimport type translations from \"../../admin/i18n/en.json\";\n\ntype I18nKey = keyof typeof translations;\n\n/**\n * Translation object for the given i18n key.\n *\n * @param key Translation key from admin/i18n/en.json\n * @param args Values for the `%s` placeholders of that key, substituted in every language\n */\nexport function tName(key: I18nKey, ...args: (string | number)[]): ioBroker.StringOrTranslated {\n  return I18n.getTranslatedObject(key, ...args);\n}\n\n/**\n * Translation object for a datapoint's `common.desc`. Same lookup as {@link tName} \u2014\n * separate name so a reader sees at the call site that this is the EXPLANATION, which\n * the fleet standard treats differently from the label: one plain sentence, never an\n * identifier, and left out entirely where there is nothing to explain.\n *\n * @param key Translation key from admin/i18n/en.json (the `desc\u2026` keys)\n */\nexport function tDesc(key: I18nKey): ioBroker.StringOrTranslated {\n  return I18n.getTranslatedObject(key);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,0BAAqB;AAWd,SAAS,MAAM,QAAiB,MAAwD;AAC7F,SAAO,yBAAK,oBAAoB,KAAK,GAAG,IAAI;AAC9C;AAUO,SAAS,MAAM,KAA2C;AAC/D,SAAO,yBAAK,oBAAoB,GAAG;AACrC;",
   "names": []
 }

@@ -1,4 +1,10 @@
 # Older Changes
+## 0.11.0 (2026-08-26)
+
+- New: Fan speeds — a new "Fans" switch creates one datapoint per fan, in rpm (needs Beszel 0.18.8 or newer, Linux hosts).
+- New: Systems with several batteries now show the level of each battery separately (needs Beszel 0.18.8 or newer).
+- New: After switching metrics on or off you can see straight away how many datapoints appeared or disappeared, instead of searching the object tree.
+
 ## 0.10.1 (2026-08-22)
 
 - Changed: Internal cleanup. No user-facing changes.

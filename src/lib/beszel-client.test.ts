@@ -1666,3 +1666,49 @@ describe("BeszelClient", () => {
     });
   });
 });
+
+describe("pagination capacity and cost", () => {
+  it("reads a large installation completely and in a handful of requests", async () => {
+    // The page size is not just a tuning knob: together with the page cap it decides
+    // how much of a big installation the adapter can see at all, and how many
+    // round-trips that costs the Hub. Shrinking it far enough silently truncates the
+    // result once the cap is reached — which is why this is a behaviour test, not a
+    // test that nails down the number 200.
+    const TOTAL = 250;
+    const requests: string[] = [];
+    const server = http.createServer((req, res) => {
+      const path = req.url ?? "";
+      requests.push(path);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      if (path.includes("auth-with-password")) {
+        res.end(JSON.stringify({ token: "tok" }));
+        return;
+      }
+      const params = new URL(path, "http://localhost").searchParams;
+      const perPage = Number(params.get("perPage"));
+      const page = Number(params.get("page"));
+      const start = (page - 1) * perPage;
+      const count = Math.max(0, Math.min(perPage, TOTAL - start));
+      const items = Array.from({ length: count }, (_, i) => ({
+        id: `sys${start + i}`,
+        name: `Server ${start + i}`,
+        status: "up",
+        host: "10.0.0.1",
+        info: {},
+      }));
+      res.end(JSON.stringify({ page, perPage, totalItems: TOTAL, totalPages: Math.ceil(TOTAL / perPage), items }));
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", () => resolve()));
+    const { port } = server.address() as { port: number };
+    try {
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "u", "p");
+      const systems = await client.getSystems();
+
+      expect(systems, "every system must arrive, none truncated by the page cap").to.have.lengthOf(TOTAL);
+      const listCalls = requests.filter(path => path.includes("/systems/records"));
+      expect(listCalls.length, "a 250-system Hub must not cost dozens of round-trips").to.be.at.most(5);
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+});

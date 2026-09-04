@@ -12,6 +12,7 @@ import {
   validateHubUrl,
 } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
+import { tDesc, tName } from "./lib/i18n";
 import { SYSTEM_STATUS_UNKNOWN } from "./lib/metric-registry";
 import { StateManager } from "./lib/state-manager";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails } from "./lib/types";
@@ -139,6 +140,52 @@ export class BeszelAdapter extends utils.Adapter {
     }
   }
 
+  /**
+   * Re-apply the names and explanations of the manifest's `instanceObjects` to the
+   * objects that already exist.
+   *
+   * js-controller creates `instanceObjects` only where they are MISSING, so a corrected
+   * name or description in io-package.json reaches fresh installs only — an upgraded
+   * installation keeps the old text while the manifest and every gate look green
+   * (fleet rule, krobi 2026-09-03). Each object therefore gets an explicit
+   * `extendObject` here. No `preserve`: these texts belong to the adapter.
+   *
+   * Only name and description are written — type, role and default stay whatever the
+   * manifest created, so there is no second definition to drift apart from it.
+   */
+  private async ensureInstanceObjects(): Promise<void> {
+    await this.extendObject("info", {
+      type: "channel",
+      common: { name: tName("channelInfo") },
+      native: {},
+    });
+    await this.extendObject("info.connection", {
+      type: "state",
+      common: { name: tName("connectionStatus"), desc: tDesc("descConnection") },
+      native: {},
+    });
+    await this.extendObject("info.systemsTotal", {
+      type: "state",
+      common: { name: tName("systemsTotal"), desc: tDesc("descSystemsTotal") },
+      native: {},
+    });
+    await this.extendObject("info.systemsOnline", {
+      type: "state",
+      common: { name: tName("systemsOnline"), desc: tDesc("descSystemsOnline") },
+      native: {},
+    });
+    await this.extendObject("info.systemsAllUp", {
+      type: "state",
+      common: { name: tName("systemsAllUp"), desc: tDesc("descSystemsAllUp") },
+      native: {},
+    });
+    await this.extendObject("systems", {
+      type: "folder",
+      common: { name: tName("channelSystems") },
+      native: {},
+    });
+  }
+
   private async onReady(): Promise<void> {
     try {
       // First: without this the whole shutdown path stays dead on an updated install.
@@ -147,6 +194,9 @@ export class BeszelAdapter extends utils.Adapter {
         return;
       }
       await I18n.init(join(this.adapterDir, "admin"), this);
+      // Straight after the translations are loaded: an existing installation must pick
+      // up corrected names/descriptions too, not just a fresh one.
+      await this.ensureInstanceObjects();
       const config = this.config as unknown as AdapterConfig;
 
       this.log.debug(

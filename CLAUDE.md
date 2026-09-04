@@ -21,11 +21,12 @@ src/main.ts                     → Adapter (Lifecycle, Polling, Message-Handler
 src/lib/beszel-client.ts        → HTTP Client (Auth, Systems, Stats, Containers, getSystemDetails)
 src/lib/coerce.ts               → Boundary-Validator (NaN/Infinity/Typ-Drift) + errText + validateHubUrl + coercePollInterval/coerceTimeoutMs (v0.5.0 S1)
 src/lib/state-manager.ts        → ioBroker States erstellen/updaten/cleanup, createdIds-Cache
-src/lib/i18n.ts                 → tName(key) Wrapper über I18n.getTranslatedObject() (adapter-core I18n-Framework)
-admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations (99 Keys × 11 Sprachen)
+src/lib/i18n.ts                 → tName(key, ...args) + tDesc(key) über I18n.getTranslatedObject() (adapter-core I18n-Framework)
+admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations, Namen UND Beschreibungen (194 Keys × 11 Sprachen)
 src/lib/message-router.ts       → onMessage-Dispatcher (default-Branch-Contract, v0.4.5 testClient-Hooks)
 src/lib/types.ts                → TypeScript Interfaces (API + Config)
-../scripts/sync-iopackage-from-i18n.py → regeneriert io-package.json:instanceObjects.common.name aus admin/i18n/ (zentral, source: admin-i18n)
+../scripts/sync-iopackage-from-i18n.py → regeneriert io-package.json:instanceObjects.common.name + .desc aus admin/i18n/ (zentral, source: admin-i18n)
+docs/<en|de>/                   → Nutzerdoku im Repo (README/datapoints/faq), verlinkt in io-package.json:common.docs
 ```
 
 ## Design-Entscheidungen
@@ -48,7 +49,7 @@ src/lib/types.ts                → TypeScript Interfaces (API + Config)
 16. **Dynamic-Group-Pruning (v0.7.2)** — `pruneDynamicChildren(base, activeIds, childType)` löscht verschwundene Mitglieder jeder dynamischen Gruppe (Sensoren, Lüfter, Akkus, Cores, Interfaces, GPUs, Engines, Filesystems, Container). Kostenmodell: Object-View nur beim ERSTEN Poll je Gruppe nach Adapter-Start (Zombie-Reconcile), danach in-memory-Diff. Kein Prune ohne Daten (down-System mit `stats=undefined` fasst keine Gruppe an). Toggle-Wechsel = Instanz-Restart → Start-Cleanup (`cleanupMetrics`) deckt Toggle-offs, inkl. gpuDetails (power_package+engines je GPU via View-Enumeration).
 17. **Poll-Write-Sparsamkeit (v0.7.2)** — `getLatestStats` bricht die Pagination ab, sobald eine Seite keinen neuen System-Key liefert (1m-Retention = 8 h ≙ 480 Records/System, der neueste je System liegt bei `sort=-updated` auf den ersten Seiten); Device-Objekt-`extendObject` nur bei geänderter id/host/name-Signatur.
 18. **Lüfter + Multi-Akku (v0.11.0, Beszel 0.18.8)** — beides sind normale dynamische Gruppen über `syncDynamicGroup` (Prune + H2-Entprellung inklusive). **Lüfter** = eigener Kanal `<sys>.fans` je System (NICHT unter `temperature`: eigene Agent-Quelle `agent/fans.go`, eigenes Hub-Diagramm), ein State je Lüfter, Einheit `rpm`, Rolle schlicht `value` — der Rollen-Katalog hat keine Rolle für gemessene Drehzahl (`value.speed` = Wind, `level.speed` = schreibbarer Stellwert). **0 rpm ist ein Messwert** (stehender Lüfter), kein Falsy-Filter. Eigener opt-in-Schalter `metrics_fans` ohne Kategorie-Abhängigkeit. **Multi-Akku** = `<sys>.battery.batteries.<name>` (Prozent, `value.battery`) neben den bestehenden Aggregat-States; **bewusst OHNE „nur ab 2 Akkus"-Schwelle** — eine Schwelle würde beim Wechsel 2→1 Akku die Kinder LÖSCHEN, was wie ein Fehler aussieht. Hängt am `metrics_battery`-Schalter, kein eigener.
-19. **Datenpunkt-Zähler (v0.11.0)** — eine Info-Zeile pro Poll: „Object tree updated: created N datapoint(s), removed M datapoint(s)", still wenn sich nichts geändert hat. Grundlage ist `knownStateIds`: `snapshotExistingStates()` liest beim Start EINMAL alle vorhandenen States (Object-View) — **muss vor `cleanupMetrics` und dem ersten Poll laufen**. Nötig, weil `createAndSetState` bei JEDEM Neustart ein `extendObject`-Rollen-Retrofit fährt (Design 16/Rollen-Retrofit) und ohne Basislinie jeder Neustart alle States als „neu" melden würde. Gelöschte IDs verlassen das Set → ein Wiederauftauchen zählt wieder. Rekursive Löschungen (Kanal/Gerät/Gruppen-Kind) zählen per Object-View VOR dem Löschen. Zwei Sonderfälle: die Legacy-Migration ist bewusst AUSGENOMMEN (`deleteChannelIfExists(id, false)`) weil sie ihre eigene Summe meldet — nur ihr Marker zählt; die drei Rollup-States sind seit v0.13.0 statische `instanceObjects` (Design 25) und liegen damit von Anfang an im Start-Schnappschuss — kein Sonderfall mehr im Zähler.
+19. **Datenpunkt-Zähler (v0.11.0)** — eine Info-Zeile pro Poll: „Object tree updated: created N datapoint(s), removed M datapoint(s)", still wenn sich nichts geändert hat. Grundlage ist `knownStateIds`: `snapshotExistingStates()` liest beim Start EINMAL alle vorhandenen States (Object-View) — **muss vor `cleanupMetrics` und dem ersten Poll laufen**. Nötig, weil `createAndSetState` bei JEDEM Neustart ein `extendObject`-Rollen-Retrofit fährt (Design 16/Rollen-Retrofit) und ohne Basislinie jeder Neustart alle States als „neu" melden würde. Gelöschte IDs verlassen das Set → ein Wiederauftauchen zählt wieder. Rekursive Löschungen (Kanal/Gerät/Gruppen-Kind) zählen per Object-View VOR dem Löschen. Ein Sonderfall: die Legacy-Migration ist bewusst AUSGENOMMEN (`deleteChannelIfExists(id, false)`), weil sie ihre eigene Summe meldet — seit v0.14.0 ist auch ihr Marker weg (Design 29), gezählt wird nur noch dessen einmalige Entfernung. Die drei Rollup-States sind seit v0.13.0 statische `instanceObjects` (Design 25) und liegen damit von Anfang an im Start-Schnappschuss.
 
 ## Metric-Toggles
 
@@ -61,9 +62,49 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
 24. **IPv6-Adresse als Hub-URL (v0.13.0)** — `URL.hostname` liefert für `http://[fd00::1]:8090` den Wert `[fd00::1]` MIT Klammern; Nodes http-Client reicht ihn so an die Namensauflösung weiter → `getaddrinfo ENOTFOUND [fd00::1]` (gemessen an Node 22). `hostnameForRequest()` entfernt die Klammern wie `url.urlToHttpOptions`; Test mit echtem Server auf `::1`. `validateHubUrl` und `isPlaintextRemoteUrl` kamen damit schon zurecht.
 25. **Flotten-Zusammenfassung als statische `instanceObjects` (v0.13.0, krobi: „bau das um")** — `info.systemsTotal`/`systemsOnline`/`systemsAllUp` stehen im Manifest (Namen aus `admin/i18n` über `sync-iopackage-from-i18n.py`, dessen `name_mapping` die drei Schlüssel trägt) wie nut2s `info.upsTotal`-Trio. Vorher lazy beim ersten erfolgreichen Poll angelegt: eine Neuinstallation mit nicht erreichbarem Hub hatte sie gar nicht, und Beenden-/Fehlerpfad mussten mit `rollupCreated` raten, ob sie schon existieren. Jetzt schreiben beide Pfade bedingungslos, `writeRollup` schreibt nur noch Werte, und ein Manifest-Test hält die drei Objekte (Typ/Rolle/Default) fest. Bestandsinstallationen: die vorhandenen Objekte werden beim Update aus dem Manifest ergänzt, Werte bleiben.
 
-## Tests (573 unit + 57 package + 1 integration = 631)
+26. **Namen und Beschreibungen erreichen BESTEHENDE Anlagen (v0.14.0)** — js-controller legt die
+    `instanceObjects` des Manifests nur an, wo sie FEHLEN; `ensureChannel` benutzte
+    `setObjectNotExists`, und `createAndSetState` schonte per `preserve` den alten `common.name`.
+    Alle drei Wege froren den Text ein, mit dem eine Anlage einmal angelegt wurde — eine
+    korrigierte Übersetzung erreichte nur Neuinstallationen, und kein Gate sah es (nur der
+    Live-Baum). Jetzt: `ensureInstanceObjects()` in `onReady` erneuert alle sechs Manifest-Objekte
+    per `extendObject` (ohne `preserve`), `ensureChannel` schreibt per `extendObject`, und
+    `createAndSetState` verzichtet auf `preserve`. **Einzige Ausnahme ist das GERÄTE-Objekt** — sein
+    Name ist der Systemname vom Hub, und ein Hub-seitiges Umbenennen erzeugt ohnehin eine neue
+    sanitisierte id, also ein neues Objekt; `preserve` schützt dort nur eine Umbenennung des
+    Nutzers und blockiert nichts, was der Adapter ausliefert. Preis der Umstellung: eine vom Nutzer
+    in der Admin vergebene Datenpunkt-Umbenennung wird beim nächsten Start überschrieben
+    (krobi 2026-09-03).
+27. **`common.desc` = Erklärung, sonst leer (v0.14.0)** — 24 i18n-Schlüssel (`desc…`) in elf
+    Sprachen, über `tDesc()` und das neue optionale `descKey` der `MetricDef` verdrahtet. Sie
+    hängen an genau den Datenpunkten, deren Bedeutung man nicht raten kann: Mittel der drei
+    heißesten Sensoren, Spitzenwert im Aggregationsintervall, `io_util` und die beiden
+    `io_await`-Werte (gegen `agent/disk.go` der gebündelten 0.18.8-Quelle geprüft: Anteil der
+    Zeit mit mindestens einer offenen Anfrage bzw. Durchschnittsdauer EINER Operation, wie
+    `iostat` r_await/w_await), kumulative Interface-Summen, `battery.charging`, Container-`health`,
+    `power_package`, Root-Dateisystem, systemd-Einheiten, Buffers/ZFS-ARC, `cpu.steal`/`iowait`.
+    Alle übrigen Datenpunkte tragen bewusst KEINE Beschreibung.
+28. **Einfrieren vs. Zurücksetzen, restart-fest (v0.14.0)** — `applyMetrics` unterscheidet jetzt die
+    beiden Gründe, aus denen eine Metrik „nicht verfügbar" ist. **Kein Stats-Datensatz** (System
+    down/paused) ⇒ nichts anfassen, die letzten Werte bleiben stehen — dieselbe Linie, der die
+    dynamischen Gruppen schon folgten. **Datensatz da, FELD fehlt** (`dios`/`cpub` sind
+    omitzero/omitempty) ⇒ auf `null` zurücksetzen, und zwar über `knownStateIds` statt nur
+    `createdIds`: der Cache ist nach jedem Neustart leer, deshalb hörte das Zurücksetzen bisher
+    still auf zu wirken und der alte Messwert stand unbegrenzt. Vorher waren beide Fälle vertauscht
+    abhängig davon, ob der Adapter zwischendurch neu gestartet war.
+29. **`info.legacyMigrated` ist ersatzlos entfallen (v0.14.0)** — der Marker sparte nur den
+    Legacy-Scan (34 Einzelabfragen je System). Seit v0.11.0 liest `snapshotExistingStates()` beim
+    Start ohnehin einmal alles und läuft VOR der Migration, also entscheidet der Sweep jetzt aus
+    dem Schnappschuss: null zusätzliche Abfragen, und der Marker ist überflüssig. Er wurde
+    obendrein von JEDER Neuinstallation angelegt, obwohl er nur einem Upgrade von vor 0.3.0 diente.
+    Der Schnappschuss liest dafür per `getObjectListAsync` States UND Kanäle in EINEM Aufruf (statt
+    einer state-View), damit auch der eine Legacy-Kanal ohne Objektabfrage erkannt wird. Auf
+    Bestandsanlagen wird der Datenpunkt beim Start gelöscht und in der Datenpunkt-Bilanz gemeldet.
 
-Zusammensetzung: state-manager 236 · coerce 140 · main 75 · beszel-client 63 · message-router 16 · repo-standards 9 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version, 0.3.0 brachte eine Prüfung mehr) · i18n 7.
+
+## Tests (585 unit + 57 package + 1 integration = 643)
+
+Zusammensetzung (gemessen): state-manager 253 · coerce 140 · main 94 · beszel-client 66 · message-router 16 · repo-standards 9 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · i18n 7.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 

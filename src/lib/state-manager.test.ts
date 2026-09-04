@@ -47,6 +47,10 @@ interface MockAdapter {
     search: string,
     params: { startkey: string; endkey: string },
   ) => Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null>;
+  getObjectListAsync: (params: {
+    startkey: string;
+    endkey: string;
+  }) => Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null>;
   delObjectAsync: (id: string, opts?: { recursive: boolean }) => Promise<void>;
 }
 
@@ -104,6 +108,20 @@ function createMockAdapter(): MockAdapter {
       // getExistingSystemNames, "channel" for cleanupStaleContainers.
       for (const [key, value] of objects.entries()) {
         if (key.startsWith(prefix) && value.type === search) {
+          rows.push({ id: `beszel.0.${key}`, value });
+        }
+      }
+      return Promise.resolve({ rows });
+    },
+    // Object LIST: every type in one call, unlike the per-type view above.
+    getObjectListAsync: (params: {
+      startkey: string;
+      endkey: string;
+    }): Promise<{ rows: Array<{ id: string; value: ObjectDef }> }> => {
+      const rows: Array<{ id: string; value: ObjectDef }> = [];
+      const prefix = params.startkey.replace("beszel.0.", "");
+      for (const [key, value] of objects.entries()) {
+        if (key.startsWith(prefix)) {
           rows.push({ id: `beszel.0.${key}`, value });
         }
       }
@@ -1664,6 +1682,72 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.filesystems.mnt_backup")).to.be.false; // pruned
     });
 
+    it("a datapoint whose meaning is not obvious carries an explanation", async () => {
+      // Fleet standard: `common.desc` is a readable sentence, and exactly for the
+      // values a user cannot guess — the average is over the three HOTTEST sensors.
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.temperature.average")?.common.desc).to.deep.equal({
+        en: "descTemperatureAvg",
+        de: "descTemperatureAvg_de",
+      });
+    });
+
+    it("a self-explanatory datapoint carries NO explanation", async () => {
+      // The same standard: an invented sentence is worse than none.
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.memory.used")?.common.desc).to.be.undefined;
+    });
+
+    it("the per-core label is a translation object, not a hard-coded string", async () => {
+      await manager.updateSystem(
+        testSystem,
+        { ...testStats, cpus: [10, 20] },
+        [],
+        allMetricsConfig({ metrics_cpuCores: true }),
+      );
+      expect(adapter.objects.get("systems.my_server.cpu.cores.core0")?.common.name).to.deep.equal({
+        en: "cpuCore",
+        de: "cpuCore_de",
+      });
+    });
+
+    it("H2b survives a restart: a field that vanished is still reset to null", async () => {
+      // The reset used to hang off `createdIds`, which is empty in a fresh process —
+      // so after an adapter restart the state kept the last busy value forever
+      // (v0.14.0). The startup snapshot is what makes it work across restarts.
+      const cfg = allMetricsConfig({ metrics_diskIo: true });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, { ...testStats, dios: [10, 20, 35, 1, 2, 50] }, [], cfg);
+      expect(adapter.states.get("systems.my_server.disk.io_util")?.val).to.equal(35);
+
+      // Restart: fresh manager over the same object store, `createdIds` empty.
+      const fresh = new StateManager(adapter as never);
+      await fresh.snapshotExistingStates();
+      await fresh.updateSystem(testSystem, { ...testStats, dios: undefined }, [], cfg);
+
+      expect(adapter.states.get("systems.my_server.disk.io_util")?.val).to.equal(null);
+    });
+
+    it("a system without ANY stats keeps its last values — in the same run and after a restart", async () => {
+      // The Hub has no reading for the system (down / paused). The dynamic groups
+      // already froze in this case; the scalars nulled themselves, so the same
+      // situation produced two different trees depending on whether the adapter had
+      // restarted in between (v0.14.0).
+      const cfg = allMetricsConfig();
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], cfg);
+      const measured = adapter.states.get("systems.my_server.cpu.usage")?.val;
+      expect(measured).to.be.a("number");
+
+      await manager.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+      expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(measured);
+
+      const fresh = new StateManager(adapter as never);
+      await fresh.snapshotExistingStates();
+      await fresh.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+      expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(measured);
+    });
+
     it("H2b: a presence-gated scalar (disk I/O) that goes absent is reset to null, not frozen", async () => {
       const cfg = allMetricsConfig({ metrics_diskIo: true });
       await manager.updateSystem(testSystem, { ...testStats, dios: [10, 20, 35, 1, 2, 50] }, [], cfg);
@@ -1908,29 +1992,46 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.temperatures.core_0")).to.be.false;
     });
 
-    it("L6: skips the whole scan on a later restart (one-shot marker)", async () => {
-      // The marker exists so a restart doesn't probe 33 legacy ids per system
-      // again. Without the short-circuit the scan runs every start — invisible
-      // to the suite until now (audit 2026-08-22).
+    it("sweeps without probing: not a single object read for the legacy ids", async () => {
+      // The sweep decides from the startup snapshot. Before v0.14.0 it probed 33 ids
+      // per system and needed the `info.legacyMigrated` marker to stop doing that on
+      // every restart; now there is nothing to skip, so the marker is gone.
       adapter.objects.set("systems.my_server", { type: "device", common: { name: "My Server" }, native: {} });
-      adapter.states.set("info.legacyMigrated", { val: true, ack: true });
+      adapter.objects.set("systems.my_server.cpu_usage", { type: "state", common: {}, native: {} });
+      await manager.snapshotExistingStates();
       let objectReads = 0;
       const origGet = adapter.getObjectAsync;
-      adapter.getObjectAsync = async (id: string): Promise<ObjectDef | null> => {
+      adapter.getObjectAsync = (id: string): Promise<ObjectDef | null> => {
         objectReads++;
         return origGet(id);
       };
       await manager.migrateLegacyStates();
+      expect(adapter.objects.has("systems.my_server.cpu_usage")).to.be.false;
       expect(objectReads).to.equal(0);
     });
 
-    it("L6: still scans when the marker is missing or not yet true", async () => {
+    it("takes the snapshot itself when the caller did not", async () => {
+      // onReady always snapshots first; a direct caller must still get a working sweep.
       adapter.objects.set("systems.my_server", { type: "device", common: { name: "My Server" }, native: {} });
       adapter.objects.set("systems.my_server.cpu_usage", { type: "state", common: {}, native: {} });
-      adapter.states.set("info.legacyMigrated", { val: false, ack: true });
       await manager.migrateLegacyStates();
       expect(adapter.objects.has("systems.my_server.cpu_usage")).to.be.false;
-      expect(adapter.states.get("info.legacyMigrated")?.val).to.equal(true);
+    });
+
+    it("removes the obsolete legacyMigrated marker from an upgraded install", async () => {
+      adapter.objects.set("info.legacyMigrated", {
+        type: "state",
+        common: { name: "Legacy state migration completed" },
+        native: {},
+      });
+      adapter.states.set("info.legacyMigrated", { val: true, ack: true });
+      await manager.snapshotExistingStates();
+
+      await manager.migrateLegacyStates();
+
+      expect(adapter.objects.has("info.legacyMigrated")).to.be.false;
+      // The user-facing datapoint line has to report it like any other removal.
+      expect(manager.takeChangeCounts().removed).to.equal(1);
     });
 
     it("should do nothing when no legacy states exist", async () => {
@@ -1940,9 +2041,9 @@ describe("StateManager", () => {
 
       await manager.migrateLegacyStates();
 
-      // L6: nothing to migrate here, but the one-shot marker is created (+1).
-      expect(adapter.objects.has("info.legacyMigrated")).to.be.true;
-      expect(adapter.objects.size).to.equal(objectCountBefore + 1);
+      // No marker is created any more — the object tree is untouched.
+      expect(adapter.objects.has("info.legacyMigrated")).to.be.false;
+      expect(adapter.objects.size).to.equal(objectCountBefore);
     });
 
     it("should handle empty adapter with no systems", async () => {
@@ -2176,14 +2277,14 @@ describe("StateManager", () => {
   });
 
   // -----------------------------------------------------------------------
-  // createdIds cache: avoid repeated setObjectNotExistsAsync per poll
+  // createdIds cache: avoid repeated object writes per poll
   // -----------------------------------------------------------------------
 
   describe("createdIds cache", () => {
-    it("does not call setObjectNotExistsAsync again on a second poll", async () => {
+    it("does not write the channel objects again on a second poll", async () => {
       let createCalls = 0;
-      const original = adapter.setObjectNotExistsAsync;
-      adapter.setObjectNotExistsAsync = async (id, obj): Promise<void> => {
+      const original = adapter.extendObject;
+      adapter.extendObject = (id, obj): Promise<void> => {
         createCalls++;
         return original(id, obj);
       };
@@ -2201,8 +2302,8 @@ describe("StateManager", () => {
       await manager.cleanupSystems([]); // remove my_server
 
       let createCalls = 0;
-      const original = adapter.setObjectNotExistsAsync;
-      adapter.setObjectNotExistsAsync = async (id, obj): Promise<void> => {
+      const original = adapter.extendObject;
+      adapter.extendObject = (id, obj): Promise<void> => {
         createCalls++;
         return original(id, obj);
       };
@@ -2217,8 +2318,8 @@ describe("StateManager", () => {
       await manager.cleanupMetrics("my_server", allMetricsConfig({ metrics_cpu: false }));
 
       let createCalls = 0;
-      const original = adapter.setObjectNotExistsAsync;
-      adapter.setObjectNotExistsAsync = async (id, obj): Promise<void> => {
+      const original = adapter.extendObject;
+      adapter.extendObject = (id, obj): Promise<void> => {
         createCalls++;
         return original(id, obj);
       };
@@ -2259,17 +2360,64 @@ describe("StateManager", () => {
       expect(stateExtends).to.equal(0);
     });
 
-    it("DP-retrofit: a state object is extended with preserve so a renamed state keeps its name", async () => {
+    it("DP-retrofit: a state object is extended WITHOUT preserve, so a changed name reaches it", async () => {
       const calls: unknown[][] = [];
       const origExtend = adapter.extendObject;
-      adapter.extendObject = async (...args: unknown[]): Promise<void> => {
+      adapter.extendObject = (...args: unknown[]): Promise<void> => {
         calls.push(args);
         return origExtend(args[0] as string, args[1] as Partial<ObjectDef>);
       };
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       const stateCall = calls.find(c => c[0] === "systems.my_server.cpu.usage");
-      expect(stateCall, "cpu.usage must be created via extendObject").to.not.be.undefined;
-      expect(stateCall![2]).to.deep.equal({ preserve: { common: ["name"] } });
+      expect(stateCall, "cpu.usage must be written via extendObject").to.not.be.undefined;
+      // No third argument: preserving `common.name` would freeze the text an
+      // existing installation was first created with (v0.14.0).
+      expect(stateCall![2]).to.be.undefined;
+    });
+
+    it("a corrected name reaches a state that ALREADY exists (not just fresh installs)", async () => {
+      // The exact defect `preserve` used to cause: an upgraded install keeps the
+      // old wording forever while the manifest and every gate look green.
+      adapter.objects.set("systems.my_server.cpu.usage", {
+        type: "state",
+        common: { name: { en: "old wording", de: "alter Text" }, type: "number", role: "value" },
+        native: {},
+      });
+
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+
+      expect(adapter.objects.get("systems.my_server.cpu.usage")?.common.name).to.deep.equal({
+        en: "cpuUsage",
+        de: "cpuUsage_de",
+      });
+    });
+
+    it("a corrected name reaches a CHANNEL that already exists", async () => {
+      adapter.objects.set("systems.my_server.cpu", {
+        type: "channel",
+        common: { name: { en: "old channel wording" } },
+        native: {},
+      });
+
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+
+      expect(adapter.objects.get("systems.my_server.cpu")?.common.name).to.deep.equal({
+        en: "channelCpu",
+        de: "channelCpu_de",
+      });
+    });
+
+    it("the DEVICE object keeps preserve — its name is the Hub's, a user rename stays", async () => {
+      const calls: unknown[][] = [];
+      const origExtend = adapter.extendObject;
+      adapter.extendObject = (...args: unknown[]): Promise<void> => {
+        calls.push(args);
+        return origExtend(args[0] as string, args[1] as Partial<ObjectDef>);
+      };
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      const deviceCall = calls.find(c => c[0] === "systems.my_server");
+      expect(deviceCall, "the device object must be written").to.not.be.undefined;
+      expect(deviceCall![2]).to.deep.equal({ preserve: { common: ["name"] } });
     });
   });
 
@@ -2863,16 +3011,15 @@ describe("StateManager", () => {
 
       const fresh = await restart();
       await fresh.migrateLegacyStates(["my_server"]);
-      // The two legacy states it deleted are NOT in the counter (they belong to
-      // the migration's own "removed N legacy state(s)" line). The one datapoint
-      // reported is the migration marker, which really is new.
-      expect(fresh.takeChangeCounts()).to.deep.equal({ created: 1, removed: 0 });
+      // The two legacy states it deleted are NOT in the counter — they belong to
+      // the migration's own "removed N legacy state(s)" line. Nothing else moved.
+      expect(fresh.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
     });
 
-    it("counts the migration marker only once, not on every later start", async () => {
+    it("stays silent on an install that never had legacy states", async () => {
       await manager.snapshotExistingStates();
       await manager.migrateLegacyStates([]);
-      expect(manager.takeChangeCounts()).to.deep.equal({ created: 1, removed: 0 });
+      expect(manager.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
 
       const afterRestart = await restart();
       await afterRestart.migrateLegacyStates([]);

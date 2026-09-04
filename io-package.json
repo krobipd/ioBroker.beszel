@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.13.0",
+    "version": "0.14.0",
     "news": {
+      "0.14.0": {
+        "en": "Corrected names and descriptions now reach installations that already have the datapoints.\nDatapoints whose meaning is not obvious carry a short explanation.\nA system the Hub has no reading for keeps its last values.\nUser documentation in English and German.",
+        "de": "Korrigierte Namen und Beschreibungen erreichen jetzt auch bestehende Anlagen.\nDatenpunkte, deren Bedeutung man nicht raten kann, tragen eine kurze Erklärung.\nEin System ohne Messwert behält seine letzten Werte.\nNutzerdoku auf Deutsch und Englisch.",
+        "ru": "Исправленные имена и описания теперь доходят и до существующих установок.\nНеочевидные датапоинты получили краткое пояснение.\nСистема без показаний сохраняет последние значения.\nДокументация на английском и немецком.",
+        "pt": "Nomes e descrições corrigidos chegam agora às instalações existentes.\nOs pontos de dados menos óbvios têm uma breve explicação.\nUm sistema sem leitura mantém os últimos valores.\nDocumentação em inglês e alemão.",
+        "nl": "Gecorrigeerde namen en beschrijvingen bereiken nu ook bestaande installaties.\nNiet vanzelfsprekende datapunten krijgen een korte uitleg.\nEen systeem zonder meting behoudt de laatste waarden.\nGebruikersdocumentatie in het Engels en Duits.",
+        "fr": "Les noms et descriptions corrigés atteignent désormais les installations existantes.\nLes points de données peu évidents portent une brève explication.\nUn système sans mesure conserve ses dernières valeurs.\nDocumentation en anglais et allemand.",
+        "it": "Nomi e descrizioni corretti raggiungono ora anche le installazioni esistenti.\nI datapoint meno ovvi hanno una breve spiegazione.\nUn sistema senza letture mantiene gli ultimi valori.\nDocumentazione in inglese e tedesco.",
+        "es": "Los nombres y descripciones corregidos llegan ahora a las instalaciones existentes.\nLos puntos de datos poco evidentes llevan una breve explicación.\nUn sistema sin lectura conserva sus últimos valores.\nDocumentación en inglés y alemán.",
+        "pl": "Poprawione nazwy i opisy docierają teraz także do istniejących instalacji.\nMniej oczywiste punkty danych mają krótkie wyjaśnienie.\nSystem bez odczytu zachowuje ostatnie wartości.\nDokumentacja po angielsku i niemiecku.",
+        "uk": "Виправлені назви та описи тепер доходять і до наявних інсталяцій.\nНеочевидні точки даних мають коротке пояснення.\nСистема без вимірювання зберігає останні значення.\nДокументація англійською та німецькою.",
+        "zh-cn": "更正后的名称和说明现在也会应用到已有安装。\n含义不直观的数据点带有简短说明。\n无读数的系统保留最后的数值。\n提供英文和德文用户文档。"
+      },
       "0.13.0": {
         "en": "IPv6 Hub addresses work; stopping during a poll logs no false error; systems stay offline when the adapter cannot start; the fleet summary states exist from the installation on.",
         "de": "IPv6-Hub-Adressen funktionieren; Stoppen während eines Abrufs erzeugt keine falsche Fehlerzeile; Systeme bleiben offline, wenn der Adapter nicht startet; Zusammenfassung ab Installation vorhanden.",
@@ -80,19 +93,6 @@
         "pl": "Porządki wewnętrzne. Bez zmian dla użytkownika.",
         "uk": "Внутрішнє прибирання. Без змін для користувачів.",
         "zh-cn": "内部清理。用户无可见变化。"
-      },
-      "0.10.0": {
-        "en": "Container states are no longer deleted when the adapter briefly loses access to the container data — they are kept until the containers are really gone.",
-        "de": "Container-Datenpunkte werden nicht mehr gelöscht, wenn der Adapter kurz keinen Zugriff auf die Container-Daten hat — sie bleiben, bis die Container wirklich weg sind.",
-        "ru": "Состояния контейнеров больше не удаляются, когда адаптер ненадолго теряет доступ к данным контейнеров — они сохраняются, пока контейнеры действительно не исчезнут.",
-        "pt": "Os estados dos contêineres já não são apagados quando o adaptador perde brevemente o acesso aos dados dos contêineres — permanecem até os contêineres desaparecerem mesmo.",
-        "nl": "Containerstatussen worden niet meer verwijderd wanneer de adapter kort geen toegang heeft tot de containergegevens — ze blijven behouden tot de containers echt weg zijn.",
-        "fr": "Les états des conteneurs ne sont plus supprimés lorsque l'adaptateur perd brièvement l'accès aux données des conteneurs — ils sont conservés jusqu'à leur disparition réelle.",
-        "it": "Gli stati dei container non vengono più eliminati quando l'adapter perde brevemente l'accesso ai dati dei container — vengono mantenuti finché i container non spariscono davvero.",
-        "es": "Los estados de los contenedores ya no se eliminan cuando el adaptador pierde brevemente el acceso a los datos de los contenedores — se conservan hasta que desaparecen de verdad.",
-        "pl": "Stany kontenerów nie są już usuwane, gdy adapter na chwilę traci dostęp do danych kontenerów — pozostają, dopóki kontenery naprawdę nie znikną.",
-        "uk": "Стани контейнерів більше не видаляються, коли адаптер ненадовго втрачає доступ до даних контейнерів — вони зберігаються, доки контейнери справді не зникнуть.",
-        "zh-cn": "当适配器短暂无法访问容器数据时，容器状态不再被删除——它们会一直保留，直到容器真正消失。"
       }
     },
     "plugins": {
@@ -125,6 +125,18 @@
       "pl": "Łączy się z Beszel Hub i udostępnia metryki serwera jako stany ioBroker",
       "uk": "Підключається до Beszel Hub та надає метрики сервера як стани ioBroker",
       "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
+    },
+    "docs": {
+      "en": [
+        "docs/en/README.md",
+        "docs/en/datapoints.md",
+        "docs/en/faq.md"
+      ],
+      "de": [
+        "docs/de/README.md",
+        "docs/de/datapoints.md",
+        "docs/de/faq.md"
+      ]
     },
     "authors": [
       "krobi <krobi@power-dreams.com>"
@@ -209,7 +221,20 @@
         "role": "indicator.connected",
         "read": true,
         "write": false,
-        "def": false
+        "def": false,
+        "desc": {
+          "en": "Whether the adapter currently reaches the Beszel Hub.",
+          "de": "Ob der Adapter den Beszel-Hub gerade erreicht.",
+          "ru": "Доступен ли сейчас Beszel Hub для адаптера.",
+          "pt": "Se o adaptador está a alcançar o Beszel Hub neste momento.",
+          "nl": "Of de adapter de Beszel-hub op dit moment bereikt.",
+          "fr": "Si l'adaptateur atteint actuellement le Hub Beszel.",
+          "it": "Se l'adapter raggiunge attualmente l'hub Beszel.",
+          "es": "Si el adaptador alcanza actualmente el Hub de Beszel.",
+          "pl": "Czy adapter aktualnie łączy się z hubem Beszel.",
+          "uk": "Чи доступний зараз Beszel Hub для адаптера.",
+          "zh-cn": "适配器当前是否能连接到 Beszel Hub。"
+        }
       },
       "native": {}
     },
@@ -220,21 +245,34 @@
         "name": {
           "en": "Systems total",
           "de": "Systeme gesamt",
-          "ru": "Systems total",
-          "pt": "Systems total",
-          "nl": "Systems total",
-          "fr": "Systems total",
-          "it": "Systems total",
-          "es": "Systems total",
-          "pl": "Systems total",
-          "uk": "Systems total",
-          "zh-cn": "Systems total"
+          "ru": "Всего систем",
+          "pt": "Total de sistemas",
+          "nl": "Systemen totaal",
+          "fr": "Total des systèmes",
+          "it": "Sistemi totali",
+          "es": "Sistemas en total",
+          "pl": "Systemy łącznie",
+          "uk": "Усього систем",
+          "zh-cn": "系统总数"
         },
         "type": "number",
         "role": "value",
         "read": true,
         "write": false,
-        "def": 0
+        "def": 0,
+        "desc": {
+          "en": "How many systems are registered on the Hub.",
+          "de": "Wie viele Systeme am Hub registriert sind.",
+          "ru": "Сколько систем зарегистрировано на хабе.",
+          "pt": "Quantos sistemas estão registados no Hub.",
+          "nl": "Hoeveel systemen op de hub geregistreerd zijn.",
+          "fr": "Combien de systèmes sont enregistrés sur le Hub.",
+          "it": "Quanti sistemi sono registrati sull'hub.",
+          "es": "Cuántos sistemas están registrados en el Hub.",
+          "pl": "Ile systemów jest zarejestrowanych w hubie.",
+          "uk": "Скільки систем зареєстровано на хабі.",
+          "zh-cn": "Hub 上注册了多少个系统。"
+        }
       },
       "native": {}
     },
@@ -245,21 +283,34 @@
         "name": {
           "en": "Systems online",
           "de": "Systeme online",
-          "ru": "Systems online",
-          "pt": "Systems online",
-          "nl": "Systems online",
-          "fr": "Systems online",
-          "it": "Systems online",
-          "es": "Systems online",
-          "pl": "Systems online",
-          "uk": "Systems online",
-          "zh-cn": "Systems online"
+          "ru": "Систем онлайн",
+          "pt": "Sistemas online",
+          "nl": "Systemen online",
+          "fr": "Systèmes en ligne",
+          "it": "Sistemi online",
+          "es": "Sistemas en línea",
+          "pl": "Systemy online",
+          "uk": "Систем онлайн",
+          "zh-cn": "在线系统"
         },
         "type": "number",
         "role": "value",
         "read": true,
         "write": false,
-        "def": 0
+        "def": 0,
+        "desc": {
+          "en": "How many of the registered systems currently report \"up\".",
+          "de": "Wie viele der registrierten Systeme gerade „up\" melden.",
+          "ru": "Сколько из зарегистрированных систем сейчас сообщают «up».",
+          "pt": "Quantos dos sistemas registados reportam «up» neste momento.",
+          "nl": "Hoeveel van de geregistreerde systemen op dit moment \"up\" melden.",
+          "fr": "Combien des systèmes enregistrés signalent actuellement « up ».",
+          "it": "Quanti dei sistemi registrati riportano attualmente «up».",
+          "es": "Cuántos de los sistemas registrados informan «up» en este momento.",
+          "pl": "Ile z zarejestrowanych systemów zgłasza obecnie „up\".",
+          "uk": "Скільки із зареєстрованих систем зараз повідомляють «up».",
+          "zh-cn": "已注册的系统中当前有多少报告为 “up”。"
+        }
       },
       "native": {}
     },
@@ -270,21 +321,34 @@
         "name": {
           "en": "All systems online",
           "de": "Alle Systeme online",
-          "ru": "All systems online",
-          "pt": "All systems online",
-          "nl": "All systems online",
-          "fr": "All systems online",
-          "it": "All systems online",
-          "es": "All systems online",
-          "pl": "All systems online",
-          "uk": "All systems online",
-          "zh-cn": "All systems online"
+          "ru": "Все системы онлайн",
+          "pt": "Todos os sistemas online",
+          "nl": "Alle systemen online",
+          "fr": "Tous les systèmes en ligne",
+          "it": "Tutti i sistemi online",
+          "es": "Todos los sistemas en línea",
+          "pl": "Wszystkie systemy online",
+          "uk": "Усі системи онлайн",
+          "zh-cn": "所有系统在线"
         },
         "type": "boolean",
         "role": "indicator",
         "read": true,
         "write": false,
-        "def": false
+        "def": false,
+        "desc": {
+          "en": "True while every registered system reports \"up\".",
+          "de": "Wahr, solange jedes registrierte System „up\" meldet.",
+          "ru": "Истина, пока все зарегистрированные системы сообщают «up».",
+          "pt": "Verdadeiro enquanto todos os sistemas registados reportam «up».",
+          "nl": "Waar zolang elk geregistreerd systeem \"up\" meldt.",
+          "fr": "Vrai tant que chaque système enregistré signale « up ».",
+          "it": "Vero finché ogni sistema registrato riporta «up».",
+          "es": "Verdadero mientras todos los sistemas registrados informen «up».",
+          "pl": "Prawda, dopóki każdy zarejestrowany system zgłasza „up\".",
+          "uk": "Істина, доки кожна зареєстрована система повідомляє «up».",
+          "zh-cn": "当所有已注册系统都报告 “up” 时为真。"
+        }
       },
       "native": {}
     },

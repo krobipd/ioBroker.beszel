@@ -1,6 +1,6 @@
 import type * as utils from "@iobroker/adapter-core";
 import { errText, sanitizeDisplayName, sanitizeForLog } from "./coerce";
-import { tName } from "./i18n";
+import { tDesc, tName } from "./i18n";
 import {
   buildMetricDefs,
   commonFor,
@@ -21,14 +21,54 @@ import type { LocalizedName, MetricDef } from "./metric-registry";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
 /**
+ * Flat state ids used before 0.3.0, when every metric lived directly under the
+ * system device instead of a channel. Swept once from the startup snapshot.
+ */
+const LEGACY_FLAT_STATE_IDS = [
+  "online",
+  "status",
+  "uptime",
+  "uptime_text",
+  "agent_version",
+  "services_total",
+  "services_failed",
+  "cpu_usage",
+  "load_avg_1m",
+  "load_avg_5m",
+  "load_avg_15m",
+  "cpu_user",
+  "cpu_system",
+  "cpu_iowait",
+  "cpu_steal",
+  "cpu_idle",
+  "memory_percent",
+  "memory_used",
+  "memory_total",
+  "buffers",
+  "zfs_arc",
+  "swap_used",
+  "swap_total",
+  "disk_percent",
+  "disk_used",
+  "disk_total",
+  "disk_read",
+  "disk_write",
+  "network_sent",
+  "network_recv",
+  "temperature",
+  "battery_percent",
+  "battery_charging",
+] as const;
+
+/**
  * Manages creation, update and cleanup of ioBroker objects and states for Beszel systems.
  */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
   /**
-   * Tracks IDs we already created via `setObjectNotExistsAsync`. Skipping the
-   * call on subsequent polls avoids a redundant js-controller round-trip per
-   * state per system per minute.
+   * Tracks IDs whose object we already wrote this run. Skipping the write on
+   * subsequent polls avoids a redundant js-controller round-trip per state per
+   * system per minute — the object write happens once per id per restart.
    */
   private readonly createdIds = new Set<string>();
 
@@ -78,6 +118,13 @@ export class StateManager {
    * a genuine new creation.
    */
   private readonly knownStateIds = new Set<string>();
+  /**
+   * v0.14.0: the channels the startup snapshot found. Only the legacy sweep reads
+   * them — it lets the one pre-0.3.0 channel be recognised without an object read.
+   */
+  private readonly knownChannelIds = new Set<string>();
+  /** Whether {@link snapshotExistingStates} has run — the legacy sweep depends on it. */
+  private snapshotTaken = false;
   private createdStatesCount = 0;
   private removedStatesCount = 0;
 
@@ -94,13 +141,22 @@ export class StateManager {
    * or deleted before it would be miscounted.
    */
   public async snapshotExistingStates(): Promise<void> {
-    const view = await this.adapter.getObjectViewAsync("system", "state", {
+    // One object LIST instead of a per-type view: it carries states and channels in
+    // the same round-trip, which is what lets the pre-0.3.0 sweep run without probing
+    // ids one by one (and made the `info.legacyMigrated` marker obsolete).
+    const list = await this.adapter.getObjectListAsync({
       startkey: `${this.adapter.namespace}.`,
       endkey: `${this.adapter.namespace}.\uFFFF`,
     });
-    for (const row of view?.rows ?? []) {
-      this.knownStateIds.add(this.stripNamespace(row.id));
+    for (const row of list?.rows ?? []) {
+      const id = this.stripNamespace(row.id);
+      if (row.value?.type === "state") {
+        this.knownStateIds.add(id);
+      } else if (row.value?.type === "channel") {
+        this.knownChannelIds.add(id);
+      }
     }
+    this.snapshotTaken = true;
   }
 
   /**
@@ -326,11 +382,11 @@ export class StateManager {
       if (id.endsWith(".info.online")) {
         await this.adapter.setStateChangedAsync(id, { val: false, ack: true });
       } else if (id.endsWith(".info.status")) {
-        await this.adapter.extendObject(
-          id,
-          { type: "state", common: { states: SYSTEM_STATUS_STATES }, native: {} },
-          { preserve: { common: ["name"] } },
-        );
+        await this.adapter.extendObject(id, {
+          type: "state",
+          common: { states: SYSTEM_STATUS_STATES },
+          native: {},
+        });
         await this.adapter.setStateChangedAsync(id, { val: SYSTEM_STATUS_UNKNOWN, ack: true });
       }
     }
@@ -442,12 +498,28 @@ export class StateManager {
       if (!d.available || d.available(stats, system)) {
         return true;
       }
-      // H2b: a field that went absent (e.g. `dios`/`cpub` are omitzero/omitempty
-      // on the wire, so a fully-idle disk drops them) is no longer "available" —
-      // but if the state was already created we must still UPDATE it (extract →
-      // null) instead of freezing the last busy value. A never-created state on
-      // an older Hub stays uncreated.
-      return this.createdIds.has(`${sysId}.${d.id}`);
+      // Not available — and the two reasons for that need opposite handling.
+      if (!stats) {
+        // The Hub has no reading for this system at all (down / paused, or its newest
+        // record is older than the stats walk). Nothing may be nulled here: the
+        // dynamic groups freeze in exactly this case too, and "every ioBroker adapter
+        // leaves the last values standing" is the line krobi confirmed. Before v0.14.0
+        // this branch nulled every metric of a system that went down mid-run, while
+        // the same system after a restart kept its values — same situation, two
+        // different trees.
+        return false;
+      }
+      // H2b: the record IS there but one field went absent (e.g. `dios`/`cpub` are
+      // omitzero/omitempty on the wire, so a fully-idle disk drops them). Then the
+      // state must be UPDATED (extract → null) instead of freezing the last busy
+      // value. A never-created state on an older Hub stays uncreated.
+      //
+      // `knownStateIds` as well as `createdIds`: the latter is empty on a fresh
+      // process, so the reset silently stopped working after every adapter restart —
+      // the stale value then stood forever. The startup snapshot knows the state is
+      // there (v0.14.0).
+      const id = `${sysId}.${d.id}`;
+      return this.createdIds.has(id) || this.knownStateIds.has(id);
     });
     const channels = new Set(active.map(d => d.channel));
     for (const ch of channels) {
@@ -513,6 +585,11 @@ export class StateManager {
           },
           native: { id: system.id, host: system.host },
         },
+        // The only object that KEEPS `preserve`. Its name is the system name from
+        // the Hub, and renaming a system there produces a different sanitized id —
+        // i.e. a new device object anyway. So preserving here can only ever protect
+        // a rename the user typed in the admin, and never blocks anything the
+        // adapter itself ships (unlike the channels/states below, v0.14.0).
         { preserve: { common: ["name"] } },
       );
       this.deviceWritten.set(sysId, deviceSig);
@@ -530,7 +607,7 @@ export class StateManager {
     await this.createAndSetState(
       `${sysId}.info.status`,
       {
-        ...textCommon(tName("status"), "info.status"),
+        ...textCommon(tName("status"), "info.status", tDesc("descStatus")),
         states: SYSTEM_STATUS_STATES,
       },
       system.status,
@@ -735,6 +812,13 @@ export class StateManager {
    * Remove legacy flat state paths from pre-0.3.0 installations.
    * Must be called once during onReady before the first poll.
    *
+   * v0.14.0: decided entirely from the startup snapshot — no probing of dozens of
+   * legacy ids per system, and therefore no `info.legacyMigrated` marker any more.
+   * The marker only ever existed to skip that probing; since v0.11.0 the snapshot
+   * reads every existing object once anyway (and runs BEFORE this), so the whole
+   * sweep is free and the marker datapoint was pure bookkeeping in the user's tree.
+   * An install that still carries it gets it removed here.
+   *
    * F3: `existingNames` may be passed in when the caller (onReady) has already
    * enumerated the system devices — then this method reuses that list instead of
    * running the same object view a second time. Omitted (e.g. in unit tests) it
@@ -743,16 +827,15 @@ export class StateManager {
    * @param existingNames Pre-enumerated system device names, or undefined to enumerate here.
    */
   public async migrateLegacyStates(existingNames?: string[]): Promise<void> {
-    // L6: one-shot guard. Pre-0.3.0 flat states only exist on installs that
-    // upgraded through <0.3.0; once swept (or confirmed absent) a marker lets
-    // later restarts skip probing dozens of legacy ids per system every time.
-    const marker = await this.adapter.getStateAsync("info.legacyMigrated");
-    if (marker?.val === true) {
-      return;
+    // The sweep reads the snapshot, so it has to exist. onReady always takes it
+    // first; a direct caller (unit test) gets it taken here. Idempotent.
+    if (!this.snapshotTaken) {
+      await this.snapshotExistingStates();
     }
+    await this.removeLegacyMigrationMarker();
+
     const names = existingNames ?? (await this.getExistingSystemNames());
     if (names.length === 0) {
-      await this.markLegacyMigrationDone();
       return;
     }
     // v0.4.4 (G4): trace the scan-start so the migration-summary at the end
@@ -760,67 +843,34 @@ export class StateManager {
     // the existing info-summary stays silent.
     this.adapter.log.debug(`migrateLegacyStates: scanning ${names.length} existing system(s) for legacy flat states`);
 
-    // Old flat state IDs that moved into channels
-    const legacyStates = [
-      "online",
-      "status",
-      "uptime",
-      "uptime_text",
-      "agent_version",
-      "services_total",
-      "services_failed",
-      "cpu_usage",
-      "load_avg_1m",
-      "load_avg_5m",
-      "load_avg_15m",
-      "cpu_user",
-      "cpu_system",
-      "cpu_iowait",
-      "cpu_steal",
-      "cpu_idle",
-      "memory_percent",
-      "memory_used",
-      "memory_total",
-      "buffers",
-      "zfs_arc",
-      "swap_used",
-      "swap_total",
-      "disk_percent",
-      "disk_used",
-      "disk_total",
-      "disk_read",
-      "disk_write",
-      "network_sent",
-      "network_recv",
-      "temperature",
-      "battery_percent",
-      "battery_charging",
-    ];
-
-    // v0.4.3 (SM3): per-system migration in parallel; per-state checks
-    // within a system stay sequential (the mocha+ts-node ESM loader trips
-    // on doubly-nested Promise.all here — see Memory `feedback_mocha_esm_loader_bug`).
-    // Outer parallel still cuts total time by N where N = system count.
+    // v0.4.3 (SM3): per-system migration in parallel. Each system only touches
+    // the ids the snapshot actually lists, so there is no probing left to do.
     const counts = await Promise.all(
       names.map(async name => {
         const sysId = `systems.${name}`;
         let local = 0;
-        for (const stateId of legacyStates) {
+        for (const stateId of LEGACY_FLAT_STATE_IDS) {
           const fullId = `${sysId}.${stateId}`;
-          const obj = await this.adapter.getObjectAsync(fullId);
-          if (obj && obj.type === "state") {
-            await this.adapter.delObjectAsync(fullId);
-            this.createdIds.delete(fullId);
-            // Not counted (see the countRemoval=false note below) but dropped
-            // from the id set so the bookkeeping stays truthful.
-            this.knownStateIds.delete(fullId);
-            local++;
+          if (!this.knownStateIds.has(fullId)) {
+            continue;
           }
+          await this.adapter.delObjectAsync(fullId);
+          this.createdIds.delete(fullId);
+          // Not counted (see the countRemoval=false note below) but dropped
+          // from the id set so the bookkeeping stays truthful.
+          this.knownStateIds.delete(fullId);
+          local++;
         }
-        // countRemoval=false: the legacy sweep reports its own total below —
-        // letting it also feed the datapoint counter would report the same
-        // removals twice, in two differently-scoped lines.
-        await this.deleteChannelIfExists(`${sysId}.temperatures`, false);
+        // The one legacy CHANNEL. The snapshot lists channels too, so this needs
+        // no object read either.
+        const legacyChannel = `${sysId}.temperatures`;
+        if (this.knownChannelIds.has(legacyChannel)) {
+          // countRemoval=false: the legacy sweep reports its own total below —
+          // letting it also feed the datapoint counter would report the same
+          // removals twice, in two differently-scoped lines.
+          await this.deleteChannelIfExists(legacyChannel, false);
+          this.knownChannelIds.delete(legacyChannel);
+        }
         return local;
       }),
     );
@@ -829,24 +879,23 @@ export class StateManager {
     if (migrated > 0) {
       this.adapter.log.info(`Migration: removed ${migrated} legacy state(s) from flat structure`);
     }
-    await this.markLegacyMigrationDone();
   }
 
-  /** L6: set the one-shot marker so later restarts skip the legacy-state scan. */
-  private async markLegacyMigrationDone(): Promise<void> {
-    await this.adapter.setObjectNotExistsAsync("info.legacyMigrated", {
-      type: "state",
-      common: {
-        name: "Legacy state migration completed",
-        type: "boolean",
-        role: "indicator",
-        read: true,
-        write: false,
-      },
-      native: {},
-    });
-    this.noteStateCreated("info.legacyMigrated");
-    await this.adapter.setStateChangedAsync("info.legacyMigrated", { val: true, ack: true });
+  /**
+   * v0.14.0: drop the obsolete `info.legacyMigrated` marker. It guarded a scan that
+   * costs nothing any more, and every fresh install created it as well — a technical
+   * bookkeeping flag in the user's object tree that says nothing about the system
+   * being monitored. Counted like any other removal, so the datapoint line reports it.
+   */
+  private async removeLegacyMigrationMarker(): Promise<void> {
+    const id = "info.legacyMigrated";
+    if (!this.knownStateIds.has(id)) {
+      return;
+    }
+    await this.adapter.delObjectAsync(id);
+    this.createdIds.delete(id);
+    this.noteStateRemoved(id);
+    this.adapter.log.debug(`Removed the obsolete migration marker ${id}`);
   }
 
   // -------------------------------------------------------------------------
@@ -935,7 +984,9 @@ export class StateManager {
           activeCores.add(`core${i}`);
           await this.createAndSetState(
             `${sysId}.cpu.cores.core${i}`,
-            percentCommon(`Core ${i}`),
+            // Positional label, but still a translation object: the fleet standard
+            // wants one for every object, and `%s` carries the index into each language.
+            percentCommon(tName("cpuCore", i)),
             clampPercent(cores[i]),
           );
         }
@@ -972,12 +1023,12 @@ export class StateManager {
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_up`,
-            numCommon(tName("ifaceTotalUp"), "GB"),
+            numCommon(tName("ifaceTotalUp"), "GB", "value", tDesc("descIfaceTotal")),
             bytesToGib(vals[2]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_down`,
-            numCommon(tName("ifaceTotalDown"), "GB"),
+            numCommon(tName("ifaceTotalDown"), "GB", "value", tDesc("descIfaceTotal")),
             bytesToGib(vals[3]),
           );
         },
@@ -1022,7 +1073,7 @@ export class StateManager {
           if (config.metrics_gpuDetails) {
             await this.createAndSetState(
               `${sysId}.gpu.${safeId}.power_package`,
-              numCommon(tName("gpuPowerPackage"), "W", "value.power"),
+              numCommon(tName("gpuPowerPackage"), "W", "value.power", tDesc("descGpuPowerPackage")),
               gpuData.pp ?? null,
             );
             await this.syncDynamicGroup(
@@ -1154,7 +1205,7 @@ export class StateManager {
       const healthIdx = Math.floor(container.health);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
-        textCommon(tName("containerHealth")),
+        textCommon(tName("containerHealth"), "text", tDesc("descContainerHealth")),
         healthLabels[healthIdx] ?? "unknown",
       );
       await this.createAndSetState(`${sysId}.containers.${cId}.cpu`, percentCommon(tName("cpuUsage")), container.cpu);
@@ -1173,7 +1224,7 @@ export class StateManager {
       if (container.net != null) {
         await this.createAndSetState(
           `${sysId}.containers.${cId}.network`,
-          numCommon(tName("containerNetwork"), "B/s"),
+          numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
           container.net,
         );
       }
@@ -1309,11 +1360,22 @@ export class StateManager {
     this.dynamicChildren.set(base, new Set(activeIds));
   }
 
+  /**
+   * Ensure a channel exists AND carries the current name. `extendObject`, not
+   * `setObjectNotExists`: the names are the adapter's own (translated via
+   * `admin/i18n`), so a corrected translation has to reach an installation that
+   * already has the channel — otherwise it only ever lands on fresh installs
+   * while every gate looks green. Runs once per channel per restart
+   * (`createdIds`-gated), so it is a startup cost, not a per-poll write.
+   *
+   * @param id Channel id, namespace-relative.
+   * @param name Current display name (translation object).
+   */
   private async ensureChannel(id: string, name: LocalizedName): Promise<void> {
     if (this.createdIds.has(id)) {
       return;
     }
-    await this.adapter.setObjectNotExistsAsync(id, {
+    await this.adapter.extendObject(id, {
       type: "channel",
       common: { name },
       native: {},
@@ -1337,7 +1399,7 @@ export class StateManager {
         this.dropCacheUnder(id);
       }
     } catch (err) {
-      // v0.5.0 (S2): silent-catch ersetzt durch debug-Trace. Broker-already-down
+      // v0.5.0 (S2): a silent catch replaced by a debug trace. Broker-already-down
       // or "object does not exist" are expected here — keep them out of the
       // user log but leave a breadcrumb for diagnostics.
       this.adapter.log.debug(`deleteChannelIfExists(${id}) ignored: ${errText(err)}`);
@@ -1348,8 +1410,15 @@ export class StateManager {
     if (!this.createdIds.has(id)) {
       // DP-retrofit: extendObject (not setObjectNotExists) on first touch so a
       // changed `common` (the value.battery/value.power/info.status role fixes)
-      // reaches states that already exist on an upgraded install — user-renamed
-      // names are preserved. Runs once per state per restart (createdIds-gated).
+      // reaches states that already exist on an upgraded install. Runs once per
+      // state per restart (createdIds-gated).
+      //
+      // v0.14.0: WITHOUT `preserve: { common: ["name"] }`. These names belong to the
+      // adapter (translated via `admin/i18n`) or to the Hub (sensor/container/GPU
+      // names) — never to the user. Preserving them froze every existing tree on the
+      // text it was first created with, so a corrected translation reached fresh
+      // installs only, invisible to every gate. The price is that a rename a user
+      // typed into the admin is overwritten on the next start (krobi 2026-09-03).
       //
       // Deliberately every restart, NOT gated behind a one-shot schema-version
       // marker. A marker would set "done" after the first successful poll — but a
@@ -1358,7 +1427,7 @@ export class StateManager {
       // role would be frozen forever. The every-restart extendObject is idempotent,
       // self-healing (a returning system gets retrofitted next restart) and only a
       // startup cost. Don't "optimize" it into that regression.
-      await this.adapter.extendObject(id, { type: "state", common, native: {} }, { preserve: { common: ["name"] } });
+      await this.adapter.extendObject(id, { type: "state", common, native: {} });
       this.createdIds.add(id);
       this.noteStateCreated(id);
     }

@@ -16,6 +16,7 @@ vi.mock("@iobroker/adapter-core", () => {
     public setState = vi.fn(async () => {});
     public setStateChangedAsync = vi.fn(async () => {});
     public setObjectNotExistsAsync = vi.fn(async () => {});
+    public extendObject = vi.fn(async () => {});
     public setInterval = vi.fn(() => ({}));
     public clearInterval = vi.fn();
     public setTimeout = vi.fn(() => ({}));
@@ -99,6 +100,7 @@ function internalOf(adapter: BeszelAdapter): {
   setState: ReturnType<typeof vi.fn>;
   setStateChangedAsync: ReturnType<typeof vi.fn>;
   setObjectNotExistsAsync: ReturnType<typeof vi.fn>;
+  extendObject: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   extendForeignObjectAsync: ReturnType<typeof vi.fn>;
@@ -632,6 +634,32 @@ describe("BeszelAdapter poll — happy path", () => {
     expect(byId.get("info.systemsTotal")?.common).toMatchObject({ type: "number", role: "value", def: 0 });
     expect(byId.get("info.systemsOnline")?.common).toMatchObject({ type: "number", role: "value", def: 0 });
     expect(byId.get("info.systemsAllUp")?.common).toMatchObject({ type: "boolean", role: "indicator", def: false });
+  });
+
+  it("every manifest object is refreshed at runtime, so an existing tree gets the new texts", async () => {
+    // js-controller creates instanceObjects only where they are MISSING. Without an
+    // explicit extendObject a corrected name/description reaches fresh installs only,
+    // while the manifest and every gate look green (fleet rule, krobi 2026-09-03).
+    const manifest = JSON.parse(readFileSync(join(__dirname, "..", "io-package.json"), "utf8")) as {
+      instanceObjects: Array<{ _id: string }>;
+    };
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const touched = i.extendObject.mock.calls.map(c => c[0] as string);
+    for (const obj of manifest.instanceObjects) {
+      expect(touched, `${obj._id} must be refreshed in onReady`).toContain(obj._id);
+    }
+  });
+
+  it("refreshes the manifest objects WITHOUT preserve — the old name must not survive", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const call = i.extendObject.mock.calls.find(c => c[0] === "info.systemsTotal");
+    expect(call, "info.systemsTotal must be refreshed").toBeDefined();
+    // A third argument would be the preserve option — that is exactly what froze the
+    // English wording on upgraded installations.
+    expect(call![2]).toBeUndefined();
+    expect((call![1] as { common: Record<string, unknown> }).common.desc).toBeDefined();
   });
 
   it("DP4: never creates the rollup objects at runtime — the manifest owns them", async () => {

@@ -1,4 +1,4 @@
-import { tName } from "./i18n";
+import { tDesc, tName } from "./i18n";
 import type { AdapterConfig, BeszelSystem, SystemStats } from "./types";
 
 /**
@@ -30,6 +30,12 @@ export interface MetricDef {
   id: string;
   /** i18n key for the state's display name. */
   nameKey: string;
+  /**
+   * i18n key for the state's `common.desc` — one plain sentence explaining what the
+   * value means. Omitted where the name and unit already say everything: the fleet
+   * standard wants an empty desc rather than an invented one.
+   */
+  descKey?: string;
   /** Which common shape to build. */
   kind: "percent" | "num" | "text" | "bool";
   /** Unit for numeric kinds. */
@@ -121,7 +127,7 @@ export const DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = 
  * admin/jsonConfig.json. Every non-base metric in a category gates on the
  * category's base/usage metric — including the default-on co-metrics `loadAvg`
  * (→ CPU) and `diskSpeed` (→ Disk): krobi wants a category to switch off
- * completely, no "logischer Ausreißer". Only the System category (uptime /
+ * completely, with no odd one out. Only the System category (uptime /
  * system-info / services) has no single base, so its three are not gated.
  */
 export const METRIC_DEPENDENCIES = {
@@ -147,10 +153,12 @@ export const METRIC_DEPENDENCIES = {
  *
  * @param name Localized state name.
  * @param role common.role (default "value"; e.g. "value.battery").
+ * @param desc Localized one-sentence explanation, omitted when there is nothing to explain.
  */
-export function percentCommon(name: LocalizedName, role = "value"): ioBroker.StateCommon {
+export function percentCommon(name: LocalizedName, role = "value", desc?: LocalizedName): ioBroker.StateCommon {
   return {
     name,
+    ...(desc ? { desc } : {}),
     type: "number",
     role,
     unit: "%",
@@ -167,10 +175,17 @@ export function percentCommon(name: LocalizedName, role = "value"): ioBroker.Sta
  * @param name Localized state name.
  * @param unit Optional unit label (e.g. "MB/s").
  * @param role common.role (default "value").
+ * @param desc Localized one-sentence explanation, omitted when there is nothing to explain.
  */
-export function numCommon(name: LocalizedName, unit?: string, role = "value"): ioBroker.StateCommon {
+export function numCommon(
+  name: LocalizedName,
+  unit?: string,
+  role = "value",
+  desc?: LocalizedName,
+): ioBroker.StateCommon {
   return {
     name,
+    ...(desc ? { desc } : {}),
     type: "number",
     role,
     unit,
@@ -184,10 +199,12 @@ export function numCommon(name: LocalizedName, unit?: string, role = "value"): i
  *
  * @param name Localized state name.
  * @param role common.role (default "text").
+ * @param desc Localized one-sentence explanation, omitted when there is nothing to explain.
  */
-export function textCommon(name: LocalizedName, role = "text"): ioBroker.StateCommon {
+export function textCommon(name: LocalizedName, role = "text", desc?: LocalizedName): ioBroker.StateCommon {
   return {
     name,
+    ...(desc ? { desc } : {}),
     type: "string",
     role,
     read: true,
@@ -200,10 +217,12 @@ export function textCommon(name: LocalizedName, role = "text"): ioBroker.StateCo
  *
  * @param name Localized state name.
  * @param role common.role (default "indicator").
+ * @param desc Localized one-sentence explanation, omitted when there is nothing to explain.
  */
-export function boolCommon(name: LocalizedName, role = "indicator"): ioBroker.StateCommon {
+export function boolCommon(name: LocalizedName, role = "indicator", desc?: LocalizedName): ioBroker.StateCommon {
   return {
     name,
+    ...(desc ? { desc } : {}),
     type: "boolean",
     role,
     read: true,
@@ -367,15 +386,16 @@ export function formatUptime(seconds: number): string {
  */
 export function commonFor(def: MetricDef): ioBroker.StateCommon {
   const name = tName(def.nameKey as Parameters<typeof tName>[0]);
+  const desc = def.descKey ? tDesc(def.descKey as Parameters<typeof tDesc>[0]) : undefined;
   switch (def.kind) {
     case "percent":
-      return percentCommon(name, def.role);
+      return percentCommon(name, def.role, desc);
     case "text":
-      return textCommon(name);
+      return textCommon(name, "text", desc);
     case "bool":
-      return boolCommon(name);
+      return boolCommon(name, "indicator", desc);
     default:
-      return numCommon(name, def.unit, def.role ?? "value");
+      return numCommon(name, def.unit, def.role ?? "value", desc);
   }
 }
 
@@ -500,6 +520,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "info",
       id: "info.podman",
       nameKey: "podman",
+      descKey: "descPodman",
       kind: "bool",
       available: (_st, s) => s.details?.podman != null,
       extract: s => s.details?.podman ?? null,
@@ -509,6 +530,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "info",
       id: "info.services_total",
       nameKey: "servicesTotal",
+      descKey: "descServicesTotal",
       kind: "num",
       available: (_st, s) => s.info.sv != null,
       extract: s => s.info.sv?.[0] ?? null,
@@ -518,6 +540,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "info",
       id: "info.services_failed",
       nameKey: "servicesFailed",
+      descKey: "descServicesFailed",
       kind: "num",
       available: (_st, s) => s.info.sv != null,
       extract: s => s.info.sv?.[1] ?? null,
@@ -580,6 +603,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "cpu",
       id: "cpu.iowait",
       nameKey: "cpuIowait",
+      descKey: "descCpuIowait",
       kind: "percent",
       available: hasCpub,
       extract: (_s, st) => st?.cpub?.[2] ?? null,
@@ -589,6 +613,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "cpu",
       id: "cpu.steal",
       nameKey: "cpuSteal",
+      descKey: "descCpuSteal",
       kind: "percent",
       available: hasCpub,
       extract: (_s, st) => st?.cpub?.[3] ?? null,
@@ -636,6 +661,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "memory",
       id: "memory.buffers",
       nameKey: "memoryBuffers",
+      descKey: "descMemoryBuffers",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -646,6 +672,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "memory",
       id: "memory.zfs_arc",
       nameKey: "memoryZfsArc",
+      descKey: "descMemoryZfsArc",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -676,6 +703,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.percent",
       nameKey: "diskPercent",
+      descKey: "descRootDisk",
       kind: "percent",
       available: hasStats,
       extract: (_s, st) => st?.dp ?? null,
@@ -685,6 +713,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.used",
       nameKey: "diskUsed",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -695,6 +724,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.total",
       nameKey: "diskTotal",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "GB",
       available: hasStats,
@@ -705,6 +735,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.read",
       nameKey: "diskRead",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "MB/s",
       available: hasStats,
@@ -715,6 +746,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.write",
       nameKey: "diskWrite",
+      descKey: "descRootDisk",
       kind: "num",
       unit: "MB/s",
       available: hasStats,
@@ -745,6 +777,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "temperature",
       id: "temperature.average",
       nameKey: "temperatureAvg",
+      descKey: "descTemperatureAvg",
       kind: "num",
       unit: "°C",
       role: "value.temperature",
@@ -756,6 +789,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "temperature",
       id: "temperature.max",
       nameKey: "temperatureMax",
+      descKey: "descTemperatureMax",
       kind: "num",
       unit: "°C",
       role: "value.temperature",
@@ -777,6 +811,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "battery",
       id: "battery.charging",
       nameKey: "batteryCharging",
+      descKey: "descBatteryCharging",
       kind: "bool",
       available: hasStats,
       extract: (s, st) => {
@@ -798,6 +833,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "cpu",
       id: "cpu.peak",
       nameKey: "cpuPeak",
+      descKey: "descPeak",
       kind: "percent",
       available: st => st?.cpum != null,
       extract: (_s, st) => st?.cpum ?? null,
@@ -807,6 +843,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "memory",
       id: "memory.peak",
       nameKey: "memoryPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "GB",
       available: st => st?.mm != null,
@@ -817,6 +854,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.read_peak",
       nameKey: "diskReadPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: st => st?.drm != null,
@@ -827,6 +865,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.write_peak",
       nameKey: "diskWritePeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: st => st?.dwm != null,
@@ -837,6 +876,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "network",
       id: "network.sent_peak",
       nameKey: "networkSentPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: st => st?.nsm != null,
@@ -847,6 +887,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "network",
       id: "network.recv_peak",
       nameKey: "networkRecvPeak",
+      descKey: "descPeak",
       kind: "num",
       unit: "MB/s",
       available: st => st?.nrm != null,
@@ -857,6 +898,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.io_util",
       nameKey: "diskIoUtil",
+      descKey: "descDiskIoUtil",
       kind: "percent",
       available: st => hasDio(st, 3),
       extract: (_s, st) => st?.dios?.[2] ?? null,
@@ -866,6 +908,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.io_await_read",
       nameKey: "diskIoAwaitRead",
+      descKey: "descDiskIoAwaitRead",
       kind: "num",
       unit: "ms",
       available: st => hasDio(st, 5),
@@ -876,6 +919,7 @@ export function buildMetricDefs(): MetricDef[] {
       channel: "disk",
       id: "disk.io_await_write",
       nameKey: "diskIoAwaitWrite",
+      descKey: "descDiskIoAwaitWrite",
       kind: "num",
       unit: "ms",
       available: st => hasDio(st, 5),

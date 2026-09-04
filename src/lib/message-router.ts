@@ -150,9 +150,9 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         break;
       }
       default:
-        // v0.4.4 (H4): **architecture fix** — switch had no default-Branch
-        // before, so any unknown command left `obj.callback` ungerufen
-        // until ioBroker timed out (~5s). Now: explicit error response.
+        // v0.4.4 (H4): **architecture fix** — the switch had no default branch
+        // before, so an unknown command left `obj.callback` uncalled until ioBroker
+        // timed out (~5 s). Now: an explicit error response.
         // See `reference_onmessage_default_branch.md` for the pattern.
         deps.log.debug(`onMessage: unknown command '${obj.command}'`);
         deps.sendTo(obj.from, obj.command, { error: "Unknown command" }, obj.callback);

@@ -37,6 +37,7 @@ var import_node_path = require("node:path");
 var import_beszel_client = require("./lib/beszel-client");
 var import_coerce = require("./lib/coerce");
 var import_message_router = require("./lib/message-router");
+var import_i18n = require("./lib/i18n");
 var import_metric_registry = require("./lib/metric-registry");
 var import_state_manager = require("./lib/state-manager");
 class BeszelAdapter extends utils.Adapter {
@@ -148,12 +149,58 @@ class BeszelAdapter extends utils.Adapter {
       return false;
     }
   }
+  /**
+   * Re-apply the names and explanations of the manifest's `instanceObjects` to the
+   * objects that already exist.
+   *
+   * js-controller creates `instanceObjects` only where they are MISSING, so a corrected
+   * name or description in io-package.json reaches fresh installs only — an upgraded
+   * installation keeps the old text while the manifest and every gate look green
+   * (fleet rule, krobi 2026-09-03). Each object therefore gets an explicit
+   * `extendObject` here. No `preserve`: these texts belong to the adapter.
+   *
+   * Only name and description are written — type, role and default stay whatever the
+   * manifest created, so there is no second definition to drift apart from it.
+   */
+  async ensureInstanceObjects() {
+    await this.extendObject("info", {
+      type: "channel",
+      common: { name: (0, import_i18n.tName)("channelInfo") },
+      native: {}
+    });
+    await this.extendObject("info.connection", {
+      type: "state",
+      common: { name: (0, import_i18n.tName)("connectionStatus"), desc: (0, import_i18n.tDesc)("descConnection") },
+      native: {}
+    });
+    await this.extendObject("info.systemsTotal", {
+      type: "state",
+      common: { name: (0, import_i18n.tName)("systemsTotal"), desc: (0, import_i18n.tDesc)("descSystemsTotal") },
+      native: {}
+    });
+    await this.extendObject("info.systemsOnline", {
+      type: "state",
+      common: { name: (0, import_i18n.tName)("systemsOnline"), desc: (0, import_i18n.tDesc)("descSystemsOnline") },
+      native: {}
+    });
+    await this.extendObject("info.systemsAllUp", {
+      type: "state",
+      common: { name: (0, import_i18n.tName)("systemsAllUp"), desc: (0, import_i18n.tDesc)("descSystemsAllUp") },
+      native: {}
+    });
+    await this.extendObject("systems", {
+      type: "folder",
+      common: { name: (0, import_i18n.tName)("channelSystems") },
+      native: {}
+    });
+  }
   async onReady() {
     try {
       if (await this.clearStopInstanceFlag()) {
         return;
       }
       await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
+      await this.ensureInstanceObjects();
       const config = this.config;
       this.log.debug(
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`

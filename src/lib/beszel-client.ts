@@ -247,10 +247,9 @@ export class BeszelClient {
       return;
     }
     if (this.authInFlight) {
-      // v0.4.4 (B1): trace concurrent-request wait. Diagnostically wertvoll
-      // weil B1 (token-mutex) garantiert dass mehrere parallel-Requests
-      // sich EINE auth-Roundtrip teilen — bei Bug-Report "weird auth burst"
-      // erkennt der Maintainer ob der mutex greift.
+      // v0.4.4 (B1): trace the concurrent-request wait. Worth having: B1 (the token
+      // mutex) is what guarantees several parallel requests share ONE auth round-trip,
+      // so on a "weird auth burst" report this line shows whether the mutex holds.
       this.log?.debug("ensureToken: waiting for in-flight authenticate");
       await this.authInFlight;
       return;
