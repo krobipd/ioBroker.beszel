@@ -231,6 +231,10 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.14.1 (2026-09-04)
+
+- Fixed: a system that is offline right now kept the old datapoint names and got no descriptions — the update reached only systems the Hub had a current reading for
+
 ### 0.14.0 (2026-09-04)
 
 - New: user documentation in the repository, in English and German — setup step by step, what every metric switch creates, and the questions that keep coming up
@@ -257,11 +261,6 @@ beszel.0.
 
 - Fixed: on an installation that was updated rather than freshly installed, the systems kept showing as online when the adapter was stopped — they now go offline there as well.
 - Fixed: the count of systems currently online no longer keeps its last value while the adapter is stopped — it drops to zero along with the individual systems.
-
-### 0.12.0 (2026-08-27)
-
-- Fixed: a system no longer shows as online while the adapter is stopped or cannot reach the Hub — its status then reads "Unknown" instead of keeping the last value it had.
-- Fixed: systems or containers could stay missing from the object tree when the Hub sent a record the adapter could not read — everything the Hub reports now shows up again.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

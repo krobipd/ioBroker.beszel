@@ -126,12 +126,25 @@ export class BeszelAdapter extends utils.Adapter {
     const id = `system.adapter.${this.namespace}`;
     try {
       const obj = await this.getForeignObjectAsync(id);
-      const supported = obj?.common?.supportedMessages as { stopInstance?: unknown } | undefined;
-      if (!supported?.stopInstance) {
+      const supported = obj?.common?.supportedMessages;
+      // Correct as soon as the KEY exists at all — not just when `stopInstance` is on.
+      // The earlier guard (`if (!supported?.stopInstance)`) never matched its own result,
+      // so an instance that had already been "corrected" stayed broken forever.
+      if (supported === undefined || supported === null) {
         return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
-      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      // Delete the whole key rather than writing `{ stopInstance: false }`.
+      // `supportedMessages` is a POSITIVE LIST: js-controller stops looking at
+      // `common.messagebox` as soon as it is an object, and a list whose entries are all
+      // `false` means "no messages at all" — `subscribeMessage` never runs and the
+      // Test-Connection button does nothing (that is what happened to govee-smart).
+      // beszel escaped it by luck: its manifest carried `checkConnection: true` until
+      // v0.11.x, and the merge keeps that entry, so the box stayed open. Leaving a
+      // half-corrected object behind to rely on that is not a state worth keeping.
+      // `null` is copied by the merge (`undefined` would be skipped), which puts the
+      // instance back on the plain messagebox path.
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (err: unknown) {
       // Objects DB unreachable — not worth failing the start over; the next start retries.

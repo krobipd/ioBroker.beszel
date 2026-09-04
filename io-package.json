@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.14.0",
+    "version": "0.14.1",
     "news": {
+      "0.14.1": {
+        "en": "Datapoints of a system that is currently offline now receive the corrected names and descriptions too.",
+        "de": "Datenpunkte eines gerade nicht erreichbaren Systems bekommen jetzt ebenfalls die korrigierten Namen und Beschreibungen.",
+        "ru": "Датапоинты системы, недоступной в данный момент, теперь тоже получают исправленные имена и описания.",
+        "pt": "Os pontos de dados de um sistema atualmente offline recebem agora também os nomes e descrições corrigidos.",
+        "nl": "Datapunten van een systeem dat momenteel offline is, krijgen nu ook de gecorrigeerde namen en beschrijvingen.",
+        "fr": "Les points de données d'un système actuellement hors ligne reçoivent désormais aussi les noms et descriptions corrigés.",
+        "it": "Anche i datapoint di un sistema attualmente offline ricevono ora i nomi e le descrizioni corretti.",
+        "es": "Los puntos de datos de un sistema actualmente sin conexión reciben ahora también los nombres y descripciones corregidos.",
+        "pl": "Punkty danych systemu, który jest obecnie offline, otrzymują teraz również poprawione nazwy i opisy.",
+        "uk": "Точки даних системи, яка зараз офлайн, тепер теж отримують виправлені назви та описи.",
+        "zh-cn": "当前离线系统的数据点现在同样会收到更正后的名称和说明。"
+      },
       "0.14.0": {
         "en": "Corrected names and descriptions now reach installations that already have the datapoints.\nDatapoints whose meaning is not obvious carry a short explanation.\nA system the Hub has no reading for keeps its last values.\nUser documentation in English and German.",
         "de": "Korrigierte Namen und Beschreibungen erreichen jetzt auch bestehende Anlagen.\nDatenpunkte, deren Bedeutung man nicht raten kann, tragen eine kurze Erklärung.\nEin System ohne Messwert behält seine letzten Werte.\nNutzerdoku auf Deutsch und Englisch.",
@@ -80,19 +93,6 @@
         "ru": "Теперь доступны скорости вентиляторов, а системы с несколькими батареями показывают уровень каждой из них (требуется Beszel 0.18.8 или новее). При включении и отключении метрик также видно, сколько точек данных добавилось или исчезло.",
         "uk": "Тепер доступні швидкості вентиляторів, а системи з кількома батареями показують рівень кожної з них (потрібен Beszel 0.18.8 або новіший). Під час вмикання та вимикання метрик також видно, скільки точок даних додалося або зникло.",
         "zh-cn": "现在可以查看风扇转速，配备多块电池的系统会分别显示每块电池的电量（需要 Beszel 0.18.8 或更高版本）。开启或关闭指标时，还会显示新增或移除了多少个数据点。"
-      },
-      "0.10.1": {
-        "en": "Internal cleanup. No user-facing changes.",
-        "de": "Interne Aufräumarbeiten. Keine Änderungen für Nutzer.",
-        "ru": "Внутренняя очистка. Изменений для пользователей нет.",
-        "pt": "Limpeza interna. Sem alterações para o utilizador.",
-        "nl": "Interne opschoning. Geen wijzigingen voor gebruikers.",
-        "fr": "Nettoyage interne. Aucun changement pour l'utilisateur.",
-        "it": "Pulizia interna. Nessuna modifica per gli utenti.",
-        "es": "Limpieza interna. Sin cambios para el usuario.",
-        "pl": "Porządki wewnętrzne. Bez zmian dla użytkownika.",
-        "uk": "Внутрішнє прибирання. Без змін для користувачів.",
-        "zh-cn": "内部清理。用户无可见变化。"
       }
     },
     "plugins": {

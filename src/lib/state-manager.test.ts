@@ -250,6 +250,32 @@ const testStats: SystemStats = {
   cpub: [30, 10, 5, 2, 53],
 };
 
+/** Every dynamic group populated at once — used by the refresh-table invariant test. */
+function richStats(): SystemStats {
+  return {
+    ...testStats,
+    cpus: [10, 20],
+    ni: { eth0: [10, 20, 1000, 2000] as [number, number, number, number] },
+    f: { cpu_fan: 950 },
+    bats: { bat0: 88 },
+    g: { gpu0: { n: "NVIDIA RTX 4090", u: 80, mu: 8.5, mt: 24, p: 350, pp: 380, e: { render: 40 } } },
+  };
+}
+
+const testContainers: BeszelContainer[] = [
+  {
+    id: "c1",
+    system: "sys001",
+    name: "nginx",
+    status: "running",
+    health: 2,
+    cpu: 1.5,
+    memory: 128,
+    image: "nginx:latest",
+    net: 2048,
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -1726,6 +1752,124 @@ describe("StateManager", () => {
       await fresh.updateSystem(testSystem, { ...testStats, dios: undefined }, [], cfg);
 
       expect(adapter.states.get("systems.my_server.disk.io_util")?.val).to.equal(null);
+    });
+
+    it("the dynamic groups also get corrected names when the system has no stats", async () => {
+      // Same defect one level down: updateDynamicStats only runs with live data, so a
+      // system that is down kept the old wording on its container / GPU / interface /
+      // filesystem datapoints (v0.14.1).
+      const cfg = allMetricsConfig({ metrics_containers: true, metrics_gpu: true });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, testContainers, cfg);
+      // Pretend an older version had created them with different wording.
+      for (const id of [...adapter.objects.keys()].filter(k => k.includes(".containers."))) {
+        const o = adapter.objects.get(id)!;
+        adapter.objects.set(id, { ...o, common: { ...o.common, name: { en: "old wording" } } });
+      }
+
+      const fresh = new StateManager(adapter as never);
+      await fresh.snapshotExistingStates();
+      await fresh.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+
+      const statusId = [...adapter.objects.keys()].find(k => /\.containers\.[^.]+\.status$/.test(k));
+      expect(statusId, "the test fixture must produce a container status datapoint").to.not.be.undefined;
+      expect(adapter.objects.get(statusId!)?.common.name).to.deep.equal({ en: "status", de: "status_de" });
+    });
+
+    it("the group CHANNELS are refreshed too when the system has no stats", async () => {
+      // The channels the adapter names itself (containers, sensors, cores, …) ride the
+      // same path — without this they keep the name they were created with.
+      const cfg = allMetricsConfig({ metrics_containers: true });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, testContainers, cfg);
+      const chan = adapter.objects.get("systems.my_server.containers")!;
+      adapter.objects.set("systems.my_server.containers", {
+        ...chan,
+        common: { ...chan.common, name: { en: "old channel wording" } },
+      });
+
+      const fresh = new StateManager(adapter as never);
+      await fresh.snapshotExistingStates();
+      await fresh.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+
+      expect(adapter.objects.get("systems.my_server.containers")?.common.name).to.deep.equal({
+        en: "channelContainers",
+        de: "channelContainers_de",
+      });
+    });
+
+    it("every adapter-named dynamic datapoint is covered by the refresh table", async () => {
+      // The table is a second description of what the creation paths build, so it can
+      // drift. This walks a fully populated system and demands that each datapoint the
+      // ADAPTER names (the mock marks those with a `_de` suffix) is matched by it —
+      // a new metric that is forgotten in the table fails here, not on a user's tree.
+      const cfg = allMetricsConfig({
+        metrics_containers: true,
+        metrics_gpu: true,
+        metrics_gpuDetails: true,
+        metrics_extraFs: true,
+        metrics_networkInterfaces: true,
+        metrics_cpuCores: true,
+      });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, richStats(), testContainers, cfg);
+
+      const table = (
+        StateManager as unknown as {
+          DYNAMIC_LEAF_COMMONS: { match: RegExp }[];
+        }
+      ).DYNAMIC_LEAF_COMMONS;
+      const prefix = "systems.my_server.";
+      const groups =
+        /^(temperature\.sensors|fans|battery\.batteries|cpu\.cores|network\.interfaces|gpu|filesystems|containers)\./;
+      const missed: string[] = [];
+      for (const [id, obj] of adapter.objects) {
+        if (obj.type !== "state" || !id.startsWith(prefix)) {
+          continue;
+        }
+        const rel = id.slice(prefix.length);
+        if (!groups.test(rel)) {
+          continue; // scalar metric — covered by applyMetrics, not by this table
+        }
+        const name = obj.common.name as { de?: string } | undefined;
+        const adapterNamed = typeof name?.de === "string" && name.de.endsWith("_de");
+        if (adapterNamed && !table.some(e => e.match.test(rel))) {
+          missed.push(rel);
+        }
+      }
+      expect(missed, "adapter-named dynamic datapoints missing from DYNAMIC_LEAF_COMMONS").to.deep.equal([]);
+    });
+
+    it("a system without stats STILL gets corrected names and descriptions on its datapoints", async () => {
+      // Found on the live tree (v0.14.1): the two systems that were down carried the old
+      // wording and no descriptions, because their metrics were skipped whole — the
+      // object refresh rode along with the value write. No gate can see this.
+      adapter.objects.set("systems.my_server.cpu.usage", {
+        type: "state",
+        common: { name: { en: "old wording" }, type: "number", role: "value" },
+        native: {},
+      });
+      adapter.states.set("systems.my_server.cpu.usage", { val: 42, ack: true });
+      await manager.snapshotExistingStates();
+
+      await manager.updateSystem({ ...testSystem, status: "down" }, undefined, [], allMetricsConfig());
+
+      const obj = adapter.objects.get("systems.my_server.cpu.usage");
+      expect(obj?.common.name, "the corrected name must reach a down system too").to.deep.equal({
+        en: "cpuUsage",
+        de: "cpuUsage_de",
+      });
+      // …and the value it last measured stays exactly where it was.
+      expect(adapter.states.get("systems.my_server.cpu.usage")?.val).to.equal(42);
+    });
+
+    it("a system without stats gains NO new datapoints", async () => {
+      // The other half of the same rule: refreshing existing objects must not create
+      // datapoints for a system that never reported the metric.
+      await manager.snapshotExistingStates();
+      await manager.updateSystem({ ...testSystem, status: "down" }, undefined, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.cpu.usage")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.memory.percent")).to.be.false;
     });
 
     it("a system without ANY stats keeps its last values — in the same run and after a restart", async () => {

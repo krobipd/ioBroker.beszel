@@ -12,6 +12,7 @@ import {
   channelName,
   bytesToMib,
   bytesToGib,
+  CHANNEL_NAME_KEY,
   DYNAMIC_CHANNEL_TOGGLES,
   METRIC_DEPENDENCIES,
   SYSTEM_STATUS_STATES,
@@ -491,44 +492,55 @@ export class StateManager {
     stats: SystemStats | undefined,
     config: AdapterConfig,
   ): Promise<void> {
-    const active = this.metricDefs().filter(d => {
+    // Two separate questions per metric, and they must not be answered together:
+    // does its OBJECT belong in the tree, and is there a VALUE to write right now.
+    // Tying them together is what left a system that is currently down with the old
+    // names and no descriptions — its metrics were skipped whole, so the
+    // every-restart retrofit never reached them (measured on the live tree, v0.14.1).
+    const touched: { def: MetricDef; writeValue: boolean }[] = [];
+    for (const d of this.metricDefs()) {
       if (!config[d.toggle]) {
-        return false;
+        continue;
       }
       if (!d.available || d.available(stats, system)) {
-        return true;
+        touched.push({ def: d, writeValue: true });
+        continue;
       }
-      // Not available — and the two reasons for that need opposite handling.
-      if (!stats) {
-        // The Hub has no reading for this system at all (down / paused, or its newest
-        // record is older than the stats walk). Nothing may be nulled here: the
-        // dynamic groups freeze in exactly this case too, and "every ioBroker adapter
-        // leaves the last values standing" is the line krobi confirmed. Before v0.14.0
-        // this branch nulled every metric of a system that went down mid-run, while
-        // the same system after a restart kept its values — same situation, two
-        // different trees.
-        return false;
-      }
-      // H2b: the record IS there but one field went absent (e.g. `dios`/`cpub` are
-      // omitzero/omitempty on the wire, so a fully-idle disk drops them). Then the
-      // state must be UPDATED (extract → null) instead of freezing the last busy
-      // value. A never-created state on an older Hub stays uncreated.
-      //
-      // `knownStateIds` as well as `createdIds`: the latter is empty on a fresh
-      // process, so the reset silently stopped working after every adapter restart —
-      // the stale value then stood forever. The startup snapshot knows the state is
-      // there (v0.14.0).
+      // Not available. A state that was never created stays uncreated — an older Hub
+      // must not gain empty datapoints.
       const id = `${sysId}.${d.id}`;
-      return this.createdIds.has(id) || this.knownStateIds.has(id);
-    });
-    const channels = new Set(active.map(d => d.channel));
+      if (!this.createdIds.has(id) && !this.knownStateIds.has(id)) {
+        continue;
+      }
+      // It exists, so its object gets refreshed either way. Only the VALUE differs,
+      // and the two reasons for "not available" need opposite handling:
+      //
+      // No stats at all (system down / paused, or its newest record is older than the
+      // stats walk) — keep the last reading. The dynamic groups freeze in exactly this
+      // case too, and "every ioBroker adapter leaves the last values standing" is the
+      // line krobi confirmed.
+      //
+      // H2b: the record IS there but one field went absent (`dios`/`cpub` are
+      // omitzero/omitempty on the wire, so a fully idle disk drops them) — then the
+      // state must be reset to null instead of freezing the last busy value.
+      // `knownStateIds` alongside `createdIds`, because the latter is empty in a fresh
+      // process: without it the reset silently stopped working after every restart.
+      touched.push({ def: d, writeValue: !!stats });
+    }
+
+    const channels = new Set(touched.map(t => t.def.channel));
     for (const ch of channels) {
       await this.ensureChannel(`${sysId}.${ch}`, channelName(ch));
     }
-    for (const def of active) {
+    for (const { def, writeValue } of touched) {
+      const id = `${sysId}.${def.id}`;
+      if (!writeValue) {
+        await this.ensureStateObject(id, commonFor(def));
+        continue;
+      }
       const raw = def.extract(system, stats);
       const value = def.kind === "percent" && typeof raw === "number" ? clampPercent(raw) : raw;
-      await this.createAndSetState(`${sysId}.${def.id}`, commonFor(def), value);
+      await this.createAndSetState(id, commonFor(def), value);
     }
   }
 
@@ -623,6 +635,10 @@ export class StateManager {
     // need live stats and fan out to N children — kept in their own handler.
     if (stats) {
       await this.updateDynamicStats(sysId, stats, config);
+    } else {
+      // No reading: the groups cannot be rebuilt, but their existing datapoints still
+      // have to receive corrected names and descriptions.
+      await this.refreshDynamicObjects(sysId);
     }
 
     // Containers. F1: only touch the container tree when the fetch actually
@@ -901,6 +917,106 @@ export class StateManager {
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
+
+  /**
+   * Datapoints inside the dynamic groups whose `common` the ADAPTER owns — name and
+   * description come from `admin/i18n`, not from the Hub. Keyed by the id suffix below
+   * the system, so {@link refreshDynamicObjects} can rebuild them from the object tree
+   * alone, with no live data.
+   *
+   * Deliberately NOT listed: everything named by the Hub (sensor, fan, battery, GPU,
+   * filesystem, interface and container names). Those cannot be rebuilt without the
+   * data, and they never change through an adapter update either.
+   *
+   * A test walks a fully populated system and fails if any adapter-named datapoint is
+   * missing here — that is what keeps this table from drifting away from the creation
+   * paths below.
+   */
+  private static readonly DYNAMIC_LEAF_COMMONS: {
+    match: RegExp;
+    common: (m: RegExpMatchArray) => ioBroker.StateCommon;
+  }[] = [
+    {
+      match: /^cpu\.cores\.core(\d+)$/,
+      common: m => percentCommon(tName("cpuCore", Number(m[1]))),
+    },
+    { match: /^network\.interfaces\.[^.]+\.up$/, common: () => numCommon(tName("ifaceUp"), "MB/s") },
+    { match: /^network\.interfaces\.[^.]+\.down$/, common: () => numCommon(tName("ifaceDown"), "MB/s") },
+    {
+      match: /^network\.interfaces\.[^.]+\.total_up$/,
+      common: () => numCommon(tName("ifaceTotalUp"), "GB", "value", tDesc("descIfaceTotal")),
+    },
+    {
+      match: /^network\.interfaces\.[^.]+\.total_down$/,
+      common: () => numCommon(tName("ifaceTotalDown"), "GB", "value", tDesc("descIfaceTotal")),
+    },
+    { match: /^gpu\.[^.]+\.usage$/, common: () => percentCommon(tName("gpuUsage")) },
+    { match: /^gpu\.[^.]+\.memory_used$/, common: () => numCommon(tName("gpuMemoryUsed"), "MB") },
+    { match: /^gpu\.[^.]+\.memory_total$/, common: () => numCommon(tName("gpuMemoryTotal"), "MB") },
+    { match: /^gpu\.[^.]+\.power$/, common: () => numCommon(tName("gpuPower"), "W", "value.power") },
+    {
+      match: /^gpu\.[^.]+\.power_package$/,
+      common: () => numCommon(tName("gpuPowerPackage"), "W", "value.power", tDesc("descGpuPowerPackage")),
+    },
+    { match: /^filesystems\.[^.]+\.disk_percent$/, common: () => percentCommon(tName("diskPercent")) },
+    { match: /^filesystems\.[^.]+\.disk_used$/, common: () => numCommon(tName("diskUsed"), "GB") },
+    { match: /^filesystems\.[^.]+\.disk_total$/, common: () => numCommon(tName("diskTotal"), "GB") },
+    { match: /^filesystems\.[^.]+\.read_speed$/, common: () => numCommon(tName("readSpeed"), "MB/s") },
+    { match: /^filesystems\.[^.]+\.write_speed$/, common: () => numCommon(tName("writeSpeed"), "MB/s") },
+    { match: /^containers\.[^.]+\.status$/, common: () => textCommon(tName("status")) },
+    {
+      match: /^containers\.[^.]+\.health$/,
+      common: () => textCommon(tName("containerHealth"), "text", tDesc("descContainerHealth")),
+    },
+    { match: /^containers\.[^.]+\.cpu$/, common: () => percentCommon(tName("cpuUsage")) },
+    { match: /^containers\.[^.]+\.memory$/, common: () => numCommon(tName("containerMemory"), "MB") },
+    { match: /^containers\.[^.]+\.image$/, common: () => textCommon(tName("containerImage")) },
+    {
+      match: /^containers\.[^.]+\.network$/,
+      common: () => numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
+    },
+  ];
+
+  /**
+   * Bring the dynamic groups' names and descriptions up to date WITHOUT live data.
+   *
+   * `updateDynamicStats` only runs when the Hub delivered a reading, so a system that is
+   * currently down never had its container / GPU / interface / filesystem datapoints
+   * refreshed — they kept the wording they were created with, and no gate can see that
+   * (found on the live tree, v0.14.1). This walks what the startup snapshot already
+   * knows: the group channels the adapter names itself, and the leaves in
+   * {@link DYNAMIC_LEAF_COMMONS}. It creates nothing, deletes nothing, writes no value.
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   */
+  private async refreshDynamicObjects(sysId: string): Promise<void> {
+    const prefix = `${sysId}.`;
+    // Group channels the adapter names (temperature.sensors, cpu.cores, containers, …).
+    // A channel named by the Hub (gpu.<id>, containers.<name>) has a last segment that is
+    // not in the catalog and is skipped — its name never changes through an update.
+    for (const id of this.knownChannelIds) {
+      if (!id.startsWith(prefix)) {
+        continue;
+      }
+      const last = id.slice(id.lastIndexOf(".") + 1);
+      if (CHANNEL_NAME_KEY[last]) {
+        await this.ensureChannel(id, channelName(last));
+      }
+    }
+    for (const id of this.knownStateIds) {
+      if (!id.startsWith(prefix)) {
+        continue;
+      }
+      const rel = id.slice(prefix.length);
+      for (const entry of StateManager.DYNAMIC_LEAF_COMMONS) {
+        const m = rel.match(entry.match);
+        if (m) {
+          await this.ensureStateObject(id, entry.common(m));
+          break;
+        }
+      }
+    }
+  }
 
   private async updateDynamicStats(sysId: string, stats: SystemStats, config: AdapterConfig): Promise<void> {
     // Temperature details — per-sensor. Sensor names come from the agent
@@ -1406,31 +1522,45 @@ export class StateManager {
     }
   }
 
-  private async createAndSetState(id: string, common: ioBroker.StateCommon, value: ioBroker.StateValue): Promise<void> {
-    if (!this.createdIds.has(id)) {
-      // DP-retrofit: extendObject (not setObjectNotExists) on first touch so a
-      // changed `common` (the value.battery/value.power/info.status role fixes)
-      // reaches states that already exist on an upgraded install. Runs once per
-      // state per restart (createdIds-gated).
-      //
-      // v0.14.0: WITHOUT `preserve: { common: ["name"] }`. These names belong to the
-      // adapter (translated via `admin/i18n`) or to the Hub (sensor/container/GPU
-      // names) — never to the user. Preserving them froze every existing tree on the
-      // text it was first created with, so a corrected translation reached fresh
-      // installs only, invisible to every gate. The price is that a rename a user
-      // typed into the admin is overwritten on the next start (krobi 2026-09-03).
-      //
-      // Deliberately every restart, NOT gated behind a one-shot schema-version
-      // marker. A marker would set "done" after the first successful poll — but a
-      // system that is `down`/`paused` at that moment never has its pre-existing
-      // states touched (they're not in createdIds on a fresh process), so their old
-      // role would be frozen forever. The every-restart extendObject is idempotent,
-      // self-healing (a returning system gets retrofitted next restart) and only a
-      // startup cost. Don't "optimize" it into that regression.
-      await this.adapter.extendObject(id, { type: "state", common, native: {} });
-      this.createdIds.add(id);
-      this.noteStateCreated(id);
+  /**
+   * Make sure the state object exists and carries the CURRENT common (name,
+   * description, role, unit) — without touching its value.
+   *
+   * Split out of {@link createAndSetState} because a datapoint of a system the Hub has
+   * no reading for still has to receive corrected names and descriptions. Tying the
+   * object refresh to "there is a value to write" left every currently-down system on
+   * the old wording, which no gate can see — only the live tree (v0.14.1).
+   *
+   * @param id State id, namespace-relative.
+   * @param common The state's current common definition.
+   */
+  private async ensureStateObject(id: string, common: ioBroker.StateCommon): Promise<void> {
+    if (this.createdIds.has(id)) {
+      return;
     }
+    // DP-retrofit: extendObject (not setObjectNotExists) on first touch so a changed
+    // `common` (roles, names, descriptions) reaches states that already exist on an
+    // upgraded install. Runs once per state per restart (createdIds-gated).
+    //
+    // v0.14.0: WITHOUT `preserve: { common: ["name"] }`. These names belong to the
+    // adapter (translated via `admin/i18n`) or to the Hub (sensor/container/GPU
+    // names) — never to the user. Preserving them froze every existing tree on the
+    // text it was first created with, so a corrected translation reached fresh
+    // installs only, invisible to every gate. The price is that a rename a user
+    // typed into the admin is overwritten on the next start (krobi 2026-09-03).
+    //
+    // Deliberately every restart, NOT gated behind a one-shot schema-version marker.
+    // A marker would set "done" after the first successful poll — but a system that is
+    // `down`/`paused` at that moment never has its pre-existing states touched, so its
+    // old role would be frozen forever. The every-restart extendObject is idempotent,
+    // self-healing and only a startup cost. Don't "optimize" it into that regression.
+    await this.adapter.extendObject(id, { type: "state", common, native: {} });
+    this.createdIds.add(id);
+    this.noteStateCreated(id);
+  }
+
+  private async createAndSetState(id: string, common: ioBroker.StateCommon, value: ioBroker.StateValue): Promise<void> {
+    await this.ensureStateObject(id, common);
     await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
   }
 

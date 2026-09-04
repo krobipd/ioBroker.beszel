@@ -1,4 +1,9 @@
 # Older Changes
+## 0.12.0 (2026-08-27)
+
+- Fixed: a system no longer shows as online while the adapter is stopped or cannot reach the Hub — its status then reads "Unknown" instead of keeping the last value it had.
+- Fixed: systems or containers could stay missing from the object tree when the Hub sent a record the adapter could not read — everything the Hub reports now shows up again.
+
 ## 0.11.0 (2026-08-26)
 
 - New: Fan speeds — a new "Fans" switch creates one datapoint per fan, in rpm (needs Beszel 0.18.8 or newer, Linux hosts).

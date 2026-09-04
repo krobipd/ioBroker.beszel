@@ -447,27 +447,34 @@ class StateManager {
    * @param config Current adapter configuration
    */
   async applyMetrics(sysId, system, stats, config) {
-    const active = this.metricDefs().filter((d) => {
+    const touched = [];
+    for (const d of this.metricDefs()) {
       if (!config[d.toggle]) {
-        return false;
+        continue;
       }
       if (!d.available || d.available(stats, system)) {
-        return true;
-      }
-      if (!stats) {
-        return false;
+        touched.push({ def: d, writeValue: true });
+        continue;
       }
       const id = `${sysId}.${d.id}`;
-      return this.createdIds.has(id) || this.knownStateIds.has(id);
-    });
-    const channels = new Set(active.map((d) => d.channel));
+      if (!this.createdIds.has(id) && !this.knownStateIds.has(id)) {
+        continue;
+      }
+      touched.push({ def: d, writeValue: !!stats });
+    }
+    const channels = new Set(touched.map((t) => t.def.channel));
     for (const ch of channels) {
       await this.ensureChannel(`${sysId}.${ch}`, (0, import_metric_registry.channelName)(ch));
     }
-    for (const def of active) {
+    for (const { def, writeValue } of touched) {
+      const id = `${sysId}.${def.id}`;
+      if (!writeValue) {
+        await this.ensureStateObject(id, (0, import_metric_registry.commonFor)(def));
+        continue;
+      }
       const raw = def.extract(system, stats);
       const value = def.kind === "percent" && typeof raw === "number" ? (0, import_metric_registry.clampPercent)(raw) : raw;
-      await this.createAndSetState(`${sysId}.${def.id}`, (0, import_metric_registry.commonFor)(def), value);
+      await this.createAndSetState(id, (0, import_metric_registry.commonFor)(def), value);
     }
   }
   /**
@@ -532,6 +539,8 @@ class StateManager {
     await this.applyMetrics(sysId, system, stats, config);
     if (stats) {
       await this.updateDynamicStats(sysId, stats, config);
+    } else {
+      await this.refreshDynamicObjects(sysId);
     }
     if (config.metrics_containers && containersAvailable) {
       await this.updateContainers(sysId, containers);
@@ -752,6 +761,98 @@ class StateManager {
   // -------------------------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------------------------
+  /**
+   * Datapoints inside the dynamic groups whose `common` the ADAPTER owns — name and
+   * description come from `admin/i18n`, not from the Hub. Keyed by the id suffix below
+   * the system, so {@link refreshDynamicObjects} can rebuild them from the object tree
+   * alone, with no live data.
+   *
+   * Deliberately NOT listed: everything named by the Hub (sensor, fan, battery, GPU,
+   * filesystem, interface and container names). Those cannot be rebuilt without the
+   * data, and they never change through an adapter update either.
+   *
+   * A test walks a fully populated system and fails if any adapter-named datapoint is
+   * missing here — that is what keeps this table from drifting away from the creation
+   * paths below.
+   */
+  static DYNAMIC_LEAF_COMMONS = [
+    {
+      match: /^cpu\.cores\.core(\d+)$/,
+      common: (m) => (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("cpuCore", Number(m[1])))
+    },
+    { match: /^network\.interfaces\.[^.]+\.up$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("ifaceUp"), "MB/s") },
+    { match: /^network\.interfaces\.[^.]+\.down$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("ifaceDown"), "MB/s") },
+    {
+      match: /^network\.interfaces\.[^.]+\.total_up$/,
+      common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("ifaceTotalUp"), "GB", "value", (0, import_i18n.tDesc)("descIfaceTotal"))
+    },
+    {
+      match: /^network\.interfaces\.[^.]+\.total_down$/,
+      common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("ifaceTotalDown"), "GB", "value", (0, import_i18n.tDesc)("descIfaceTotal"))
+    },
+    { match: /^gpu\.[^.]+\.usage$/, common: () => (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("gpuUsage")) },
+    { match: /^gpu\.[^.]+\.memory_used$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("gpuMemoryUsed"), "MB") },
+    { match: /^gpu\.[^.]+\.memory_total$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("gpuMemoryTotal"), "MB") },
+    { match: /^gpu\.[^.]+\.power$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("gpuPower"), "W", "value.power") },
+    {
+      match: /^gpu\.[^.]+\.power_package$/,
+      common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("gpuPowerPackage"), "W", "value.power", (0, import_i18n.tDesc)("descGpuPowerPackage"))
+    },
+    { match: /^filesystems\.[^.]+\.disk_percent$/, common: () => (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("diskPercent")) },
+    { match: /^filesystems\.[^.]+\.disk_used$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskUsed"), "GB") },
+    { match: /^filesystems\.[^.]+\.disk_total$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotal"), "GB") },
+    { match: /^filesystems\.[^.]+\.read_speed$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("readSpeed"), "MB/s") },
+    { match: /^filesystems\.[^.]+\.write_speed$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("writeSpeed"), "MB/s") },
+    { match: /^containers\.[^.]+\.status$/, common: () => (0, import_metric_registry.textCommon)((0, import_i18n.tName)("status")) },
+    {
+      match: /^containers\.[^.]+\.health$/,
+      common: () => (0, import_metric_registry.textCommon)((0, import_i18n.tName)("containerHealth"), "text", (0, import_i18n.tDesc)("descContainerHealth"))
+    },
+    { match: /^containers\.[^.]+\.cpu$/, common: () => (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("cpuUsage")) },
+    { match: /^containers\.[^.]+\.memory$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("containerMemory"), "MB") },
+    { match: /^containers\.[^.]+\.image$/, common: () => (0, import_metric_registry.textCommon)((0, import_i18n.tName)("containerImage")) },
+    {
+      match: /^containers\.[^.]+\.network$/,
+      common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("containerNetwork"), "B/s", "value", (0, import_i18n.tDesc)("descContainerNetwork"))
+    }
+  ];
+  /**
+   * Bring the dynamic groups' names and descriptions up to date WITHOUT live data.
+   *
+   * `updateDynamicStats` only runs when the Hub delivered a reading, so a system that is
+   * currently down never had its container / GPU / interface / filesystem datapoints
+   * refreshed — they kept the wording they were created with, and no gate can see that
+   * (found on the live tree, v0.14.1). This walks what the startup snapshot already
+   * knows: the group channels the adapter names itself, and the leaves in
+   * {@link DYNAMIC_LEAF_COMMONS}. It creates nothing, deletes nothing, writes no value.
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   */
+  async refreshDynamicObjects(sysId) {
+    const prefix = `${sysId}.`;
+    for (const id of this.knownChannelIds) {
+      if (!id.startsWith(prefix)) {
+        continue;
+      }
+      const last = id.slice(id.lastIndexOf(".") + 1);
+      if (import_metric_registry.CHANNEL_NAME_KEY[last]) {
+        await this.ensureChannel(id, (0, import_metric_registry.channelName)(last));
+      }
+    }
+    for (const id of this.knownStateIds) {
+      if (!id.startsWith(prefix)) {
+        continue;
+      }
+      const rel = id.slice(prefix.length);
+      for (const entry of StateManager.DYNAMIC_LEAF_COMMONS) {
+        const m = rel.match(entry.match);
+        if (m) {
+          await this.ensureStateObject(id, entry.common(m));
+          break;
+        }
+      }
+    }
+  }
   async updateDynamicStats(sysId, stats, config) {
     var _a;
     if (config.metrics_temperatureDetails) {
@@ -1161,12 +1262,28 @@ class StateManager {
       this.adapter.log.debug(`deleteChannelIfExists(${id}) ignored: ${(0, import_coerce.errText)(err)}`);
     }
   }
-  async createAndSetState(id, common, value) {
-    if (!this.createdIds.has(id)) {
-      await this.adapter.extendObject(id, { type: "state", common, native: {} });
-      this.createdIds.add(id);
-      this.noteStateCreated(id);
+  /**
+   * Make sure the state object exists and carries the CURRENT common (name,
+   * description, role, unit) — without touching its value.
+   *
+   * Split out of {@link createAndSetState} because a datapoint of a system the Hub has
+   * no reading for still has to receive corrected names and descriptions. Tying the
+   * object refresh to "there is a value to write" left every currently-down system on
+   * the old wording, which no gate can see — only the live tree (v0.14.1).
+   *
+   * @param id State id, namespace-relative.
+   * @param common The state's current common definition.
+   */
+  async ensureStateObject(id, common) {
+    if (this.createdIds.has(id)) {
+      return;
     }
+    await this.adapter.extendObject(id, { type: "state", common, native: {} });
+    this.createdIds.add(id);
+    this.noteStateCreated(id);
+  }
+  async createAndSetState(id, common, value) {
+    await this.ensureStateObject(id, common);
     await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
   }
   // -------------------------------------------------------------------------

@@ -138,11 +138,11 @@ class BeszelAdapter extends utils.Adapter {
     try {
       const obj = await this.getForeignObjectAsync(id);
       const supported = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.supportedMessages;
-      if (!(supported == null ? void 0 : supported.stopInstance)) {
+      if (supported === void 0 || supported === null) {
         return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version \u2014 this instance restarts once");
-      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (err) {
       this.log.debug(`Could not check the instance object ${id}: ${(0, import_coerce.errText)(err)}`);

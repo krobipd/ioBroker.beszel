@@ -376,7 +376,9 @@ describe("BeszelAdapter onUnload", () => {
     const manifest = JSON.parse(readFileSync(join(__dirname, "..", "io-package.json"), "utf8")) as {
       common: { supportedMessages?: Record<string, unknown> };
     };
-    expect(manifest.common.supportedMessages?.stopInstance).toBeUndefined();
+    // The WHOLE key, not just this one flag: an empty object or any all-false list has
+    // the same effect on the message box.
+    expect(manifest.common.supportedMessages).toBeUndefined();
   });
 
   it("tells the controller we are done only AFTER the last state was written", async () => {
@@ -1233,8 +1235,11 @@ describe("BeszelAdapter clears the stopInstance flag it used to ship with", () =
 
     await i.onReady();
 
+    // The WHOLE key goes, not just the flag. `supportedMessages` is a positive list:
+    // an object whose entries are all `false` tells js-controller "no messages at all",
+    // so the adapter never subscribes and the Test-Connection button dies silently.
     expect(i.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.beszel.0", {
-      common: { supportedMessages: { stopInstance: false } },
+      common: { supportedMessages: null },
     });
   });
 
@@ -1254,16 +1259,23 @@ describe("BeszelAdapter clears the stopInstance flag it used to ship with", () =
     expect(i.setInterval).not.toHaveBeenCalled();
   });
 
-  it("writes nothing when the flag is already off — an object write restarts the instance", async () => {
+  it("corrects an instance that an EARLIER fix left on { stopInstance: false }", async () => {
+    // The old guard keyed on `stopInstance` being truthy, so once it had written
+    // `{ stopInstance: false }` itself it never matched again and left the half-corrected
+    // object standing for good. In govee-smart that state killed the message box; beszel
+    // escaped only because its manifest carried `checkConnection: true` until v0.11.x and
+    // the merge keeps that entry. Correcting on "the key exists at all" ends the loop.
     const { adapter } = setup();
     const i = internalOf(adapter);
     i.getForeignObjectAsync.mockResolvedValue({
-      common: { supportedMessages: { stopInstance: false, checkConnection: true } },
+      common: { supportedMessages: { stopInstance: false } },
     });
 
     await i.onReady();
 
-    expect(i.extendForeignObjectAsync).not.toHaveBeenCalled();
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.beszel.0", {
+      common: { supportedMessages: null },
+    });
   });
 
   it("writes nothing on a fresh install that never had the entry", async () => {
