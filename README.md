@@ -231,6 +231,11 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- Changed: Internal cleanup. No user-facing changes.
+
 ### 0.14.1 (2026-09-04)
 
 - Fixed: a system that is offline right now kept the old datapoint names and got no descriptions — the update reached only systems the Hub had a current reading for

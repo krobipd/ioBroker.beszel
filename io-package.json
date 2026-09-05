@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.14.1",
     "news": {
+      "NEXT": {
+        "en": "Internal cleanup. No user-facing changes.",
+        "de": "Interne Aufräumarbeiten. Keine Änderungen für Nutzer.",
+        "ru": "Внутренняя очистка. Изменений для пользователей нет.",
+        "pt": "Limpeza interna. Sem alterações para o utilizador.",
+        "nl": "Interne opschoning. Geen wijzigingen voor gebruikers.",
+        "fr": "Nettoyage interne. Aucun changement pour l'utilisateur.",
+        "it": "Pulizia interna. Nessuna modifica per l'utente.",
+        "es": "Limpieza interna. Sin cambios para el usuario.",
+        "pl": "Porządki wewnętrzne. Brak zmian dla użytkownika.",
+        "uk": "Внутрішнє впорядкування. Змін для користувачів немає.",
+        "zh-cn": "内部整理。用户无感知变化。"
+      },
       "0.14.1": {
         "en": "Datapoints of a system that is currently offline now receive the corrected names and descriptions too.",
         "de": "Datenpunkte eines gerade nicht erreichbaren Systems bekommen jetzt ebenfalls die korrigierten Namen und Beschreibungen.",
@@ -80,19 +93,6 @@
         "pl": "System nie twierdzi już, że jest online, gdy adapter jest zatrzymany lub nie łączy się z Hubem — jego stan wskazuje wtedy „Unknown\".",
         "uk": "Система більше не стверджує, що вона онлайн, поки адаптер зупинено або він не може зв'язатися з хабом — її стан тоді показує «Unknown».",
         "zh-cn": "当适配器已停止或无法连接 Hub 时，系统不再声称自己在线——其状态此时显示为“Unknown”。"
-      },
-      "0.11.0": {
-        "en": "Fan speeds are now available, and systems with several batteries show the level of each battery (needs Beszel 0.18.8 or newer). Switching metrics on or off also shows how many datapoints appeared or disappeared.",
-        "de": "Lüfterdrehzahlen sind jetzt verfügbar, und Systeme mit mehreren Akkus zeigen den Stand jedes einzelnen Akkus (benötigt Beszel 0.18.8 oder neuer). Beim Umschalten von Metriken siehst du außerdem, wie viele Datenpunkte dazugekommen oder weggefallen sind.",
-        "es": "Ya están disponibles las velocidades de los ventiladores y los sistemas con varias baterías muestran el nivel de cada una (requiere Beszel 0.18.8 o posterior). Al activar o desactivar métricas también se indica cuántos puntos de datos se han añadido o eliminado.",
-        "fr": "Les vitesses des ventilateurs sont désormais disponibles et les systèmes à plusieurs batteries affichent le niveau de chacune (nécessite Beszel 0.18.8 ou plus récent). L'activation ou la désactivation de métriques indique aussi combien de points de données ont été ajoutés ou supprimés.",
-        "it": "Le velocità delle ventole sono ora disponibili e i sistemi con più batterie mostrano il livello di ciascuna (richiede Beszel 0.18.8 o successivo). Attivando o disattivando le metriche viene anche indicato quanti punti dati sono stati aggiunti o rimossi.",
-        "nl": "Ventilatortoerentallen zijn nu beschikbaar en systemen met meerdere batterijen tonen het niveau van elke batterij (vereist Beszel 0.18.8 of nieuwer). Bij het in- of uitschakelen van metingen zie je ook hoeveel datapunten erbij zijn gekomen of zijn verdwenen.",
-        "pl": "Dostępne są teraz prędkości wentylatorów, a systemy z kilkoma bateriami pokazują poziom każdej z nich (wymaga Beszel 0.18.8 lub nowszego). Przy włączaniu i wyłączaniu metryk widać też, ile punktów danych przybyło lub ubyło.",
-        "pt": "As velocidades das ventoinhas já estão disponíveis e os sistemas com várias baterias mostram o nível de cada uma (requer Beszel 0.18.8 ou mais recente). Ao ligar ou desligar métricas também é indicado quantos pontos de dados foram acrescentados ou removidos.",
-        "ru": "Теперь доступны скорости вентиляторов, а системы с несколькими батареями показывают уровень каждой из них (требуется Beszel 0.18.8 или новее). При включении и отключении метрик также видно, сколько точек данных добавилось или исчезло.",
-        "uk": "Тепер доступні швидкості вентиляторів, а системи з кількома батареями показують рівень кожної з них (потрібен Beszel 0.18.8 або новіший). Під час вмикання та вимикання метрик також видно, скільки точок даних додалося або зникло.",
-        "zh-cn": "现在可以查看风扇转速，配备多块电池的系统会分别显示每块电池的电量（需要 Beszel 0.18.8 或更高版本）。开启或关闭指标时，还会显示新增或移除了多少个数据点。"
       }
     },
     "plugins": {
