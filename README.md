@@ -231,8 +231,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-
-### **WORK IN PROGRESS**
+### 0.14.2 (2026-09-05)
 
 - Changed: Internal cleanup. No user-facing changes.
 
@@ -261,11 +260,6 @@ beszel.0.
 ### 0.12.2 (2026-08-27) — stable
 
 - Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.
-
-### 0.12.1 (2026-08-27)
-
-- Fixed: on an installation that was updated rather than freshly installed, the systems kept showing as online when the adapter was stopped — they now go offline there as well.
-- Fixed: the count of systems currently online no longer keeps its last value while the adapter is stopped — it drops to zero along with the individual systems.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

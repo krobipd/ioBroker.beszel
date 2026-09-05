@@ -1,4 +1,9 @@
 # Older Changes
+## 0.12.1 (2026-08-27)
+
+- Fixed: on an installation that was updated rather than freshly installed, the systems kept showing as online when the adapter was stopped — they now go offline there as well.
+- Fixed: the count of systems currently online no longer keeps its last value while the adapter is stopped — it drops to zero along with the individual systems.
+
 ## 0.12.0 (2026-08-27)
 
 - Fixed: a system no longer shows as online while the adapter is stopped or cannot reach the Hub — its status then reads "Unknown" instead of keeping the last value it had.
