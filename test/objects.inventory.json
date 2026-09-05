@@ -1,0 +1,3964 @@
+{
+  "beszel.0.info": {
+    "_id": "beszel.0.info",
+    "type": "channel",
+    "common": {
+      "name": {
+        "en": "Info",
+        "de": "Info",
+        "ru": "Информация",
+        "pt": "Informação",
+        "nl": "Info",
+        "fr": "Infos",
+        "it": "Info",
+        "es": "Información",
+        "pl": "Info",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {}
+  },
+  "beszel.0.info.connection": {
+    "_id": "beszel.0.info.connection",
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Connection status",
+        "de": "Verbindungsstatus",
+        "ru": "Статус подключения",
+        "pt": "Estado da ligação",
+        "nl": "Verbindingsstatus",
+        "fr": "État de la connexion",
+        "it": "Stato connessione",
+        "es": "Estado de conexión",
+        "pl": "Stan połączenia",
+        "uk": "Стан з'єднання",
+        "zh-cn": "连接状态"
+      },
+      "type": "boolean",
+      "role": "indicator.connected",
+      "read": true,
+      "write": false,
+      "def": false,
+      "desc": {
+        "en": "Whether the adapter currently reaches the Beszel Hub.",
+        "de": "Ob der Adapter den Beszel-Hub gerade erreicht.",
+        "ru": "Доступен ли сейчас Beszel Hub для адаптера.",
+        "pt": "Se o adaptador está a alcançar o Beszel Hub neste momento.",
+        "nl": "Of de adapter de Beszel-hub op dit moment bereikt.",
+        "fr": "Si l'adaptateur atteint actuellement le Hub Beszel.",
+        "it": "Se l'adapter raggiunge attualmente l'hub Beszel.",
+        "es": "Si el adaptador alcanza actualmente el Hub de Beszel.",
+        "pl": "Czy adapter aktualnie łączy się z hubem Beszel.",
+        "uk": "Чи доступний зараз Beszel Hub для адаптера.",
+        "zh-cn": "适配器当前是否能连接到 Beszel Hub。"
+      }
+    },
+    "native": {}
+  },
+  "beszel.0.info.systemsAllUp": {
+    "_id": "beszel.0.info.systemsAllUp",
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "All systems online",
+        "de": "Alle Systeme online",
+        "ru": "Все системы онлайн",
+        "pt": "Todos os sistemas online",
+        "nl": "Alle systemen online",
+        "fr": "Tous les systèmes en ligne",
+        "it": "Tutti i sistemi online",
+        "es": "Todos los sistemas en línea",
+        "pl": "Wszystkie systemy online",
+        "uk": "Усі системи онлайн",
+        "zh-cn": "所有系统在线"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "def": false,
+      "desc": {
+        "en": "True while every registered system reports \"up\".",
+        "de": "Wahr, solange jedes registrierte System „up\" meldet.",
+        "ru": "Истина, пока все зарегистрированные системы сообщают «up».",
+        "pt": "Verdadeiro enquanto todos os sistemas registados reportam «up».",
+        "nl": "Waar zolang elk geregistreerd systeem \"up\" meldt.",
+        "fr": "Vrai tant que chaque système enregistré signale « up ».",
+        "it": "Vero finché ogni sistema registrato riporta «up».",
+        "es": "Verdadero mientras todos los sistemas registrados informen «up».",
+        "pl": "Prawda, dopóki każdy zarejestrowany system zgłasza „up\".",
+        "uk": "Істина, доки кожна зареєстрована система повідомляє «up».",
+        "zh-cn": "当所有已注册系统都报告 “up” 时为真。"
+      }
+    },
+    "native": {}
+  },
+  "beszel.0.info.systemsOnline": {
+    "_id": "beszel.0.info.systemsOnline",
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Systems online",
+        "de": "Systeme online",
+        "ru": "Систем онлайн",
+        "pt": "Sistemas online",
+        "nl": "Systemen online",
+        "fr": "Systèmes en ligne",
+        "it": "Sistemi online",
+        "es": "Sistemas en línea",
+        "pl": "Systemy online",
+        "uk": "Систем онлайн",
+        "zh-cn": "在线系统"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "def": 0,
+      "desc": {
+        "en": "How many of the registered systems currently report \"up\".",
+        "de": "Wie viele der registrierten Systeme gerade „up\" melden.",
+        "ru": "Сколько из зарегистрированных систем сейчас сообщают «up».",
+        "pt": "Quantos dos sistemas registados reportam «up» neste momento.",
+        "nl": "Hoeveel van de geregistreerde systemen op dit moment \"up\" melden.",
+        "fr": "Combien des systèmes enregistrés signalent actuellement « up ».",
+        "it": "Quanti dei sistemi registrati riportano attualmente «up».",
+        "es": "Cuántos de los sistemas registrados informan «up» en este momento.",
+        "pl": "Ile z zarejestrowanych systemów zgłasza obecnie „up\".",
+        "uk": "Скільки із зареєстрованих систем зараз повідомляють «up».",
+        "zh-cn": "已注册的系统中当前有多少报告为 “up”。"
+      }
+    },
+    "native": {}
+  },
+  "beszel.0.info.systemsTotal": {
+    "_id": "beszel.0.info.systemsTotal",
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Systems total",
+        "de": "Systeme gesamt",
+        "ru": "Всего систем",
+        "pt": "Total de sistemas",
+        "nl": "Systemen totaal",
+        "fr": "Total des systèmes",
+        "it": "Sistemi totali",
+        "es": "Sistemas en total",
+        "pl": "Systemy łącznie",
+        "uk": "Усього систем",
+        "zh-cn": "系统总数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "def": 0,
+      "desc": {
+        "en": "How many systems are registered on the Hub.",
+        "de": "Wie viele Systeme am Hub registriert sind.",
+        "ru": "Сколько систем зарегистрировано на хабе.",
+        "pt": "Quantos sistemas estão registados no Hub.",
+        "nl": "Hoeveel systemen op de hub geregistreerd zijn.",
+        "fr": "Combien de systèmes sont enregistrés sur le Hub.",
+        "it": "Quanti sistemi sono registrati sull'hub.",
+        "es": "Cuántos sistemas están registrados en el Hub.",
+        "pl": "Ile systemów jest zarejestrowanych w hubie.",
+        "uk": "Скільки систем зареєстровано на хабі.",
+        "zh-cn": "Hub 上注册了多少个系统。"
+      }
+    },
+    "native": {}
+  },
+  "beszel.0.systems": {
+    "_id": "beszel.0.systems",
+    "type": "folder",
+    "common": {
+      "name": {
+        "en": "Monitored Systems",
+        "de": "Überwachte Systeme",
+        "ru": "Отслеживаемые системы",
+        "pt": "Sistemas monitorizados",
+        "nl": "Gecontroleerde systemen",
+        "fr": "Systèmes surveillés",
+        "it": "Sistemi monitorati",
+        "es": "Sistemas monitorizados",
+        "pl": "Monitorowane systemy",
+        "uk": "Відстежувані системи",
+        "zh-cn": "受监控的系统"
+      }
+    },
+    "native": {}
+  },
+  "beszel.0.systems.backup_nas": {
+    "type": "device",
+    "common": {
+      "name": "Backup NAS",
+      "statusStates": {
+        "onlineId": "beszel.0.systems.backup_nas.info.online"
+      }
+    },
+    "native": {
+      "id": "sysdown01",
+      "host": "192.168.10.9"
+    },
+    "_id": "beszel.0.systems.backup_nas"
+  },
+  "beszel.0.systems.backup_nas.cpu": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "CPU",
+        "en": "CPU",
+        "es": "CPU",
+        "fr": "CPU",
+        "it": "CPU",
+        "nl": "CPU",
+        "pl": "CPU",
+        "pt": "CPU",
+        "ru": "CPU",
+        "uk": "CPU",
+        "zh-cn": "CPU"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.cpu"
+  },
+  "beszel.0.systems.backup_nas.cpu.load_15m": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Load Average 15m",
+        "en": "Load Average 15m",
+        "es": "Carga media 15m",
+        "fr": "Charge moyenne 15m",
+        "it": "Carico medio 15m",
+        "nl": "Load Average 15m",
+        "pl": "Load Average 15m",
+        "pt": "Load Average 15m",
+        "ru": "Load Average 15м",
+        "uk": "Load Average 15хв",
+        "zh-cn": "15 分钟负载"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.cpu.load_15m"
+  },
+  "beszel.0.systems.backup_nas.cpu.load_1m": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Load Average 1m",
+        "en": "Load Average 1m",
+        "es": "Carga media 1m",
+        "fr": "Charge moyenne 1m",
+        "it": "Carico medio 1m",
+        "nl": "Load Average 1m",
+        "pl": "Load Average 1m",
+        "pt": "Load Average 1m",
+        "ru": "Load Average 1м",
+        "uk": "Load Average 1хв",
+        "zh-cn": "1 分钟负载"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.cpu.load_1m"
+  },
+  "beszel.0.systems.backup_nas.cpu.load_5m": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Load Average 5m",
+        "en": "Load Average 5m",
+        "es": "Carga media 5m",
+        "fr": "Charge moyenne 5m",
+        "it": "Carico medio 5m",
+        "nl": "Load Average 5m",
+        "pl": "Load Average 5m",
+        "pt": "Load Average 5m",
+        "ru": "Load Average 5м",
+        "uk": "Load Average 5хв",
+        "zh-cn": "5 分钟负载"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.cpu.load_5m"
+  },
+  "beszel.0.systems.backup_nas.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Infos",
+        "it": "Info",
+        "nl": "Info",
+        "pl": "Info",
+        "pt": "Informação",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info"
+  },
+  "beszel.0.systems.backup_nas.info.agent_version": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Agent-Version",
+        "en": "Agent Version",
+        "es": "Versión del Agent",
+        "fr": "Version de l'Agent",
+        "it": "Versione Agent",
+        "nl": "Agent-versie",
+        "pl": "Wersja Agenta",
+        "pt": "Versão do Agent",
+        "ru": "Версия Agent",
+        "uk": "Версія Agent",
+        "zh-cn": "Agent 版本"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.agent_version"
+  },
+  "beszel.0.systems.backup_nas.info.arch": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Architektur",
+        "en": "Architecture",
+        "es": "Arquitectura",
+        "fr": "Architecture",
+        "it": "Architettura",
+        "nl": "Architectuur",
+        "pl": "Architektura",
+        "pt": "Arquitetura",
+        "ru": "Архитектура",
+        "uk": "Архітектура",
+        "zh-cn": "架构"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.arch"
+  },
+  "beszel.0.systems.backup_nas.info.cores": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Kerne",
+        "en": "CPU Cores",
+        "es": "Núcleos de CPU",
+        "fr": "Cœurs CPU",
+        "it": "Core CPU",
+        "nl": "CPU-kernen",
+        "pl": "Rdzenie CPU",
+        "pt": "Núcleos da CPU",
+        "ru": "Ядра ЦП",
+        "uk": "Ядра ЦП",
+        "zh-cn": "CPU 核心数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.cores"
+  },
+  "beszel.0.systems.backup_nas.info.cpu_model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Modell",
+        "en": "CPU Model",
+        "es": "Modelo de CPU",
+        "fr": "Modèle de CPU",
+        "it": "Modello CPU",
+        "nl": "CPU-model",
+        "pl": "Model CPU",
+        "pt": "Modelo da CPU",
+        "ru": "Модель ЦП",
+        "uk": "Модель ЦП",
+        "zh-cn": "CPU 型号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.cpu_model"
+  },
+  "beszel.0.systems.backup_nas.info.hostname": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Hostname",
+        "en": "Hostname",
+        "es": "Nombre de host",
+        "fr": "Nom d'hôte",
+        "it": "Nome host",
+        "nl": "Hostnaam",
+        "pl": "Nazwa hosta",
+        "pt": "Nome do host",
+        "ru": "Имя хоста",
+        "uk": "Ім'я хоста",
+        "zh-cn": "主机名"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.hostname"
+  },
+  "beszel.0.systems.backup_nas.info.kernel": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kernel",
+        "en": "Kernel",
+        "es": "Kernel",
+        "fr": "Noyau",
+        "it": "Kernel",
+        "nl": "Kernel",
+        "pl": "Jądro",
+        "pt": "Kernel",
+        "ru": "Ядро",
+        "uk": "Ядро",
+        "zh-cn": "内核"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.kernel"
+  },
+  "beszel.0.systems.backup_nas.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "En línea",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.online"
+  },
+  "beszel.0.systems.backup_nas.info.os": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebssystem",
+        "en": "Operating System",
+        "es": "Sistema operativo",
+        "fr": "Système d'exploitation",
+        "it": "Sistema operativo",
+        "nl": "Besturingssysteem",
+        "pl": "System operacyjny",
+        "pt": "Sistema operacional",
+        "ru": "Операционная система",
+        "uk": "Операційна система",
+        "zh-cn": "操作系统"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.os"
+  },
+  "beszel.0.systems.backup_nas.info.os_name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "OS-Version",
+        "en": "OS Version",
+        "es": "Versión del SO",
+        "fr": "Version de l'OS",
+        "it": "Versione del SO",
+        "nl": "OS-versie",
+        "pl": "Wersja systemu",
+        "pt": "Versão do SO",
+        "ru": "Версия ОС",
+        "uk": "Версія ОС",
+        "zh-cn": "系统版本"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.os_name"
+  },
+  "beszel.0.systems.backup_nas.info.status": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Status",
+        "pt": "Estado",
+        "ru": "Статус",
+        "uk": "Статус",
+        "zh-cn": "状态"
+      },
+      "desc": {
+        "de": "Was der Hub über das System meldet, oder „unknown\", solange der Adapter nichts liest.",
+        "en": "What the Hub reports about the system, or \"unknown\" while the adapter is not reading.",
+        "es": "Lo que el Hub informa sobre el sistema, o «unknown» mientras el adaptador no consulta.",
+        "fr": "Ce que le Hub indique sur le système, ou « unknown » tant que l'adaptateur ne lit rien.",
+        "it": "Ciò che l'hub riporta sul sistema, oppure «unknown» finché l'adapter non legge.",
+        "nl": "Wat de hub over het systeem meldt, of \"unknown\" zolang de adapter niets uitleest.",
+        "pl": "Co hub zgłasza o systemie lub „unknown\", dopóki adapter nie odpytuje.",
+        "pt": "O que o Hub reporta sobre o sistema, ou «unknown» enquanto o adaptador não consulta.",
+        "ru": "Что хаб сообщает о системе, или «unknown», пока адаптер не опрашивает.",
+        "uk": "Що хаб повідомляє про систему, або «unknown», доки адаптер не опитує.",
+        "zh-cn": "Hub 对该系统的报告；适配器未读取时为 “unknown”。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "up": "Online",
+        "down": "Offline",
+        "paused": "Paused",
+        "pending": "Pending",
+        "unknown": "Unknown"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.status"
+  },
+  "beszel.0.systems.backup_nas.info.threads": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Threads",
+        "en": "CPU Threads",
+        "es": "Hilos de CPU",
+        "fr": "Threads CPU",
+        "it": "Thread CPU",
+        "nl": "CPU-threads",
+        "pl": "Wątki CPU",
+        "pt": "Threads da CPU",
+        "ru": "Потоки ЦП",
+        "uk": "Потоки ЦП",
+        "zh-cn": "CPU 线程数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.threads"
+  },
+  "beszel.0.systems.backup_nas.info.uptime": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebszeit",
+        "en": "Uptime",
+        "es": "Tiempo activo",
+        "fr": "Temps de fonctionnement",
+        "it": "Tempo di attività",
+        "nl": "Uptime",
+        "pl": "Czas pracy",
+        "pt": "Tempo ativo",
+        "ru": "Время работы",
+        "uk": "Час роботи",
+        "zh-cn": "运行时间"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.uptime"
+  },
+  "beszel.0.systems.backup_nas.info.uptime_text": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebszeit (formatiert)",
+        "en": "Uptime (formatted)",
+        "es": "Tiempo activo (formateado)",
+        "fr": "Temps de fonctionnement (formaté)",
+        "it": "Tempo di attività (formattato)",
+        "nl": "Uptime (geformatteerd)",
+        "pl": "Czas pracy (formatowany)",
+        "pt": "Tempo ativo (formatado)",
+        "ru": "Время работы (форматированное)",
+        "uk": "Час роботи (форматований)",
+        "zh-cn": "运行时间（格式化）"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.backup_nas.info.uptime_text"
+  },
+  "beszel.0.systems.homelab_server": {
+    "type": "device",
+    "common": {
+      "name": "Homelab Server",
+      "statusStates": {
+        "onlineId": "beszel.0.systems.homelab_server.info.online"
+      }
+    },
+    "native": {
+      "id": "sysfull01",
+      "host": "192.168.10.5"
+    },
+    "_id": "beszel.0.systems.homelab_server"
+  },
+  "beszel.0.systems.homelab_server.battery": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Akku",
+        "en": "Battery",
+        "es": "Batería",
+        "fr": "Batterie",
+        "it": "Batteria",
+        "nl": "Accu",
+        "pl": "Bateria",
+        "pt": "Bateria",
+        "ru": "Батарея",
+        "uk": "Батарея",
+        "zh-cn": "电池"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.battery"
+  },
+  "beszel.0.systems.homelab_server.battery.batteries": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Akkus",
+        "en": "Batteries",
+        "es": "Baterías",
+        "fr": "Batteries",
+        "it": "Batterie",
+        "nl": "Batterijen",
+        "pl": "Baterie",
+        "pt": "Baterias",
+        "ru": "Батареи",
+        "uk": "Батареї",
+        "zh-cn": "电池"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.battery.batteries"
+  },
+  "beszel.0.systems.homelab_server.battery.batteries.bat0": {
+    "type": "state",
+    "common": {
+      "name": "BAT0",
+      "type": "number",
+      "role": "value.battery",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.battery.batteries.bat0"
+  },
+  "beszel.0.systems.homelab_server.battery.batteries.bat1": {
+    "type": "state",
+    "common": {
+      "name": "BAT1",
+      "type": "number",
+      "role": "value.battery",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.battery.batteries.bat1"
+  },
+  "beszel.0.systems.homelab_server.battery.charging": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Akku lädt",
+        "en": "Battery Charging",
+        "es": "Batería cargando",
+        "fr": "Batterie en charge",
+        "it": "Batteria in carica",
+        "nl": "Accu laadt",
+        "pl": "Bateria ładuje się",
+        "pt": "Bateria a carregar",
+        "ru": "Батарея заряжается",
+        "uk": "Батарея заряджається",
+        "zh-cn": "电池充电中"
+      },
+      "desc": {
+        "de": "Nur wahr, während der Akku wirklich lädt — nicht bei voll oder Leerlauf.",
+        "en": "True only while the battery is actually charging, not when it is full or idle.",
+        "es": "Verdadero solo mientras la batería carga realmente, no cuando está llena o inactiva.",
+        "fr": "Vrai uniquement pendant que la batterie charge réellement, pas quand elle est pleine ou au repos.",
+        "it": "Vero solo mentre la batteria è davvero in carica, non quando è piena o inattiva.",
+        "nl": "Alleen waar terwijl de accu daadwerkelijk laadt, niet bij vol of inactief.",
+        "pl": "Prawda tylko wtedy, gdy akumulator faktycznie się ładuje, nie gdy jest pełny lub bezczynny.",
+        "pt": "Verdadeiro apenas enquanto a bateria carrega de facto, não quando está cheia ou inativa.",
+        "ru": "Истина только когда батарея действительно заряжается, а не когда полна или простаивает.",
+        "uk": "Істина лише поки акумулятор справді заряджається, а не коли повний чи в спокої.",
+        "zh-cn": "仅在电池确实充电时为真，充满或空闲时不算。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.battery.charging"
+  },
+  "beszel.0.systems.homelab_server.battery.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Akku %",
+        "en": "Battery %",
+        "es": "Batería %",
+        "fr": "Batterie %",
+        "it": "Batteria %",
+        "nl": "Accu %",
+        "pl": "Bateria %",
+        "pt": "Bateria %",
+        "ru": "Батарея %",
+        "uk": "Батарея %",
+        "zh-cn": "电池 %"
+      },
+      "type": "number",
+      "role": "value.battery",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.battery.percent"
+  },
+  "beszel.0.systems.homelab_server.containers": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Container",
+        "en": "Containers",
+        "es": "Contenedores",
+        "fr": "Conteneurs",
+        "it": "Container",
+        "nl": "Containers",
+        "pl": "Kontenery",
+        "pt": "Contentores",
+        "ru": "Контейнеры",
+        "uk": "Контейнери",
+        "zh-cn": "容器"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers"
+  },
+  "beszel.0.systems.homelab_server.containers.backup_job": {
+    "type": "channel",
+    "common": {
+      "name": "backup-job"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.containers.backup_job"
+  },
+  "beszel.0.systems.homelab_server.containers.backup_job.cpu": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Auslastung",
+        "en": "CPU Usage",
+        "es": "Uso de CPU",
+        "fr": "Utilisation CPU",
+        "it": "Utilizzo CPU",
+        "nl": "CPU-belasting",
+        "pl": "Wykorzystanie CPU",
+        "pt": "Uso de CPU",
+        "ru": "Загрузка CPU",
+        "uk": "Завантаження CPU",
+        "zh-cn": "CPU 使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.backup_job.cpu"
+  },
+  "beszel.0.systems.homelab_server.containers.backup_job.health": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Health",
+        "en": "Health",
+        "es": "Salud",
+        "fr": "Santé",
+        "it": "Salute",
+        "nl": "Health",
+        "pl": "Health",
+        "pt": "Saúde",
+        "ru": "Health",
+        "uk": "Стан здоров'я",
+        "zh-cn": "健康状态"
+      },
+      "desc": {
+        "de": "Ergebnis der Health-Prüfung des Images; „none\", wenn das Image keine definiert.",
+        "en": "Result of the image's health check; \"none\" when the image defines none.",
+        "es": "Resultado de la comprobación de salud de la imagen; «none» si la imagen no define ninguna.",
+        "fr": "Résultat du contrôle de santé de l'image ; « none » si l'image n'en définit aucun.",
+        "it": "Esito dell'health check dell'immagine; «none» se l'immagine non ne definisce uno.",
+        "nl": "Uitkomst van de health check van het image; \"none\" als het image er geen definieert.",
+        "pl": "Wynik health check obrazu; „none\", gdy obraz go nie definiuje.",
+        "pt": "Resultado da verificação de saúde da imagem; «none» quando a imagem não define nenhuma.",
+        "ru": "Результат проверки работоспособности образа; «none», если образ её не задаёт.",
+        "uk": "Результат перевірки стану образу; «none», якщо образ її не визначає.",
+        "zh-cn": "镜像健康检查的结果；镜像未定义时为 “none”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.backup_job.health"
+  },
+  "beszel.0.systems.homelab_server.containers.backup_job.image": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Image",
+        "en": "Image",
+        "es": "Imagen",
+        "fr": "Image",
+        "it": "Immagine",
+        "nl": "Image",
+        "pl": "Obraz",
+        "pt": "Imagem",
+        "ru": "Образ",
+        "uk": "Образ",
+        "zh-cn": "镜像"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.backup_job.image"
+  },
+  "beszel.0.systems.homelab_server.containers.backup_job.memory": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher",
+        "en": "Memory",
+        "es": "Memoria",
+        "fr": "Mémoire",
+        "it": "Memoria",
+        "nl": "Geheugen",
+        "pl": "Pamięć",
+        "pt": "Memória",
+        "ru": "Память",
+        "uk": "Пам'ять",
+        "zh-cn": "内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.backup_job.memory"
+  },
+  "beszel.0.systems.homelab_server.containers.backup_job.status": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Status",
+        "pt": "Estado",
+        "ru": "Статус",
+        "uk": "Статус",
+        "zh-cn": "状态"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.backup_job.status"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx": {
+    "type": "channel",
+    "common": {
+      "name": "nginx"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.containers.nginx"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx.cpu": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Auslastung",
+        "en": "CPU Usage",
+        "es": "Uso de CPU",
+        "fr": "Utilisation CPU",
+        "it": "Utilizzo CPU",
+        "nl": "CPU-belasting",
+        "pl": "Wykorzystanie CPU",
+        "pt": "Uso de CPU",
+        "ru": "Загрузка CPU",
+        "uk": "Завантаження CPU",
+        "zh-cn": "CPU 使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.nginx.cpu"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx.health": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Health",
+        "en": "Health",
+        "es": "Salud",
+        "fr": "Santé",
+        "it": "Salute",
+        "nl": "Health",
+        "pl": "Health",
+        "pt": "Saúde",
+        "ru": "Health",
+        "uk": "Стан здоров'я",
+        "zh-cn": "健康状态"
+      },
+      "desc": {
+        "de": "Ergebnis der Health-Prüfung des Images; „none\", wenn das Image keine definiert.",
+        "en": "Result of the image's health check; \"none\" when the image defines none.",
+        "es": "Resultado de la comprobación de salud de la imagen; «none» si la imagen no define ninguna.",
+        "fr": "Résultat du contrôle de santé de l'image ; « none » si l'image n'en définit aucun.",
+        "it": "Esito dell'health check dell'immagine; «none» se l'immagine non ne definisce uno.",
+        "nl": "Uitkomst van de health check van het image; \"none\" als het image er geen definieert.",
+        "pl": "Wynik health check obrazu; „none\", gdy obraz go nie definiuje.",
+        "pt": "Resultado da verificação de saúde da imagem; «none» quando a imagem não define nenhuma.",
+        "ru": "Результат проверки работоспособности образа; «none», если образ её не задаёт.",
+        "uk": "Результат перевірки стану образу; «none», якщо образ її не визначає.",
+        "zh-cn": "镜像健康检查的结果；镜像未定义时为 “none”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.nginx.health"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx.image": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Image",
+        "en": "Image",
+        "es": "Imagen",
+        "fr": "Image",
+        "it": "Immagine",
+        "nl": "Image",
+        "pl": "Obraz",
+        "pt": "Imagem",
+        "ru": "Образ",
+        "uk": "Образ",
+        "zh-cn": "镜像"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.nginx.image"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx.memory": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher",
+        "en": "Memory",
+        "es": "Memoria",
+        "fr": "Mémoire",
+        "it": "Memoria",
+        "nl": "Geheugen",
+        "pl": "Pamięć",
+        "pt": "Memória",
+        "ru": "Память",
+        "uk": "Пам'ять",
+        "zh-cn": "内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.nginx.memory"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx.network": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Netzwerk",
+        "en": "Network",
+        "es": "Red",
+        "fr": "Réseau",
+        "it": "Rete",
+        "nl": "Netwerk",
+        "pl": "Sieć",
+        "pt": "Rede",
+        "ru": "Сеть",
+        "uk": "Мережа",
+        "zh-cn": "网络"
+      },
+      "desc": {
+        "de": "Gesendet und empfangen zusammen, in Byte pro Sekunde.",
+        "en": "Sent and received together, in bytes per second.",
+        "es": "Enviado y recibido juntos, en bytes por segundo.",
+        "fr": "Émis et reçu confondus, en octets par seconde.",
+        "it": "Inviato e ricevuto insieme, in byte al secondo.",
+        "nl": "Verzonden en ontvangen samen, in bytes per seconde.",
+        "pl": "Wysłane i odebrane łącznie, w bajtach na sekundę.",
+        "pt": "Enviado e recebido em conjunto, em bytes por segundo.",
+        "ru": "Отправлено и принято вместе, в байтах в секунду.",
+        "uk": "Надіслане й отримане разом, у байтах за секунду.",
+        "zh-cn": "发送与接收之和，单位为字节/秒。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "B/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.nginx.network"
+  },
+  "beszel.0.systems.homelab_server.containers.nginx.status": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Status",
+        "pt": "Estado",
+        "ru": "Статус",
+        "uk": "Статус",
+        "zh-cn": "状态"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.nginx.status"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres": {
+    "type": "channel",
+    "common": {
+      "name": "postgres"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.containers.postgres"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres.cpu": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Auslastung",
+        "en": "CPU Usage",
+        "es": "Uso de CPU",
+        "fr": "Utilisation CPU",
+        "it": "Utilizzo CPU",
+        "nl": "CPU-belasting",
+        "pl": "Wykorzystanie CPU",
+        "pt": "Uso de CPU",
+        "ru": "Загрузка CPU",
+        "uk": "Завантаження CPU",
+        "zh-cn": "CPU 使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.postgres.cpu"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres.health": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Health",
+        "en": "Health",
+        "es": "Salud",
+        "fr": "Santé",
+        "it": "Salute",
+        "nl": "Health",
+        "pl": "Health",
+        "pt": "Saúde",
+        "ru": "Health",
+        "uk": "Стан здоров'я",
+        "zh-cn": "健康状态"
+      },
+      "desc": {
+        "de": "Ergebnis der Health-Prüfung des Images; „none\", wenn das Image keine definiert.",
+        "en": "Result of the image's health check; \"none\" when the image defines none.",
+        "es": "Resultado de la comprobación de salud de la imagen; «none» si la imagen no define ninguna.",
+        "fr": "Résultat du contrôle de santé de l'image ; « none » si l'image n'en définit aucun.",
+        "it": "Esito dell'health check dell'immagine; «none» se l'immagine non ne definisce uno.",
+        "nl": "Uitkomst van de health check van het image; \"none\" als het image er geen definieert.",
+        "pl": "Wynik health check obrazu; „none\", gdy obraz go nie definiuje.",
+        "pt": "Resultado da verificação de saúde da imagem; «none» quando a imagem não define nenhuma.",
+        "ru": "Результат проверки работоспособности образа; «none», если образ её не задаёт.",
+        "uk": "Результат перевірки стану образу; «none», якщо образ її не визначає.",
+        "zh-cn": "镜像健康检查的结果；镜像未定义时为 “none”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.postgres.health"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres.image": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Image",
+        "en": "Image",
+        "es": "Imagen",
+        "fr": "Image",
+        "it": "Immagine",
+        "nl": "Image",
+        "pl": "Obraz",
+        "pt": "Imagem",
+        "ru": "Образ",
+        "uk": "Образ",
+        "zh-cn": "镜像"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.postgres.image"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres.memory": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher",
+        "en": "Memory",
+        "es": "Memoria",
+        "fr": "Mémoire",
+        "it": "Memoria",
+        "nl": "Geheugen",
+        "pl": "Pamięć",
+        "pt": "Memória",
+        "ru": "Память",
+        "uk": "Пам'ять",
+        "zh-cn": "内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.postgres.memory"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres.network": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Netzwerk",
+        "en": "Network",
+        "es": "Red",
+        "fr": "Réseau",
+        "it": "Rete",
+        "nl": "Netwerk",
+        "pl": "Sieć",
+        "pt": "Rede",
+        "ru": "Сеть",
+        "uk": "Мережа",
+        "zh-cn": "网络"
+      },
+      "desc": {
+        "de": "Gesendet und empfangen zusammen, in Byte pro Sekunde.",
+        "en": "Sent and received together, in bytes per second.",
+        "es": "Enviado y recibido juntos, en bytes por segundo.",
+        "fr": "Émis et reçu confondus, en octets par seconde.",
+        "it": "Inviato e ricevuto insieme, in byte al secondo.",
+        "nl": "Verzonden en ontvangen samen, in bytes per seconde.",
+        "pl": "Wysłane i odebrane łącznie, w bajtach na sekundę.",
+        "pt": "Enviado e recebido em conjunto, em bytes por segundo.",
+        "ru": "Отправлено и принято вместе, в байтах в секунду.",
+        "uk": "Надіслане й отримане разом, у байтах за секунду.",
+        "zh-cn": "发送与接收之和，单位为字节/秒。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "B/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.postgres.network"
+  },
+  "beszel.0.systems.homelab_server.containers.postgres.status": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Status",
+        "pt": "Estado",
+        "ru": "Статус",
+        "uk": "Статус",
+        "zh-cn": "状态"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.containers.postgres.status"
+  },
+  "beszel.0.systems.homelab_server.cpu": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "CPU",
+        "en": "CPU",
+        "es": "CPU",
+        "fr": "CPU",
+        "it": "CPU",
+        "nl": "CPU",
+        "pl": "CPU",
+        "pt": "CPU",
+        "ru": "CPU",
+        "uk": "CPU",
+        "zh-cn": "CPU"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu"
+  },
+  "beszel.0.systems.homelab_server.cpu.cores": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "CPU-Kerne",
+        "en": "CPU Cores",
+        "es": "Núcleos de CPU",
+        "fr": "Cœurs CPU",
+        "it": "Core CPU",
+        "nl": "CPU-kernen",
+        "pl": "Rdzenie CPU",
+        "pt": "Núcleos da CPU",
+        "ru": "Ядра ЦП",
+        "uk": "Ядра ЦП",
+        "zh-cn": "CPU 核心"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.cores"
+  },
+  "beszel.0.systems.homelab_server.cpu.cores.core0": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kern 0",
+        "en": "Core 0",
+        "es": "Núcleo 0",
+        "fr": "Cœur 0",
+        "it": "Core 0",
+        "nl": "Kern 0",
+        "pl": "Rdzeń 0",
+        "pt": "Núcleo 0",
+        "ru": "Ядро 0",
+        "uk": "Ядро 0",
+        "zh-cn": "核心 0"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.cores.core0"
+  },
+  "beszel.0.systems.homelab_server.cpu.cores.core1": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kern 1",
+        "en": "Core 1",
+        "es": "Núcleo 1",
+        "fr": "Cœur 1",
+        "it": "Core 1",
+        "nl": "Kern 1",
+        "pl": "Rdzeń 1",
+        "pt": "Núcleo 1",
+        "ru": "Ядро 1",
+        "uk": "Ядро 1",
+        "zh-cn": "核心 1"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.cores.core1"
+  },
+  "beszel.0.systems.homelab_server.cpu.cores.core2": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kern 2",
+        "en": "Core 2",
+        "es": "Núcleo 2",
+        "fr": "Cœur 2",
+        "it": "Core 2",
+        "nl": "Kern 2",
+        "pl": "Rdzeń 2",
+        "pt": "Núcleo 2",
+        "ru": "Ядро 2",
+        "uk": "Ядро 2",
+        "zh-cn": "核心 2"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.cores.core2"
+  },
+  "beszel.0.systems.homelab_server.cpu.cores.core3": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kern 3",
+        "en": "Core 3",
+        "es": "Núcleo 3",
+        "fr": "Cœur 3",
+        "it": "Core 3",
+        "nl": "Kern 3",
+        "pl": "Rdzeń 3",
+        "pt": "Núcleo 3",
+        "ru": "Ядро 3",
+        "uk": "Ядро 3",
+        "zh-cn": "核心 3"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.cores.core3"
+  },
+  "beszel.0.systems.homelab_server.cpu.idle": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU Leerlauf %",
+        "en": "CPU Idle %",
+        "es": "CPU inactiva %",
+        "fr": "CPU inactif %",
+        "it": "CPU inattiva %",
+        "nl": "CPU inactief %",
+        "pl": "CPU bezczynny %",
+        "pt": "CPU inativa %",
+        "ru": "Простой CPU %",
+        "uk": "Простій CPU %",
+        "zh-cn": "CPU 空闲 %"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.idle"
+  },
+  "beszel.0.systems.homelab_server.cpu.iowait": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU IOWait %",
+        "en": "CPU IOWait %",
+        "es": "CPU IOWait %",
+        "fr": "CPU IOWait %",
+        "it": "CPU IOWait %",
+        "nl": "CPU IOWait %",
+        "pl": "CPU IOWait %",
+        "pt": "CPU IOWait %",
+        "ru": "CPU IOWait %",
+        "uk": "CPU IOWait %",
+        "zh-cn": "CPU IOWait %"
+      },
+      "desc": {
+        "de": "Zeitanteil, in dem die CPU nur auf Platte oder Netzwerk gewartet hat.",
+        "en": "Share of time the CPU had nothing to do but wait for disk or network.",
+        "es": "Proporción de tiempo en que la CPU solo esperó al disco o a la red.",
+        "fr": "Part du temps où le processeur n'a fait qu'attendre le disque ou le réseau.",
+        "it": "Quota di tempo in cui la CPU ha solo atteso disco o rete.",
+        "nl": "Deel van de tijd dat de CPU alleen op schijf of netwerk wachtte.",
+        "pl": "Udział czasu, w którym procesor tylko czekał na dysk lub sieć.",
+        "pt": "Percentagem de tempo em que a CPU apenas esperou pelo disco ou pela rede.",
+        "ru": "Доля времени, когда процессор лишь ждал диск или сеть.",
+        "uk": "Частка часу, коли процесор лише чекав на диск або мережу.",
+        "zh-cn": "CPU 仅在等待磁盘或网络的时间占比。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.iowait"
+  },
+  "beszel.0.systems.homelab_server.cpu.load_15m": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Load Average 15m",
+        "en": "Load Average 15m",
+        "es": "Carga media 15m",
+        "fr": "Charge moyenne 15m",
+        "it": "Carico medio 15m",
+        "nl": "Load Average 15m",
+        "pl": "Load Average 15m",
+        "pt": "Load Average 15m",
+        "ru": "Load Average 15м",
+        "uk": "Load Average 15хв",
+        "zh-cn": "15 分钟负载"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.load_15m"
+  },
+  "beszel.0.systems.homelab_server.cpu.load_1m": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Load Average 1m",
+        "en": "Load Average 1m",
+        "es": "Carga media 1m",
+        "fr": "Charge moyenne 1m",
+        "it": "Carico medio 1m",
+        "nl": "Load Average 1m",
+        "pl": "Load Average 1m",
+        "pt": "Load Average 1m",
+        "ru": "Load Average 1м",
+        "uk": "Load Average 1хв",
+        "zh-cn": "1 分钟负载"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.load_1m"
+  },
+  "beszel.0.systems.homelab_server.cpu.load_5m": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Load Average 5m",
+        "en": "Load Average 5m",
+        "es": "Carga media 5m",
+        "fr": "Charge moyenne 5m",
+        "it": "Carico medio 5m",
+        "nl": "Load Average 5m",
+        "pl": "Load Average 5m",
+        "pt": "Load Average 5m",
+        "ru": "Load Average 5м",
+        "uk": "Load Average 5хв",
+        "zh-cn": "5 分钟负载"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.load_5m"
+  },
+  "beszel.0.systems.homelab_server.cpu.peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Spitze",
+        "en": "CPU Peak",
+        "es": "Pico de CPU",
+        "fr": "Pic CPU",
+        "it": "Picco CPU",
+        "nl": "CPU-piek",
+        "pl": "Szczyt CPU",
+        "pt": "Pico da CPU",
+        "ru": "Пик ЦП",
+        "uk": "Пік ЦП",
+        "zh-cn": "CPU 峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Zeitraum dieses Datensatzes, nicht der aktuelle Messwert.",
+        "en": "Highest value within the interval this record covers, not the current reading.",
+        "es": "Valor más alto dentro del intervalo de este registro, no la lectura actual.",
+        "fr": "Valeur la plus élevée sur l'intervalle de cet enregistrement, pas la mesure actuelle.",
+        "it": "Valore più alto nell'intervallo di questo record, non la lettura attuale.",
+        "nl": "Hoogste waarde binnen het interval van deze registratie, niet de huidige meting.",
+        "pl": "Najwyższa wartość w okresie tego zapisu, nie bieżący odczyt.",
+        "pt": "Valor mais alto no intervalo deste registo, não a leitura atual.",
+        "ru": "Максимум за интервал этой записи, а не текущее значение.",
+        "uk": "Найвище значення в межах інтервалу цього запису, а не поточний вимір.",
+        "zh-cn": "该记录所覆盖区间内的最高值，而非当前读数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.peak"
+  },
+  "beszel.0.systems.homelab_server.cpu.steal": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU Steal %",
+        "en": "CPU Steal %",
+        "es": "CPU Steal %",
+        "fr": "CPU Steal %",
+        "it": "CPU Steal %",
+        "nl": "CPU Steal %",
+        "pl": "CPU Steal %",
+        "pt": "CPU Steal %",
+        "ru": "CPU Steal %",
+        "uk": "CPU Steal %",
+        "zh-cn": "CPU Steal %"
+      },
+      "desc": {
+        "de": "Zeitanteil, den der Hypervisor anderen Gästen statt dieser Maschine gegeben hat.",
+        "en": "Share of time the hypervisor gave to other guests instead of this machine.",
+        "es": "Proporción de tiempo que el hipervisor dio a otros invitados en lugar de a esta máquina.",
+        "fr": "Part du temps que l'hyperviseur a donnée à d'autres invités plutôt qu'à cette machine.",
+        "it": "Quota di tempo che l'hypervisor ha dato ad altri guest invece che a questa macchina.",
+        "nl": "Deel van de tijd dat de hypervisor aan andere gasten gaf in plaats van aan deze machine.",
+        "pl": "Udział czasu, który hypervisor oddał innym maszynom zamiast tej.",
+        "pt": "Percentagem de tempo que o hipervisor deu a outros convidados em vez desta máquina.",
+        "ru": "Доля времени, отданная гипервизором другим гостям вместо этой машины.",
+        "uk": "Частка часу, яку гіпервізор віддав іншим гостям замість цієї машини.",
+        "zh-cn": "虚拟化层分配给其他虚拟机而非本机的时间占比。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.steal"
+  },
+  "beszel.0.systems.homelab_server.cpu.system": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU System %",
+        "en": "CPU System %",
+        "es": "CPU Sistema %",
+        "fr": "CPU Système %",
+        "it": "CPU System %",
+        "nl": "CPU System %",
+        "pl": "CPU System %",
+        "pt": "CPU Sistema %",
+        "ru": "CPU System %",
+        "uk": "CPU System %",
+        "zh-cn": "CPU 内核态 %"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.system"
+  },
+  "beszel.0.systems.homelab_server.cpu.usage": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Auslastung",
+        "en": "CPU Usage",
+        "es": "Uso de CPU",
+        "fr": "Utilisation CPU",
+        "it": "Utilizzo CPU",
+        "nl": "CPU-belasting",
+        "pl": "Wykorzystanie CPU",
+        "pt": "Uso de CPU",
+        "ru": "Загрузка CPU",
+        "uk": "Завантаження CPU",
+        "zh-cn": "CPU 使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.usage"
+  },
+  "beszel.0.systems.homelab_server.cpu.user": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU User %",
+        "en": "CPU User %",
+        "es": "CPU Usuario %",
+        "fr": "CPU User %",
+        "it": "CPU User %",
+        "nl": "CPU User %",
+        "pl": "CPU User %",
+        "pt": "CPU Utilizador %",
+        "ru": "CPU User %",
+        "uk": "CPU User %",
+        "zh-cn": "CPU 用户态 %"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.cpu.user"
+  },
+  "beszel.0.systems.homelab_server.disk": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Festplatte",
+        "en": "Disk",
+        "es": "Disco",
+        "fr": "Disque",
+        "it": "Disco",
+        "nl": "Schijf",
+        "pl": "Dysk",
+        "pt": "Disco",
+        "ru": "Диск",
+        "uk": "Диск",
+        "zh-cn": "磁盘"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk"
+  },
+  "beszel.0.systems.homelab_server.disk.io_await_read": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Lese-Wartezeit",
+        "en": "Disk Read Wait",
+        "es": "Espera de lectura",
+        "fr": "Attente lecture",
+        "it": "Attesa lettura",
+        "nl": "Leeswachttijd",
+        "pl": "Czas oczekiwania odczytu",
+        "pt": "Espera de leitura",
+        "ru": "Ожидание чтения",
+        "uk": "Очікування читання",
+        "zh-cn": "磁盘读取等待"
+      },
+      "desc": {
+        "de": "Durchschnittliche Dauer eines einzelnen Lesevorgangs.",
+        "en": "Average time a single read operation took.",
+        "es": "Tiempo medio de una sola operación de lectura.",
+        "fr": "Durée moyenne d'une seule opération de lecture.",
+        "it": "Durata media di una singola operazione di lettura.",
+        "nl": "Gemiddelde duur van één leesbewerking.",
+        "pl": "Średni czas pojedynczej operacji odczytu.",
+        "pt": "Tempo médio de uma única operação de leitura.",
+        "ru": "Среднее время одной операции чтения.",
+        "uk": "Середня тривалість однієї операції читання.",
+        "zh-cn": "单次读操作的平均耗时。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "ms",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.io_await_read"
+  },
+  "beszel.0.systems.homelab_server.disk.io_await_write": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schreib-Wartezeit",
+        "en": "Disk Write Wait",
+        "es": "Espera de escritura",
+        "fr": "Attente écriture",
+        "it": "Attesa scrittura",
+        "nl": "Schrijfwachttijd",
+        "pl": "Czas oczekiwania zapisu",
+        "pt": "Espera de escrita",
+        "ru": "Ожидание записи",
+        "uk": "Очікування запису",
+        "zh-cn": "磁盘写入等待"
+      },
+      "desc": {
+        "de": "Durchschnittliche Dauer eines einzelnen Schreibvorgangs.",
+        "en": "Average time a single write operation took.",
+        "es": "Tiempo medio de una sola operación de escritura.",
+        "fr": "Durée moyenne d'une seule opération d'écriture.",
+        "it": "Durata media di una singola operazione di scrittura.",
+        "nl": "Gemiddelde duur van één schrijfbewerking.",
+        "pl": "Średni czas pojedynczej operacji zapisu.",
+        "pt": "Tempo médio de uma única operação de escrita.",
+        "ru": "Среднее время одной операции записи.",
+        "uk": "Середня тривалість однієї операції запису.",
+        "zh-cn": "单次写操作的平均耗时。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "ms",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.io_await_write"
+  },
+  "beszel.0.systems.homelab_server.disk.io_util": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Disk-I/O-Auslastung",
+        "en": "Disk I/O Utilization",
+        "es": "Utilización de E/S",
+        "fr": "Utilisation E/S disque",
+        "it": "Utilizzo I/O disco",
+        "nl": "Schijf-I/O-gebruik",
+        "pl": "Wykorzystanie We/Wy",
+        "pt": "Utilização de E/S do disco",
+        "ru": "Загрузка I/O диска",
+        "uk": "Завантаження I/O диска",
+        "zh-cn": "磁盘 I/O 利用率"
+      },
+      "desc": {
+        "de": "Zeitanteil, in dem mindestens eine Anfrage an der Platte offen war.",
+        "en": "Share of wall time the disk had at least one request in flight.",
+        "es": "Proporción de tiempo en que el disco tuvo al menos una petición en curso.",
+        "fr": "Part du temps où le disque avait au moins une requête en cours.",
+        "it": "Quota di tempo in cui il disco ha avuto almeno una richiesta in corso.",
+        "nl": "Deel van de tijd dat de schijf minstens één verzoek onderhanden had.",
+        "pl": "Udział czasu, w którym dysk miał co najmniej jedno żądanie w toku.",
+        "pt": "Percentagem de tempo em que o disco teve pelo menos um pedido em curso.",
+        "ru": "Доля времени, когда у диска был хотя бы один запрос в работе.",
+        "uk": "Частка часу, коли диск мав щонайменше один запит у роботі.",
+        "zh-cn": "磁盘至少有一个请求在处理中的时间占比。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.io_util"
+  },
+  "beszel.0.systems.homelab_server.disk.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte %",
+        "en": "Disk %",
+        "es": "Disco %",
+        "fr": "Disque %",
+        "it": "Disco %",
+        "nl": "Schijf %",
+        "pl": "Dysk %",
+        "pt": "Disco %",
+        "ru": "Диск %",
+        "uk": "Диск %",
+        "zh-cn": "磁盘使用率"
+      },
+      "desc": {
+        "de": "Gilt für das Dateisystem, das der Agent als Root führt; weitere Einhängepunkte stehen unter filesystems.",
+        "en": "Applies to the filesystem the agent tracks as root; extra mounts appear under filesystems.",
+        "es": "Se refiere al sistema de archivos que el agente trata como raíz; los demás están en filesystems.",
+        "fr": "Concerne le système de fichiers que l'agent considère comme racine ; les autres montages sont sous filesystems.",
+        "it": "Riguarda il filesystem che l'agent considera root; gli altri mount sono sotto filesystems.",
+        "nl": "Geldt voor het bestandssysteem dat de agent als root beschouwt; andere koppelpunten staan onder filesystems.",
+        "pl": "Dotyczy systemu plików traktowanego przez agenta jako główny; pozostałe są w filesystems.",
+        "pt": "Refere-se ao sistema de ficheiros que o agente trata como raiz; outras montagens estão em filesystems.",
+        "ru": "Относится к файловой системе, которую агент считает корневой; остальные — в filesystems.",
+        "uk": "Стосується файлової системи, яку агент вважає кореневою; інші — у filesystems.",
+        "zh-cn": "指代理视为根分区的文件系统，其他挂载点在 filesystems 下。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.percent"
+  },
+  "beszel.0.systems.homelab_server.disk.read": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte Lesen",
+        "en": "Disk Read",
+        "es": "Disco lectura",
+        "fr": "Disque Lecture",
+        "it": "Disco Lettura",
+        "nl": "Schijf lezen",
+        "pl": "Dysk odczyt",
+        "pt": "Disco leitura",
+        "ru": "Диск чтение",
+        "uk": "Диск читання",
+        "zh-cn": "磁盘读取"
+      },
+      "desc": {
+        "de": "Gilt für das Dateisystem, das der Agent als Root führt; weitere Einhängepunkte stehen unter filesystems.",
+        "en": "Applies to the filesystem the agent tracks as root; extra mounts appear under filesystems.",
+        "es": "Se refiere al sistema de archivos que el agente trata como raíz; los demás están en filesystems.",
+        "fr": "Concerne le système de fichiers que l'agent considère comme racine ; les autres montages sont sous filesystems.",
+        "it": "Riguarda il filesystem che l'agent considera root; gli altri mount sono sotto filesystems.",
+        "nl": "Geldt voor het bestandssysteem dat de agent als root beschouwt; andere koppelpunten staan onder filesystems.",
+        "pl": "Dotyczy systemu plików traktowanego przez agenta jako główny; pozostałe są w filesystems.",
+        "pt": "Refere-se ao sistema de ficheiros que o agente trata como raiz; outras montagens estão em filesystems.",
+        "ru": "Относится к файловой системе, которую агент считает корневой; остальные — в filesystems.",
+        "uk": "Стосується файлової системи, яку агент вважає кореневою; інші — у filesystems.",
+        "zh-cn": "指代理视为根分区的文件系统，其他挂载点在 filesystems 下。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.read"
+  },
+  "beszel.0.systems.homelab_server.disk.read_peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Lese-Spitze",
+        "en": "Disk Read Peak",
+        "es": "Pico de lectura",
+        "fr": "Pic lecture disque",
+        "it": "Picco lettura disco",
+        "nl": "Leespiek schijf",
+        "pl": "Szczyt odczytu",
+        "pt": "Pico de leitura",
+        "ru": "Пик чтения диска",
+        "uk": "Пік читання диска",
+        "zh-cn": "磁盘读取峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Zeitraum dieses Datensatzes, nicht der aktuelle Messwert.",
+        "en": "Highest value within the interval this record covers, not the current reading.",
+        "es": "Valor más alto dentro del intervalo de este registro, no la lectura actual.",
+        "fr": "Valeur la plus élevée sur l'intervalle de cet enregistrement, pas la mesure actuelle.",
+        "it": "Valore più alto nell'intervallo di questo record, non la lettura attuale.",
+        "nl": "Hoogste waarde binnen het interval van deze registratie, niet de huidige meting.",
+        "pl": "Najwyższa wartość w okresie tego zapisu, nie bieżący odczyt.",
+        "pt": "Valor mais alto no intervalo deste registo, não a leitura atual.",
+        "ru": "Максимум за интервал этой записи, а не текущее значение.",
+        "uk": "Найвище значення в межах інтервалу цього запису, а не поточний вимір.",
+        "zh-cn": "该记录所覆盖区间内的最高值，而非当前读数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.read_peak"
+  },
+  "beszel.0.systems.homelab_server.disk.total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte gesamt",
+        "en": "Disk Total",
+        "es": "Disco total",
+        "fr": "Disque total",
+        "it": "Disco totale",
+        "nl": "Schijf totaal",
+        "pl": "Dysk łącznie",
+        "pt": "Disco total",
+        "ru": "Диск всего",
+        "uk": "Диск усього",
+        "zh-cn": "总磁盘"
+      },
+      "desc": {
+        "de": "Gilt für das Dateisystem, das der Agent als Root führt; weitere Einhängepunkte stehen unter filesystems.",
+        "en": "Applies to the filesystem the agent tracks as root; extra mounts appear under filesystems.",
+        "es": "Se refiere al sistema de archivos que el agente trata como raíz; los demás están en filesystems.",
+        "fr": "Concerne le système de fichiers que l'agent considère comme racine ; les autres montages sont sous filesystems.",
+        "it": "Riguarda il filesystem che l'agent considera root; gli altri mount sono sotto filesystems.",
+        "nl": "Geldt voor het bestandssysteem dat de agent als root beschouwt; andere koppelpunten staan onder filesystems.",
+        "pl": "Dotyczy systemu plików traktowanego przez agenta jako główny; pozostałe są w filesystems.",
+        "pt": "Refere-se ao sistema de ficheiros que o agente trata como raiz; outras montagens estão em filesystems.",
+        "ru": "Относится к файловой системе, которую агент считает корневой; остальные — в filesystems.",
+        "uk": "Стосується файлової системи, яку агент вважає кореневою; інші — у filesystems.",
+        "zh-cn": "指代理视为根分区的文件系统，其他挂载点在 filesystems 下。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.total"
+  },
+  "beszel.0.systems.homelab_server.disk.used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte belegt",
+        "en": "Disk Used",
+        "es": "Disco usado",
+        "fr": "Disque utilisé",
+        "it": "Disco usato",
+        "nl": "Schijf gebruikt",
+        "pl": "Dysk użyty",
+        "pt": "Disco usado",
+        "ru": "Диск использовано",
+        "uk": "Диск використано",
+        "zh-cn": "已用磁盘"
+      },
+      "desc": {
+        "de": "Gilt für das Dateisystem, das der Agent als Root führt; weitere Einhängepunkte stehen unter filesystems.",
+        "en": "Applies to the filesystem the agent tracks as root; extra mounts appear under filesystems.",
+        "es": "Se refiere al sistema de archivos que el agente trata como raíz; los demás están en filesystems.",
+        "fr": "Concerne le système de fichiers que l'agent considère comme racine ; les autres montages sont sous filesystems.",
+        "it": "Riguarda il filesystem che l'agent considera root; gli altri mount sono sotto filesystems.",
+        "nl": "Geldt voor het bestandssysteem dat de agent als root beschouwt; andere koppelpunten staan onder filesystems.",
+        "pl": "Dotyczy systemu plików traktowanego przez agenta jako główny; pozostałe są w filesystems.",
+        "pt": "Refere-se ao sistema de ficheiros que o agente trata como raiz; outras montagens estão em filesystems.",
+        "ru": "Относится к файловой системе, которую агент считает корневой; остальные — в filesystems.",
+        "uk": "Стосується файлової системи, яку агент вважає кореневою; інші — у filesystems.",
+        "zh-cn": "指代理视为根分区的文件系统，其他挂载点在 filesystems 下。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.used"
+  },
+  "beszel.0.systems.homelab_server.disk.write": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte Schreiben",
+        "en": "Disk Write",
+        "es": "Disco escritura",
+        "fr": "Disque Écriture",
+        "it": "Disco Scrittura",
+        "nl": "Schijf schrijven",
+        "pl": "Dysk zapis",
+        "pt": "Disco escrita",
+        "ru": "Диск запись",
+        "uk": "Диск запис",
+        "zh-cn": "磁盘写入"
+      },
+      "desc": {
+        "de": "Gilt für das Dateisystem, das der Agent als Root führt; weitere Einhängepunkte stehen unter filesystems.",
+        "en": "Applies to the filesystem the agent tracks as root; extra mounts appear under filesystems.",
+        "es": "Se refiere al sistema de archivos que el agente trata como raíz; los demás están en filesystems.",
+        "fr": "Concerne le système de fichiers que l'agent considère comme racine ; les autres montages sont sous filesystems.",
+        "it": "Riguarda il filesystem che l'agent considera root; gli altri mount sono sotto filesystems.",
+        "nl": "Geldt voor het bestandssysteem dat de agent als root beschouwt; andere koppelpunten staan onder filesystems.",
+        "pl": "Dotyczy systemu plików traktowanego przez agenta jako główny; pozostałe są w filesystems.",
+        "pt": "Refere-se ao sistema de ficheiros que o agente trata como raiz; outras montagens estão em filesystems.",
+        "ru": "Относится к файловой системе, которую агент считает корневой; остальные — в filesystems.",
+        "uk": "Стосується файлової системи, яку агент вважає кореневою; інші — у filesystems.",
+        "zh-cn": "指代理视为根分区的文件系统，其他挂载点在 filesystems 下。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.write"
+  },
+  "beszel.0.systems.homelab_server.disk.write_peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schreib-Spitze",
+        "en": "Disk Write Peak",
+        "es": "Pico de escritura",
+        "fr": "Pic écriture disque",
+        "it": "Picco scrittura disco",
+        "nl": "Schrijfpiek schijf",
+        "pl": "Szczyt zapisu",
+        "pt": "Pico de escrita",
+        "ru": "Пик записи диска",
+        "uk": "Пік запису диска",
+        "zh-cn": "磁盘写入峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Zeitraum dieses Datensatzes, nicht der aktuelle Messwert.",
+        "en": "Highest value within the interval this record covers, not the current reading.",
+        "es": "Valor más alto dentro del intervalo de este registro, no la lectura actual.",
+        "fr": "Valeur la plus élevée sur l'intervalle de cet enregistrement, pas la mesure actuelle.",
+        "it": "Valore più alto nell'intervallo di questo record, non la lettura attuale.",
+        "nl": "Hoogste waarde binnen het interval van deze registratie, niet de huidige meting.",
+        "pl": "Najwyższa wartość w okresie tego zapisu, nie bieżący odczyt.",
+        "pt": "Valor mais alto no intervalo deste registo, não a leitura atual.",
+        "ru": "Максимум за интервал этой записи, а не текущее значение.",
+        "uk": "Найвище значення в межах інтервалу цього запису, а не поточний вимір.",
+        "zh-cn": "该记录所覆盖区间内的最高值，而非当前读数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.write_peak"
+  },
+  "beszel.0.systems.homelab_server.fans": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Lüfter",
+        "en": "Fans",
+        "es": "Ventiladores",
+        "fr": "Ventilateurs",
+        "it": "Ventole",
+        "nl": "Ventilatoren",
+        "pl": "Wentylatory",
+        "pt": "Ventoinhas",
+        "ru": "Вентиляторы",
+        "uk": "Вентилятори",
+        "zh-cn": "风扇"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.fans"
+  },
+  "beszel.0.systems.homelab_server.fans.nct6775_cpu_fan": {
+    "type": "state",
+    "common": {
+      "name": "nct6775_cpu_fan",
+      "type": "number",
+      "role": "value",
+      "unit": "rpm",
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.fans.nct6775_cpu_fan"
+  },
+  "beszel.0.systems.homelab_server.fans.nct6775_fan1": {
+    "type": "state",
+    "common": {
+      "name": "nct6775_fan1",
+      "type": "number",
+      "role": "value",
+      "unit": "rpm",
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.fans.nct6775_fan1"
+  },
+  "beszel.0.systems.homelab_server.filesystems": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Dateisysteme",
+        "en": "Filesystems",
+        "es": "Sistemas de archivos",
+        "fr": "Systèmes de fichiers",
+        "it": "Filesystem",
+        "nl": "Bestandssystemen",
+        "pl": "Systemy plików",
+        "pt": "Sistemas de ficheiros",
+        "ru": "Файловые системы",
+        "uk": "Файлові системи",
+        "zh-cn": "文件系统"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data": {
+    "type": "channel",
+    "common": {
+      "name": "/mnt/data"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.disk_percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte %",
+        "en": "Disk %",
+        "es": "Disco %",
+        "fr": "Disque %",
+        "it": "Disco %",
+        "nl": "Schijf %",
+        "pl": "Dysk %",
+        "pt": "Disco %",
+        "ru": "Диск %",
+        "uk": "Диск %",
+        "zh-cn": "磁盘使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.disk_percent"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.disk_total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte gesamt",
+        "en": "Disk Total",
+        "es": "Disco total",
+        "fr": "Disque total",
+        "it": "Disco totale",
+        "nl": "Schijf totaal",
+        "pl": "Dysk łącznie",
+        "pt": "Disco total",
+        "ru": "Диск всего",
+        "uk": "Диск усього",
+        "zh-cn": "总磁盘"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.disk_total"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.disk_used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte belegt",
+        "en": "Disk Used",
+        "es": "Disco usado",
+        "fr": "Disque utilisé",
+        "it": "Disco usato",
+        "nl": "Schijf gebruikt",
+        "pl": "Dysk użyty",
+        "pt": "Disco usado",
+        "ru": "Диск использовано",
+        "uk": "Диск використано",
+        "zh-cn": "已用磁盘"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.disk_used"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.read_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Lesegeschwindigkeit",
+        "en": "Read Speed",
+        "es": "Velocidad de lectura",
+        "fr": "Vitesse de lecture",
+        "it": "Velocità di lettura",
+        "nl": "Leessnelheid",
+        "pl": "Prędkość odczytu",
+        "pt": "Velocidade de leitura",
+        "ru": "Скорость чтения",
+        "uk": "Швидкість читання",
+        "zh-cn": "读取速度"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.read_speed"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.write_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schreibgeschwindigkeit",
+        "en": "Write Speed",
+        "es": "Velocidad de escritura",
+        "fr": "Vitesse d'écriture",
+        "it": "Velocità di scrittura",
+        "nl": "Schrijfsnelheid",
+        "pl": "Prędkość zapisu",
+        "pt": "Velocidade de escrita",
+        "ru": "Скорость записи",
+        "uk": "Швидкість запису",
+        "zh-cn": "写入速度"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.write_speed"
+  },
+  "beszel.0.systems.homelab_server.gpu": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "GPU",
+        "en": "GPU",
+        "es": "GPU",
+        "fr": "GPU",
+        "it": "GPU",
+        "nl": "GPU",
+        "pl": "GPU",
+        "pt": "GPU",
+        "ru": "GPU",
+        "uk": "GPU",
+        "zh-cn": "GPU"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu"
+  },
+  "beszel.0.systems.homelab_server.gpu.0": {
+    "type": "channel",
+    "common": {
+      "name": "NVIDIA GeForce RTX 3060"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.gpu.0"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.engines": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "GPU-Engines",
+        "en": "GPU Engines",
+        "es": "Motores de GPU",
+        "fr": "Moteurs GPU",
+        "it": "Motori GPU",
+        "nl": "GPU-engines",
+        "pl": "Silniki GPU",
+        "pt": "Motores da GPU",
+        "ru": "Движки GPU",
+        "uk": "Рушії GPU",
+        "zh-cn": "GPU 引擎"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu.0.engines"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.engines.3d": {
+    "type": "state",
+    "common": {
+      "name": "3D",
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.gpu.0.engines.3d"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.engines.video": {
+    "type": "state",
+    "common": {
+      "name": "Video",
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.gpu.0.engines.video"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.memory_total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "GPU-Speicher gesamt",
+        "en": "GPU Memory Total",
+        "es": "Memoria GPU total",
+        "fr": "Mémoire GPU totale",
+        "it": "Memoria GPU totale",
+        "nl": "GPU-geheugen totaal",
+        "pl": "Pamięć GPU łącznie",
+        "pt": "Memória GPU total",
+        "ru": "GPU память всего",
+        "uk": "Пам'ять GPU усього",
+        "zh-cn": "总 GPU 内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu.0.memory_total"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.memory_used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "GPU-Speicher belegt",
+        "en": "GPU Memory Used",
+        "es": "Memoria GPU usada",
+        "fr": "Mémoire GPU utilisée",
+        "it": "Memoria GPU usata",
+        "nl": "GPU-geheugen gebruikt",
+        "pl": "Pamięć GPU użyta",
+        "pt": "Memória GPU usada",
+        "ru": "GPU память использовано",
+        "uk": "Пам'ять GPU використано",
+        "zh-cn": "已用 GPU 内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu.0.memory_used"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.power": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "GPU Leistung",
+        "en": "GPU Power",
+        "es": "Potencia GPU",
+        "fr": "Puissance GPU",
+        "it": "Potenza GPU",
+        "nl": "GPU-vermogen",
+        "pl": "Moc GPU",
+        "pt": "Potência GPU",
+        "ru": "GPU потребление",
+        "uk": "Потужність GPU",
+        "zh-cn": "GPU 功耗"
+      },
+      "type": "number",
+      "role": "value.power",
+      "unit": "W",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu.0.power"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.power_package": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Package-Leistung",
+        "en": "Package Power",
+        "es": "Potencia del paquete",
+        "fr": "Puissance package",
+        "it": "Potenza package",
+        "nl": "Package-vermogen",
+        "pl": "Moc pakietu",
+        "pt": "Potência do pacote",
+        "ru": "Мощность пакета",
+        "uk": "Потужність пакета",
+        "zh-cn": "封装功耗"
+      },
+      "desc": {
+        "de": "Leistungsaufnahme des gesamten Chip-Pakets, wo der Treiber sie getrennt meldet.",
+        "en": "Power draw of the whole chip package where the driver reports it separately.",
+        "es": "Consumo de todo el paquete del chip, cuando el controlador lo informa por separado.",
+        "fr": "Consommation de l'ensemble du package de la puce, lorsque le pilote la rapporte séparément.",
+        "it": "Assorbimento dell'intero package del chip, dove il driver lo riporta separatamente.",
+        "nl": "Opgenomen vermogen van het hele chippakket, waar de driver dit apart meldt.",
+        "pl": "Pobór mocy całego układu, jeśli sterownik podaje go osobno.",
+        "pt": "Consumo de todo o pacote do chip, quando o controlador o reporta em separado.",
+        "ru": "Потребление всего чипа целиком, если драйвер сообщает его отдельно.",
+        "uk": "Споживання всього корпусу чипа, якщо драйвер повідомляє його окремо.",
+        "zh-cn": "整个芯片封装的功耗（驱动单独上报时）。"
+      },
+      "type": "number",
+      "role": "value.power",
+      "unit": "W",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu.0.power_package"
+  },
+  "beszel.0.systems.homelab_server.gpu.0.usage": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "GPU-Auslastung",
+        "en": "GPU Usage",
+        "es": "Uso de GPU",
+        "fr": "Utilisation GPU",
+        "it": "Utilizzo GPU",
+        "nl": "GPU-belasting",
+        "pl": "Wykorzystanie GPU",
+        "pt": "Uso de GPU",
+        "ru": "Загрузка GPU",
+        "uk": "Завантаження GPU",
+        "zh-cn": "GPU 使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.gpu.0.usage"
+  },
+  "beszel.0.systems.homelab_server.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Infos",
+        "it": "Info",
+        "nl": "Info",
+        "pl": "Info",
+        "pt": "Informação",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info"
+  },
+  "beszel.0.systems.homelab_server.info.agent_version": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Agent-Version",
+        "en": "Agent Version",
+        "es": "Versión del Agent",
+        "fr": "Version de l'Agent",
+        "it": "Versione Agent",
+        "nl": "Agent-versie",
+        "pl": "Wersja Agenta",
+        "pt": "Versão do Agent",
+        "ru": "Версия Agent",
+        "uk": "Версія Agent",
+        "zh-cn": "Agent 版本"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.agent_version"
+  },
+  "beszel.0.systems.homelab_server.info.arch": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Architektur",
+        "en": "Architecture",
+        "es": "Arquitectura",
+        "fr": "Architecture",
+        "it": "Architettura",
+        "nl": "Architectuur",
+        "pl": "Architektura",
+        "pt": "Arquitetura",
+        "ru": "Архитектура",
+        "uk": "Архітектура",
+        "zh-cn": "架构"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.arch"
+  },
+  "beszel.0.systems.homelab_server.info.cores": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Kerne",
+        "en": "CPU Cores",
+        "es": "Núcleos de CPU",
+        "fr": "Cœurs CPU",
+        "it": "Core CPU",
+        "nl": "CPU-kernen",
+        "pl": "Rdzenie CPU",
+        "pt": "Núcleos da CPU",
+        "ru": "Ядра ЦП",
+        "uk": "Ядра ЦП",
+        "zh-cn": "CPU 核心数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.cores"
+  },
+  "beszel.0.systems.homelab_server.info.cpu_model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Modell",
+        "en": "CPU Model",
+        "es": "Modelo de CPU",
+        "fr": "Modèle de CPU",
+        "it": "Modello CPU",
+        "nl": "CPU-model",
+        "pl": "Model CPU",
+        "pt": "Modelo da CPU",
+        "ru": "Модель ЦП",
+        "uk": "Модель ЦП",
+        "zh-cn": "CPU 型号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.cpu_model"
+  },
+  "beszel.0.systems.homelab_server.info.hostname": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Hostname",
+        "en": "Hostname",
+        "es": "Nombre de host",
+        "fr": "Nom d'hôte",
+        "it": "Nome host",
+        "nl": "Hostnaam",
+        "pl": "Nazwa hosta",
+        "pt": "Nome do host",
+        "ru": "Имя хоста",
+        "uk": "Ім'я хоста",
+        "zh-cn": "主机名"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.hostname"
+  },
+  "beszel.0.systems.homelab_server.info.kernel": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kernel",
+        "en": "Kernel",
+        "es": "Kernel",
+        "fr": "Noyau",
+        "it": "Kernel",
+        "nl": "Kernel",
+        "pl": "Jądro",
+        "pt": "Kernel",
+        "ru": "Ядро",
+        "uk": "Ядро",
+        "zh-cn": "内核"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.kernel"
+  },
+  "beszel.0.systems.homelab_server.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "En línea",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.online"
+  },
+  "beszel.0.systems.homelab_server.info.os": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebssystem",
+        "en": "Operating System",
+        "es": "Sistema operativo",
+        "fr": "Système d'exploitation",
+        "it": "Sistema operativo",
+        "nl": "Besturingssysteem",
+        "pl": "System operacyjny",
+        "pt": "Sistema operacional",
+        "ru": "Операционная система",
+        "uk": "Операційна система",
+        "zh-cn": "操作系统"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.os"
+  },
+  "beszel.0.systems.homelab_server.info.os_name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "OS-Version",
+        "en": "OS Version",
+        "es": "Versión del SO",
+        "fr": "Version de l'OS",
+        "it": "Versione del SO",
+        "nl": "OS-versie",
+        "pl": "Wersja systemu",
+        "pt": "Versão do SO",
+        "ru": "Версия ОС",
+        "uk": "Версія ОС",
+        "zh-cn": "系统版本"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.os_name"
+  },
+  "beszel.0.systems.homelab_server.info.podman": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Podman",
+        "en": "Podman",
+        "es": "Podman",
+        "fr": "Podman",
+        "it": "Podman",
+        "nl": "Podman",
+        "pl": "Podman",
+        "pt": "Podman",
+        "ru": "Podman",
+        "uk": "Podman",
+        "zh-cn": "Podman"
+      },
+      "desc": {
+        "de": "Die Container-Engine auf diesem Host ist Podman statt Docker.",
+        "en": "The container engine on this host is Podman instead of Docker.",
+        "es": "El motor de contenedores de este host es Podman en lugar de Docker.",
+        "fr": "Le moteur de conteneurs de cet hôte est Podman et non Docker.",
+        "it": "Il motore container di questo host è Podman anziché Docker.",
+        "nl": "De containerengine op deze host is Podman in plaats van Docker.",
+        "pl": "Silnik kontenerów na tym hoście to Podman, a nie Docker.",
+        "pt": "O motor de contentores neste anfitrião é o Podman, não o Docker.",
+        "ru": "Движок контейнеров на этом хосте — Podman, а не Docker.",
+        "uk": "Рушій контейнерів на цьому хості — Podman, а не Docker.",
+        "zh-cn": "该主机的容器引擎是 Podman 而非 Docker。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.podman"
+  },
+  "beszel.0.systems.homelab_server.info.services_failed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Dienste fehlgeschlagen",
+        "en": "Services Failed",
+        "es": "Servicios fallidos",
+        "fr": "Services en échec",
+        "it": "Servizi falliti",
+        "nl": "Diensten mislukt",
+        "pl": "Usługi nieudane",
+        "pt": "Serviços falhados",
+        "ru": "Ошибки служб",
+        "uk": "Служби з помилкою",
+        "zh-cn": "失败的服务"
+      },
+      "desc": {
+        "de": "Anzahl der systemd-Units im Fehlerzustand.",
+        "en": "Number of systemd units in a failed state.",
+        "es": "Número de unidades systemd en estado fallido.",
+        "fr": "Nombre d'unités systemd en échec.",
+        "it": "Numero di unit systemd in stato di errore.",
+        "nl": "Aantal systemd-units in een foutstatus.",
+        "pl": "Liczba jednostek systemd w stanie błędu.",
+        "pt": "Número de unidades systemd em estado de falha.",
+        "ru": "Количество юнитов systemd в состоянии ошибки.",
+        "uk": "Кількість юнітів systemd у стані помилки.",
+        "zh-cn": "处于失败状态的 systemd 单元数量。"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.services_failed"
+  },
+  "beszel.0.systems.homelab_server.info.services_total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Dienste gesamt",
+        "en": "Services Total",
+        "es": "Servicios totales",
+        "fr": "Services au total",
+        "it": "Servizi totali",
+        "nl": "Diensten totaal",
+        "pl": "Usługi łącznie",
+        "pt": "Total de serviços",
+        "ru": "Всего служб",
+        "uk": "Усього служб",
+        "zh-cn": "服务总数"
+      },
+      "desc": {
+        "de": "Anzahl der systemd-Units auf diesem Host.",
+        "en": "Number of systemd units on this host.",
+        "es": "Número de unidades systemd en este host.",
+        "fr": "Nombre d'unités systemd sur cet hôte.",
+        "it": "Numero di unit systemd su questo host.",
+        "nl": "Aantal systemd-units op deze host.",
+        "pl": "Liczba jednostek systemd na tym hoście.",
+        "pt": "Número de unidades systemd neste anfitrião.",
+        "ru": "Количество юнитов systemd на этом хосте.",
+        "uk": "Кількість юнітів systemd на цьому хості.",
+        "zh-cn": "该主机上的 systemd 单元数量。"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.services_total"
+  },
+  "beszel.0.systems.homelab_server.info.status": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Status",
+        "pt": "Estado",
+        "ru": "Статус",
+        "uk": "Статус",
+        "zh-cn": "状态"
+      },
+      "desc": {
+        "de": "Was der Hub über das System meldet, oder „unknown\", solange der Adapter nichts liest.",
+        "en": "What the Hub reports about the system, or \"unknown\" while the adapter is not reading.",
+        "es": "Lo que el Hub informa sobre el sistema, o «unknown» mientras el adaptador no consulta.",
+        "fr": "Ce que le Hub indique sur le système, ou « unknown » tant que l'adaptateur ne lit rien.",
+        "it": "Ciò che l'hub riporta sul sistema, oppure «unknown» finché l'adapter non legge.",
+        "nl": "Wat de hub over het systeem meldt, of \"unknown\" zolang de adapter niets uitleest.",
+        "pl": "Co hub zgłasza o systemie lub „unknown\", dopóki adapter nie odpytuje.",
+        "pt": "O que o Hub reporta sobre o sistema, ou «unknown» enquanto o adaptador não consulta.",
+        "ru": "Что хаб сообщает о системе, или «unknown», пока адаптер не опрашивает.",
+        "uk": "Що хаб повідомляє про систему, або «unknown», доки адаптер не опитує.",
+        "zh-cn": "Hub 对该系统的报告；适配器未读取时为 “unknown”。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "up": "Online",
+        "down": "Offline",
+        "paused": "Paused",
+        "pending": "Pending",
+        "unknown": "Unknown"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.status"
+  },
+  "beszel.0.systems.homelab_server.info.threads": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Threads",
+        "en": "CPU Threads",
+        "es": "Hilos de CPU",
+        "fr": "Threads CPU",
+        "it": "Thread CPU",
+        "nl": "CPU-threads",
+        "pl": "Wątki CPU",
+        "pt": "Threads da CPU",
+        "ru": "Потоки ЦП",
+        "uk": "Потоки ЦП",
+        "zh-cn": "CPU 线程数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.threads"
+  },
+  "beszel.0.systems.homelab_server.info.uptime": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebszeit",
+        "en": "Uptime",
+        "es": "Tiempo activo",
+        "fr": "Temps de fonctionnement",
+        "it": "Tempo di attività",
+        "nl": "Uptime",
+        "pl": "Czas pracy",
+        "pt": "Tempo ativo",
+        "ru": "Время работы",
+        "uk": "Час роботи",
+        "zh-cn": "运行时间"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.uptime"
+  },
+  "beszel.0.systems.homelab_server.info.uptime_text": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebszeit (formatiert)",
+        "en": "Uptime (formatted)",
+        "es": "Tiempo activo (formateado)",
+        "fr": "Temps de fonctionnement (formaté)",
+        "it": "Tempo di attività (formattato)",
+        "nl": "Uptime (geformatteerd)",
+        "pl": "Czas pracy (formatowany)",
+        "pt": "Tempo ativo (formatado)",
+        "ru": "Время работы (форматированное)",
+        "uk": "Час роботи (форматований)",
+        "zh-cn": "运行时间（格式化）"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.info.uptime_text"
+  },
+  "beszel.0.systems.homelab_server.memory": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Speicher",
+        "en": "Memory",
+        "es": "Memoria",
+        "fr": "Mémoire",
+        "it": "Memoria",
+        "nl": "Geheugen",
+        "pl": "Pamięć",
+        "pt": "Memória",
+        "ru": "Память",
+        "uk": "Пам'ять",
+        "zh-cn": "内存"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory"
+  },
+  "beszel.0.systems.homelab_server.memory.buffers": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher Buffers+Cache",
+        "en": "Memory Buffers+Cache",
+        "es": "Memoria Buffers+Cache",
+        "fr": "Mémoire Buffers+Cache",
+        "it": "Memoria Buffers+Cache",
+        "nl": "Geheugen Buffers+Cache",
+        "pl": "Pamięć Buffers+Cache",
+        "pt": "Memória Buffers+Cache",
+        "ru": "Память Buffers+Cache",
+        "uk": "Пам'ять Buffers+Cache",
+        "zh-cn": "Buffers+Cache 内存"
+      },
+      "desc": {
+        "de": "Speicher für Puffer und Dateicache; das System kann ihn zurückholen.",
+        "en": "Memory used for buffers and file cache; the system can reclaim it.",
+        "es": "Memoria usada por búferes y caché de archivos; el sistema puede recuperarla.",
+        "fr": "Mémoire utilisée pour les tampons et le cache de fichiers ; le système peut la récupérer.",
+        "it": "Memoria usata per buffer e cache dei file; il sistema può recuperarla.",
+        "nl": "Geheugen voor buffers en bestandscache; het systeem kan het vrijmaken.",
+        "pl": "Pamięć na bufory i pamięć podręczną plików; system może ją odzyskać.",
+        "pt": "Memória usada por buffers e cache de ficheiros; o sistema pode recuperá-la.",
+        "ru": "Память под буферы и файловый кэш; система может её освободить.",
+        "uk": "Пам'ять під буфери та файловий кеш; система може її звільнити.",
+        "zh-cn": "用于缓冲区和文件缓存的内存，系统可随时回收。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.buffers"
+  },
+  "beszel.0.systems.homelab_server.memory.peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher-Spitze",
+        "en": "Memory Peak",
+        "es": "Pico de memoria",
+        "fr": "Pic mémoire",
+        "it": "Picco memoria",
+        "nl": "Geheugenpiek",
+        "pl": "Szczyt pamięci",
+        "pt": "Pico de memória",
+        "ru": "Пик памяти",
+        "uk": "Пік пам'яті",
+        "zh-cn": "内存峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Zeitraum dieses Datensatzes, nicht der aktuelle Messwert.",
+        "en": "Highest value within the interval this record covers, not the current reading.",
+        "es": "Valor más alto dentro del intervalo de este registro, no la lectura actual.",
+        "fr": "Valeur la plus élevée sur l'intervalle de cet enregistrement, pas la mesure actuelle.",
+        "it": "Valore più alto nell'intervallo di questo record, non la lettura attuale.",
+        "nl": "Hoogste waarde binnen het interval van deze registratie, niet de huidige meting.",
+        "pl": "Najwyższa wartość w okresie tego zapisu, nie bieżący odczyt.",
+        "pt": "Valor mais alto no intervalo deste registo, não a leitura atual.",
+        "ru": "Максимум за интервал этой записи, а не текущее значение.",
+        "uk": "Найвище значення в межах інтервалу цього запису, а не поточний вимір.",
+        "zh-cn": "该记录所覆盖区间内的最高值，而非当前读数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.peak"
+  },
+  "beszel.0.systems.homelab_server.memory.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher %",
+        "en": "Memory %",
+        "es": "Memoria %",
+        "fr": "Mémoire %",
+        "it": "Memoria %",
+        "nl": "Geheugen %",
+        "pl": "Pamięć %",
+        "pt": "Memória %",
+        "ru": "Память %",
+        "uk": "Пам'ять %",
+        "zh-cn": "内存使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.percent"
+  },
+  "beszel.0.systems.homelab_server.memory.swap_total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Swap gesamt",
+        "en": "Swap Total",
+        "es": "Swap total",
+        "fr": "Swap total",
+        "it": "Swap totale",
+        "nl": "Swap totaal",
+        "pl": "Swap łącznie",
+        "pt": "Swap total",
+        "ru": "Swap всего",
+        "uk": "Swap усього",
+        "zh-cn": "总 Swap"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.swap_total"
+  },
+  "beszel.0.systems.homelab_server.memory.swap_used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Swap belegt",
+        "en": "Swap Used",
+        "es": "Swap usado",
+        "fr": "Swap utilisé",
+        "it": "Swap usato",
+        "nl": "Swap gebruikt",
+        "pl": "Swap użyty",
+        "pt": "Swap usado",
+        "ru": "Swap использовано",
+        "uk": "Swap використано",
+        "zh-cn": "已用 Swap"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.swap_used"
+  },
+  "beszel.0.systems.homelab_server.memory.total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher gesamt",
+        "en": "Memory Total",
+        "es": "Memoria total",
+        "fr": "Mémoire totale",
+        "it": "Memoria totale",
+        "nl": "Geheugen totaal",
+        "pl": "Pamięć łącznie",
+        "pt": "Memória total",
+        "ru": "Память всего",
+        "uk": "Пам'ять усього",
+        "zh-cn": "总内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.total"
+  },
+  "beszel.0.systems.homelab_server.memory.used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher belegt",
+        "en": "Memory Used",
+        "es": "Memoria usada",
+        "fr": "Mémoire utilisée",
+        "it": "Memoria usata",
+        "nl": "Geheugen gebruikt",
+        "pl": "Pamięć użyta",
+        "pt": "Memória usada",
+        "ru": "Память использовано",
+        "uk": "Пам'ять використано",
+        "zh-cn": "已用内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.used"
+  },
+  "beszel.0.systems.homelab_server.memory.zfs_arc": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher ZFS ARC",
+        "en": "Memory ZFS ARC",
+        "es": "Memoria ZFS ARC",
+        "fr": "Mémoire ZFS ARC",
+        "it": "Memoria ZFS ARC",
+        "nl": "Geheugen ZFS ARC",
+        "pl": "Pamięć ZFS ARC",
+        "pt": "Memória ZFS ARC",
+        "ru": "Память ZFS ARC",
+        "uk": "Пам'ять ZFS ARC",
+        "zh-cn": "ZFS ARC 内存"
+      },
+      "desc": {
+        "de": "Vom ZFS-Cache belegter Speicher; zählt als belegt, ist aber zurückholbar.",
+        "en": "Memory held by the ZFS cache; counted as used, but reclaimable.",
+        "es": "Memoria retenida por la caché de ZFS; cuenta como usada, pero es recuperable.",
+        "fr": "Mémoire retenue par le cache ZFS ; comptée comme utilisée, mais récupérable.",
+        "it": "Memoria occupata dalla cache ZFS; conta come usata, ma è recuperabile.",
+        "nl": "Geheugen dat de ZFS-cache vasthoudt; telt als gebruikt, maar is vrij te maken.",
+        "pl": "Pamięć zajęta przez pamięć podręczną ZFS; liczona jako używana, ale odzyskiwalna.",
+        "pt": "Memória ocupada pela cache do ZFS; conta como usada, mas é recuperável.",
+        "ru": "Память, занятая кэшем ZFS; учитывается как занятая, но освобождаемая.",
+        "uk": "Пам'ять, зайнята кешем ZFS; рахується як зайнята, але може бути звільнена.",
+        "zh-cn": "ZFS 缓存占用的内存，计入已用但可被回收。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.memory.zfs_arc"
+  },
+  "beszel.0.systems.homelab_server.network": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Netzwerk",
+        "en": "Network",
+        "es": "Red",
+        "fr": "Réseau",
+        "it": "Rete",
+        "nl": "Netwerk",
+        "pl": "Sieć",
+        "pt": "Rede",
+        "ru": "Сеть",
+        "uk": "Мережа",
+        "zh-cn": "网络"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Netzwerkschnittstellen",
+        "en": "Network Interfaces",
+        "es": "Interfaces de red",
+        "fr": "Interfaces réseau",
+        "it": "Interfacce di rete",
+        "nl": "Netwerkinterfaces",
+        "pl": "Interfejsy sieciowe",
+        "pt": "Interfaces de rede",
+        "ru": "Сетевые интерфейсы",
+        "uk": "Мережеві інтерфейси",
+        "zh-cn": "网络接口"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.eth0": {
+    "type": "channel",
+    "common": {
+      "name": "eth0"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.eth0"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.eth0.down": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Download",
+        "en": "Download",
+        "es": "Bajada",
+        "fr": "Réception",
+        "it": "Download",
+        "nl": "Download",
+        "pl": "Pobieranie",
+        "pt": "Receção",
+        "ru": "Приём",
+        "uk": "Завантаження",
+        "zh-cn": "下载"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.eth0.down"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.eth0.total_down": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Download gesamt",
+        "en": "Total Download",
+        "es": "Bajada total",
+        "fr": "Réception totale",
+        "it": "Download totale",
+        "nl": "Totaal download",
+        "pl": "Łączne pobieranie",
+        "pt": "Total recebido",
+        "ru": "Всего принято",
+        "uk": "Усього завантажено",
+        "zh-cn": "总下载"
+      },
+      "desc": {
+        "de": "Übertragene Menge seit dem Start des Agenten, keine Rate.",
+        "en": "Volume transferred since the agent started, not a rate.",
+        "es": "Volumen transferido desde el arranque del agente, no una tasa.",
+        "fr": "Volume transféré depuis le démarrage de l'agent, pas un débit.",
+        "it": "Volume trasferito dall'avvio dell'agent, non una velocità.",
+        "nl": "Hoeveelheid overgedragen sinds de start van de agent, geen snelheid.",
+        "pl": "Ilość przesłana od uruchomienia agenta, nie prędkość.",
+        "pt": "Volume transferido desde o arranque do agente, não uma taxa.",
+        "ru": "Объём, переданный с момента запуска агента, а не скорость.",
+        "uk": "Обсяг, переданий від запуску агента, а не швидкість.",
+        "zh-cn": "自代理启动以来的累计传输量，而非速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.eth0.total_down"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.eth0.total_up": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Upload gesamt",
+        "en": "Total Upload",
+        "es": "Subida total",
+        "fr": "Émission totale",
+        "it": "Upload totale",
+        "nl": "Totaal upload",
+        "pl": "Łączne wysyłanie",
+        "pt": "Total enviado",
+        "ru": "Всего отправлено",
+        "uk": "Усього відвантажено",
+        "zh-cn": "总上传"
+      },
+      "desc": {
+        "de": "Übertragene Menge seit dem Start des Agenten, keine Rate.",
+        "en": "Volume transferred since the agent started, not a rate.",
+        "es": "Volumen transferido desde el arranque del agente, no una tasa.",
+        "fr": "Volume transféré depuis le démarrage de l'agent, pas un débit.",
+        "it": "Volume trasferito dall'avvio dell'agent, non una velocità.",
+        "nl": "Hoeveelheid overgedragen sinds de start van de agent, geen snelheid.",
+        "pl": "Ilość przesłana od uruchomienia agenta, nie prędkość.",
+        "pt": "Volume transferido desde o arranque do agente, não uma taxa.",
+        "ru": "Объём, переданный с момента запуска агента, а не скорость.",
+        "uk": "Обсяг, переданий від запуску агента, а не швидкість.",
+        "zh-cn": "自代理启动以来的累计传输量，而非速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.eth0.total_up"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.eth0.up": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Upload",
+        "en": "Upload",
+        "es": "Subida",
+        "fr": "Émission",
+        "it": "Upload",
+        "nl": "Upload",
+        "pl": "Wysyłanie",
+        "pt": "Envio",
+        "ru": "Отправка",
+        "uk": "Відвантаження",
+        "zh-cn": "上传"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.eth0.up"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.wlan0": {
+    "type": "channel",
+    "common": {
+      "name": "wlan0"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.wlan0"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.wlan0.down": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Download",
+        "en": "Download",
+        "es": "Bajada",
+        "fr": "Réception",
+        "it": "Download",
+        "nl": "Download",
+        "pl": "Pobieranie",
+        "pt": "Receção",
+        "ru": "Приём",
+        "uk": "Завантаження",
+        "zh-cn": "下载"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.wlan0.down"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.wlan0.total_down": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Download gesamt",
+        "en": "Total Download",
+        "es": "Bajada total",
+        "fr": "Réception totale",
+        "it": "Download totale",
+        "nl": "Totaal download",
+        "pl": "Łączne pobieranie",
+        "pt": "Total recebido",
+        "ru": "Всего принято",
+        "uk": "Усього завантажено",
+        "zh-cn": "总下载"
+      },
+      "desc": {
+        "de": "Übertragene Menge seit dem Start des Agenten, keine Rate.",
+        "en": "Volume transferred since the agent started, not a rate.",
+        "es": "Volumen transferido desde el arranque del agente, no una tasa.",
+        "fr": "Volume transféré depuis le démarrage de l'agent, pas un débit.",
+        "it": "Volume trasferito dall'avvio dell'agent, non una velocità.",
+        "nl": "Hoeveelheid overgedragen sinds de start van de agent, geen snelheid.",
+        "pl": "Ilość przesłana od uruchomienia agenta, nie prędkość.",
+        "pt": "Volume transferido desde o arranque do agente, não uma taxa.",
+        "ru": "Объём, переданный с момента запуска агента, а не скорость.",
+        "uk": "Обсяг, переданий від запуску агента, а не швидкість.",
+        "zh-cn": "自代理启动以来的累计传输量，而非速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.wlan0.total_down"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.wlan0.total_up": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Upload gesamt",
+        "en": "Total Upload",
+        "es": "Subida total",
+        "fr": "Émission totale",
+        "it": "Upload totale",
+        "nl": "Totaal upload",
+        "pl": "Łączne wysyłanie",
+        "pt": "Total enviado",
+        "ru": "Всего отправлено",
+        "uk": "Усього відвантажено",
+        "zh-cn": "总上传"
+      },
+      "desc": {
+        "de": "Übertragene Menge seit dem Start des Agenten, keine Rate.",
+        "en": "Volume transferred since the agent started, not a rate.",
+        "es": "Volumen transferido desde el arranque del agente, no una tasa.",
+        "fr": "Volume transféré depuis le démarrage de l'agent, pas un débit.",
+        "it": "Volume trasferito dall'avvio dell'agent, non una velocità.",
+        "nl": "Hoeveelheid overgedragen sinds de start van de agent, geen snelheid.",
+        "pl": "Ilość przesłana od uruchomienia agenta, nie prędkość.",
+        "pt": "Volume transferido desde o arranque do agente, não uma taxa.",
+        "ru": "Объём, переданный с момента запуска агента, а не скорость.",
+        "uk": "Обсяг, переданий від запуску агента, а не швидкість.",
+        "zh-cn": "自代理启动以来的累计传输量，而非速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.wlan0.total_up"
+  },
+  "beszel.0.systems.homelab_server.network.interfaces.wlan0.up": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Upload",
+        "en": "Upload",
+        "es": "Subida",
+        "fr": "Émission",
+        "it": "Upload",
+        "nl": "Upload",
+        "pl": "Wysyłanie",
+        "pt": "Envio",
+        "ru": "Отправка",
+        "uk": "Відвантаження",
+        "zh-cn": "上传"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.interfaces.wlan0.up"
+  },
+  "beszel.0.systems.homelab_server.network.recv": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Netzwerk empfangen",
+        "en": "Network Received",
+        "es": "Red recibido",
+        "fr": "Réseau reçu",
+        "it": "Rete ricevuto",
+        "nl": "Netwerk ontvangen",
+        "pl": "Sieć odebrano",
+        "pt": "Rede recebido",
+        "ru": "Сеть получено",
+        "uk": "Мережа отримано",
+        "zh-cn": "网络接收"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.recv"
+  },
+  "beszel.0.systems.homelab_server.network.recv_peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Empfangs-Spitze",
+        "en": "Network Received Peak",
+        "es": "Pico de recepción",
+        "fr": "Pic réception",
+        "it": "Picco ricezione",
+        "nl": "Ontvangstpiek",
+        "pl": "Szczyt odbioru",
+        "pt": "Pico de receção",
+        "ru": "Пик приёма",
+        "uk": "Пік отримання",
+        "zh-cn": "网络接收峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Zeitraum dieses Datensatzes, nicht der aktuelle Messwert.",
+        "en": "Highest value within the interval this record covers, not the current reading.",
+        "es": "Valor más alto dentro del intervalo de este registro, no la lectura actual.",
+        "fr": "Valeur la plus élevée sur l'intervalle de cet enregistrement, pas la mesure actuelle.",
+        "it": "Valore più alto nell'intervallo di questo record, non la lettura attuale.",
+        "nl": "Hoogste waarde binnen het interval van deze registratie, niet de huidige meting.",
+        "pl": "Najwyższa wartość w okresie tego zapisu, nie bieżący odczyt.",
+        "pt": "Valor mais alto no intervalo deste registo, não a leitura atual.",
+        "ru": "Максимум за интервал этой записи, а не текущее значение.",
+        "uk": "Найвище значення в межах інтервалу цього запису, а не поточний вимір.",
+        "zh-cn": "该记录所覆盖区间内的最高值，而非当前读数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.recv_peak"
+  },
+  "beszel.0.systems.homelab_server.network.sent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Netzwerk gesendet",
+        "en": "Network Sent",
+        "es": "Red enviado",
+        "fr": "Réseau envoyé",
+        "it": "Rete inviato",
+        "nl": "Netwerk verzonden",
+        "pl": "Sieć wysłano",
+        "pt": "Rede enviado",
+        "ru": "Сеть отправлено",
+        "uk": "Мережа надіслано",
+        "zh-cn": "网络发送"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.sent"
+  },
+  "beszel.0.systems.homelab_server.network.sent_peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sende-Spitze",
+        "en": "Network Sent Peak",
+        "es": "Pico de envío",
+        "fr": "Pic émission",
+        "it": "Picco invio",
+        "nl": "Verzendpiek",
+        "pl": "Szczyt wysyłania",
+        "pt": "Pico de envio",
+        "ru": "Пик отправки",
+        "uk": "Пік відправлення",
+        "zh-cn": "网络发送峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Zeitraum dieses Datensatzes, nicht der aktuelle Messwert.",
+        "en": "Highest value within the interval this record covers, not the current reading.",
+        "es": "Valor más alto dentro del intervalo de este registro, no la lectura actual.",
+        "fr": "Valeur la plus élevée sur l'intervalle de cet enregistrement, pas la mesure actuelle.",
+        "it": "Valore più alto nell'intervallo di questo record, non la lettura attuale.",
+        "nl": "Hoogste waarde binnen het interval van deze registratie, niet de huidige meting.",
+        "pl": "Najwyższa wartość w okresie tego zapisu, nie bieżący odczyt.",
+        "pt": "Valor mais alto no intervalo deste registo, não a leitura atual.",
+        "ru": "Максимум за интервал этой записи, а не текущее значение.",
+        "uk": "Найвище значення в межах інтервалу цього запису, а не поточний вимір.",
+        "zh-cn": "该记录所覆盖区间内的最高值，而非当前读数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.network.sent_peak"
+  },
+  "beszel.0.systems.homelab_server.temperature": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Temperatur",
+        "en": "Temperature",
+        "es": "Temperatura",
+        "fr": "Température",
+        "it": "Temperatura",
+        "nl": "Temperatuur",
+        "pl": "Temperatura",
+        "pt": "Temperatura",
+        "ru": "Температура",
+        "uk": "Температура",
+        "zh-cn": "温度"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.temperature"
+  },
+  "beszel.0.systems.homelab_server.temperature.average": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Temperatur (Ø Top 3)",
+        "en": "Temperature (avg top 3)",
+        "es": "Temperatura (media top 3)",
+        "fr": "Température (moy. top 3)",
+        "it": "Temperatura (media top 3)",
+        "nl": "Temperatuur (gem. top 3)",
+        "pl": "Temperatura (śr. top 3)",
+        "pt": "Temperatura (média top 3)",
+        "ru": "Температура (среднее топ-3)",
+        "uk": "Температура (сер. топ-3)",
+        "zh-cn": "温度（前 3 平均）"
+      },
+      "desc": {
+        "de": "Mittelwert der drei heißesten Sensoren, nicht aller.",
+        "en": "Average of the three hottest sensors, not of all of them.",
+        "es": "Media de los tres sensores más calientes, no de todos.",
+        "fr": "Moyenne des trois capteurs les plus chauds, pas de tous.",
+        "it": "Media dei tre sensori più caldi, non di tutti.",
+        "nl": "Gemiddelde van de drie heetste sensoren, niet van alle.",
+        "pl": "Średnia z trzech najgorętszych czujników, nie ze wszystkich.",
+        "pt": "Média dos três sensores mais quentes, não de todos.",
+        "ru": "Среднее по трём самым горячим датчикам, а не по всем.",
+        "uk": "Середнє з трьох найгарячіших датчиків, а не з усіх.",
+        "zh-cn": "最热的三个传感器的平均值，而非全部传感器。"
+      },
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.temperature.average"
+  },
+  "beszel.0.systems.homelab_server.temperature.max": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Temperatur (heißester Sensor)",
+        "en": "Temperature (hottest sensor)",
+        "es": "Temperatura (sensor más caliente)",
+        "fr": "Température (capteur le plus chaud)",
+        "it": "Temperatura (sensore più caldo)",
+        "nl": "Temperatuur (heetste sensor)",
+        "pl": "Temperatura (najgorętszy czujnik)",
+        "pt": "Temperatura (sensor mais quente)",
+        "ru": "Температура (самый горячий датчик)",
+        "uk": "Температура (найгарячіший датчик)",
+        "zh-cn": "温度（最热传感器）"
+      },
+      "desc": {
+        "de": "Messwert des heißesten einzelnen Sensors.",
+        "en": "Reading of the single hottest sensor.",
+        "es": "Lectura del sensor más caliente.",
+        "fr": "Mesure du capteur le plus chaud.",
+        "it": "Lettura del singolo sensore più caldo.",
+        "nl": "Meting van de heetste afzonderlijke sensor.",
+        "pl": "Odczyt najgorętszego pojedynczego czujnika.",
+        "pt": "Leitura do sensor mais quente.",
+        "ru": "Показание самого горячего датчика.",
+        "uk": "Показник найгарячішого окремого датчика.",
+        "zh-cn": "最热的单个传感器读数。"
+      },
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.temperature.max"
+  },
+  "beszel.0.systems.homelab_server.temperature.sensors": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Sensoren",
+        "en": "Sensors",
+        "es": "Sensores",
+        "fr": "Capteurs",
+        "it": "Sensori",
+        "nl": "Sensoren",
+        "pl": "Czujniki",
+        "pt": "Sensores",
+        "ru": "Датчики",
+        "uk": "Датчики",
+        "zh-cn": "传感器"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.temperature.sensors"
+  },
+  "beszel.0.systems.homelab_server.temperature.sensors.acpitz": {
+    "type": "state",
+    "common": {
+      "name": "acpitz",
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.temperature.sensors.acpitz"
+  },
+  "beszel.0.systems.homelab_server.temperature.sensors.coretemp_core_0": {
+    "type": "state",
+    "common": {
+      "name": "coretemp_core_0",
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.temperature.sensors.coretemp_core_0"
+  },
+  "beszel.0.systems.homelab_server.temperature.sensors.coretemp_package_id_0": {
+    "type": "state",
+    "common": {
+      "name": "coretemp_package_id_0",
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.temperature.sensors.coretemp_package_id_0"
+  },
+  "beszel.0.systems.homelab_server.temperature.sensors.nvme_composite": {
+    "type": "state",
+    "common": {
+      "name": "nvme_composite",
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.temperature.sensors.nvme_composite"
+  }
+}

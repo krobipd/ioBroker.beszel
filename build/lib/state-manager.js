@@ -24,6 +24,7 @@ module.exports = __toCommonJS(state_manager_exports);
 var import_coerce = require("./coerce");
 var import_i18n = require("./i18n");
 var import_metric_registry = require("./metric-registry");
+const API_NAMED = { nameSource: "api" };
 const LEGACY_FLAT_STATE_IDS = [
   "online",
   "status",
@@ -868,7 +869,8 @@ class StateManager {
           await this.createAndSetState(
             `${sysId}.temperature.sensors.${safeSensor}`,
             (0, import_metric_registry.numCommon)((0, import_coerce.sanitizeDisplayName)(sensor), "\xB0C", "value.temperature"),
-            temp
+            temp,
+            API_NAMED
           );
         }
       );
@@ -882,7 +884,12 @@ class StateManager {
           await this.ensureChannel(`${sysId}.fans`, (0, import_metric_registry.channelName)("fans"));
         },
         async (safeFan, fan, rpm) => {
-          await this.createAndSetState(`${sysId}.fans.${safeFan}`, (0, import_metric_registry.numCommon)((0, import_coerce.sanitizeDisplayName)(fan), "rpm"), rpm);
+          await this.createAndSetState(
+            `${sysId}.fans.${safeFan}`,
+            (0, import_metric_registry.numCommon)((0, import_coerce.sanitizeDisplayName)(fan), "rpm"),
+            rpm,
+            API_NAMED
+          );
         }
       );
     }
@@ -899,7 +906,8 @@ class StateManager {
           await this.createAndSetState(
             `${sysId}.battery.batteries.${safeBat}`,
             (0, import_metric_registry.percentCommon)((0, import_coerce.sanitizeDisplayName)(bat), "value.battery"),
-            (0, import_metric_registry.clampPercent)(percent)
+            (0, import_metric_registry.clampPercent)(percent),
+            API_NAMED
           );
         }
       );
@@ -933,7 +941,7 @@ class StateManager {
           await this.ensureChannel(`${sysId}.network.interfaces`, (0, import_metric_registry.channelName)("interfaces"));
         },
         async (safeId, iface, vals) => {
-          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, (0, import_coerce.sanitizeDisplayName)(iface));
+          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, (0, import_coerce.sanitizeDisplayName)(iface), API_NAMED);
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
             (0, import_metric_registry.numCommon)((0, import_i18n.tName)("ifaceUp"), "MB/s"),
@@ -967,7 +975,7 @@ class StateManager {
         },
         async (safeId, gpuId, gpuData) => {
           var _a2, _b, _c, _d, _e, _f;
-          await this.ensureChannel(`${sysId}.gpu.${safeId}`, (0, import_coerce.sanitizeDisplayName)((_a2 = gpuData.n) != null ? _a2 : gpuId));
+          await this.ensureChannel(`${sysId}.gpu.${safeId}`, (0, import_coerce.sanitizeDisplayName)((_a2 = gpuData.n) != null ? _a2 : gpuId), API_NAMED);
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
             (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("gpuUsage")),
@@ -1005,7 +1013,8 @@ class StateManager {
                 await this.createAndSetState(
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
                   (0, import_metric_registry.percentCommon)((0, import_coerce.sanitizeDisplayName)(engine)),
-                  (0, import_metric_registry.clampPercent)(value)
+                  (0, import_metric_registry.clampPercent)(value),
+                  API_NAMED
                 );
               }
             );
@@ -1023,7 +1032,7 @@ class StateManager {
         },
         async (safeId, fsName, fsData) => {
           var _a2, _b, _c, _d;
-          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, (0, import_coerce.sanitizeDisplayName)(fsName));
+          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, (0, import_coerce.sanitizeDisplayName)(fsName), API_NAMED);
           const total = (_a2 = fsData.d) != null ? _a2 : null;
           const used = (_b = fsData.du) != null ? _b : null;
           const percent = total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
@@ -1088,7 +1097,7 @@ class StateManager {
       if (cId.length === 0) {
         continue;
       }
-      await this.ensureChannel(`${sysId}.containers.${cId}`, (0, import_coerce.sanitizeDisplayName)(container.name));
+      await this.ensureChannel(`${sysId}.containers.${cId}`, (0, import_coerce.sanitizeDisplayName)(container.name), API_NAMED);
       await this.createAndSetState(`${sysId}.containers.${cId}.status`, (0, import_metric_registry.textCommon)((0, import_i18n.tName)("status")), container.status);
       const healthIdx = Math.floor(container.health);
       await this.createAndSetState(
@@ -1231,15 +1240,16 @@ class StateManager {
    *
    * @param id Channel id, namespace-relative.
    * @param name Current display name (translation object).
+   * @param native Extra `native` fields, e.g. the API-name marker of a Hub-named object (Design 31).
    */
-  async ensureChannel(id, name) {
+  async ensureChannel(id, name, native = {}) {
     if (this.createdIds.has(id)) {
       return;
     }
     await this.adapter.extendObject(id, {
       type: "channel",
       common: { name },
-      native: {}
+      native
     });
     this.createdIds.add(id);
   }
@@ -1273,17 +1283,18 @@ class StateManager {
    *
    * @param id State id, namespace-relative.
    * @param common The state's current common definition.
+   * @param native Extra `native` fields, e.g. the API-name marker of a Hub-named object (Design 31).
    */
-  async ensureStateObject(id, common) {
+  async ensureStateObject(id, common, native = {}) {
     if (this.createdIds.has(id)) {
       return;
     }
-    await this.adapter.extendObject(id, { type: "state", common, native: {} });
+    await this.adapter.extendObject(id, { type: "state", common, native });
     this.createdIds.add(id);
     this.noteStateCreated(id);
   }
-  async createAndSetState(id, common, value) {
-    await this.ensureStateObject(id, common);
+  async createAndSetState(id, common, value, native = {}) {
+    await this.ensureStateObject(id, common, native);
     await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
   }
   // -------------------------------------------------------------------------

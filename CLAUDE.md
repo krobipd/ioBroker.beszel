@@ -117,8 +117,24 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     dagegen hält ein Invarianten-Test, der ein voll bestücktes System abläuft und jeden
     adapter-benannten Datenpunkt nennt, der in der Tabelle fehlt (am echten Defekt bewiesen).
 
+31. **Hub-benannte Objekte tragen `native.nameSource: "api"` (v0.14.2)** — Sensoren, Lüfter, Akkus,
+    GPU-Engines und die Kanäle von Interfaces, GPUs, Dateisystemen und Containern heißen, wie Hub,
+    Agent oder Betriebssystem sie nennen: einsprachig, oft gleich ihrer Kennung (`acpitz`, `eth0`).
+    Der Marker sagt das dem Flotten-Inventar-Gate am Objekt selbst (krobi 2026-09-04: „als API ist
+    in diesem legitim"); ohne ihn wären diese Namen ein Fund „fester String statt
+    Übersetzungsobjekt". Ein Übersetzungsobjekt daraus zu bauen hieße, EINEN Text elfmal zu
+    behaupten. Bestandsanlagen bekommen den Marker beim nächsten Start per `extendObject`.
+32. **Objekt-Inventar aus Fixtures (v0.14.2)** — `npm run test:inventory` startet den Adapter im
+    Wegwerf-Controller gegen einen Fake-Hub (`test/fixtures/inventory/hub.json`: ein voll
+    bestücktes Linux-System mit jeder Metrikgruppe von Beszel 0.18.8 plus ein System `down`,
+    alle Schalter an) und schreibt `test/objects.inventory.json` im Format des
+    Objektstruktur-Bots; deterministisch (zwei Läufe byte-gleich). `src/inventory.test.ts` hält
+    das Inventar gegen die Metrik-Registry (jeder Datenpunkt, jede dynamische Gruppe, jede
+    Beschreibung als Übersetzungsobjekt, jeder feste Name als API-Name). Der Release-Vorlauf
+    prüft das Inventar mit Bot- und Flottenregeln und beweist mit dem Inventar des Vorgänger-Tags
+    (`INVENTORY_PREVIOUS`), dass ein Update jedes bestehende Objekt erreicht — ohne Server.
 
-## Tests (590 unit + 57 package + 1 integration = 648)
+## Tests (596 unit + 57 package + 1 integration + 1 inventory = 655)
 
 Zusammensetzung (gemessen): state-manager 253 · coerce 140 · main 94 · beszel-client 66 · message-router 16 · repo-standards 9 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · i18n 7.
 
@@ -129,6 +145,7 @@ Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vite
 ```bash
 npm run build         # Production (esbuild)
 npm test              # vitest src/**/*.test.ts + @iobroker/testing packageFiles (mocha)
+npm run test:inventory  # Adapter gegen Fake-Hub starten, test/objects.inventory.json erzeugen (Design 32)
 npm run coverage      # vitest run --coverage
 npm run lint          # ESLint
 npm run format:check  # Prettier --check

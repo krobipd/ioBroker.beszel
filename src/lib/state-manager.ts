@@ -22,6 +22,16 @@ import type { LocalizedName, MetricDef } from "./metric-registry";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
 
 /**
+ * Objects whose name comes from the Hub, the agent or the OS — sensors, fans, batteries,
+ * GPU engines, and the channels of interfaces, GPUs, filesystems and containers — carry this
+ * marker in `native`. The fleet's inventory gate then treats the plain, single-language name
+ * as what it is (the device's own name in the system language, krobi 2026-09-04: "als API
+ * ist in diesem legitim") instead of demanding a translation object that would claim eleven
+ * languages for one text. Design 31.
+ */
+const API_NAMED = { nameSource: "api" } as const;
+
+/**
  * Flat state ids used before 0.3.0, when every metric lived directly under the
  * system device instead of a channel. Swept once from the startup snapshot.
  */
@@ -1040,6 +1050,7 @@ export class StateManager {
             `${sysId}.temperature.sensors.${safeSensor}`,
             numCommon(sanitizeDisplayName(sensor), "°C", "value.temperature"),
             temp,
+            API_NAMED,
           );
         },
       );
@@ -1059,7 +1070,12 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.fans`, channelName("fans"));
         },
         async (safeFan, fan, rpm) => {
-          await this.createAndSetState(`${sysId}.fans.${safeFan}`, numCommon(sanitizeDisplayName(fan), "rpm"), rpm);
+          await this.createAndSetState(
+            `${sysId}.fans.${safeFan}`,
+            numCommon(sanitizeDisplayName(fan), "rpm"),
+            rpm,
+            API_NAMED,
+          );
         },
       );
     }
@@ -1084,6 +1100,7 @@ export class StateManager {
             `${sysId}.battery.batteries.${safeBat}`,
             percentCommon(sanitizeDisplayName(bat), "value.battery"),
             clampPercent(percent),
+            API_NAMED,
           );
         },
       );
@@ -1126,7 +1143,7 @@ export class StateManager {
         },
         async (safeId, iface, vals) => {
           // Interface name is OS-defined (eth0, wlan0, ...) → kept as-is.
-          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeDisplayName(iface));
+          await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeDisplayName(iface), API_NAMED);
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
             numCommon(tName("ifaceUp"), "MB/s"),
@@ -1163,7 +1180,7 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.gpu`, channelName("gpu"));
         },
         async (safeId, gpuId, gpuData) => {
-          await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeDisplayName(gpuData.n ?? gpuId));
+          await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeDisplayName(gpuData.n ?? gpuId), API_NAMED);
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
             percentCommon(tName("gpuUsage")),
@@ -1205,6 +1222,7 @@ export class StateManager {
                   `${sysId}.gpu.${safeId}.engines.${safeEngine}`,
                   percentCommon(sanitizeDisplayName(engine)),
                   clampPercent(value),
+                  API_NAMED,
                 );
               },
             );
@@ -1225,7 +1243,7 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.filesystems`, channelName("filesystems"));
         },
         async (safeId, fsName, fsData) => {
-          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeDisplayName(fsName));
+          await this.ensureChannel(`${sysId}.filesystems.${safeId}`, sanitizeDisplayName(fsName), API_NAMED);
 
           const total = fsData.d ?? null;
           const used = fsData.du ?? null;
@@ -1314,7 +1332,7 @@ export class StateManager {
         continue;
       }
       // container.name is user-defined (Docker container name) → keep as-is.
-      await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeDisplayName(container.name));
+      await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeDisplayName(container.name), API_NAMED);
       await this.createAndSetState(`${sysId}.containers.${cId}.status`, textCommon(tName("status")), container.status);
       // v0.4.3 (SM7): floor the health index — API drift could send a
       // float (e.g. 2.5) which `healthLabels[2.5]` resolves to undefined.
@@ -1486,15 +1504,16 @@ export class StateManager {
    *
    * @param id Channel id, namespace-relative.
    * @param name Current display name (translation object).
+   * @param native Extra `native` fields, e.g. the API-name marker of a Hub-named object (Design 31).
    */
-  private async ensureChannel(id: string, name: LocalizedName): Promise<void> {
+  private async ensureChannel(id: string, name: LocalizedName, native: Record<string, unknown> = {}): Promise<void> {
     if (this.createdIds.has(id)) {
       return;
     }
     await this.adapter.extendObject(id, {
       type: "channel",
       common: { name },
-      native: {},
+      native,
     });
     this.createdIds.add(id);
   }
@@ -1533,8 +1552,13 @@ export class StateManager {
    *
    * @param id State id, namespace-relative.
    * @param common The state's current common definition.
+   * @param native Extra `native` fields, e.g. the API-name marker of a Hub-named object (Design 31).
    */
-  private async ensureStateObject(id: string, common: ioBroker.StateCommon): Promise<void> {
+  private async ensureStateObject(
+    id: string,
+    common: ioBroker.StateCommon,
+    native: Record<string, unknown> = {},
+  ): Promise<void> {
     if (this.createdIds.has(id)) {
       return;
     }
@@ -1554,13 +1578,18 @@ export class StateManager {
     // `down`/`paused` at that moment never has its pre-existing states touched, so its
     // old role would be frozen forever. The every-restart extendObject is idempotent,
     // self-healing and only a startup cost. Don't "optimize" it into that regression.
-    await this.adapter.extendObject(id, { type: "state", common, native: {} });
+    await this.adapter.extendObject(id, { type: "state", common, native });
     this.createdIds.add(id);
     this.noteStateCreated(id);
   }
 
-  private async createAndSetState(id: string, common: ioBroker.StateCommon, value: ioBroker.StateValue): Promise<void> {
-    await this.ensureStateObject(id, common);
+  private async createAndSetState(
+    id: string,
+    common: ioBroker.StateCommon,
+    value: ioBroker.StateValue,
+    native: Record<string, unknown> = {},
+  ): Promise<void> {
+    await this.ensureStateObject(id, common, native);
     await this.adapter.setStateChangedAsync(id, { val: value, ack: true });
   }
 
