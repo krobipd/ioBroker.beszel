@@ -1,4 +1,8 @@
 # Older Changes
+## 0.12.2 (2026-08-27) — stable
+
+- Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.
+
 ## 0.12.1 (2026-08-27)
 
 - Fixed: on an installation that was updated rather than freshly installed, the systems kept showing as online when the adapter was stopped — they now go offline there as well.

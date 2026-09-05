@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.14.2",
+    "version": "0.15.0",
     "news": {
-      "NEXT": {
+      "0.15.0": {
         "en": "New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.",
         "de": "Neu: ZFS-Pools mit Belegung, Durchsatz und Zustand als zuschaltbare Metrik, der Name der Systemfestplatte und Lese-/Schreibsummen für Datenträger und Dateisysteme mit Beszel 0.19.0.",
         "ru": "Новое: пулы ZFS с заполнением, скоростью и состоянием как включаемая метрика, имя системного диска и суммарные объёмы чтения/записи для дисков и файловых систем с Beszel 0.19.0.",

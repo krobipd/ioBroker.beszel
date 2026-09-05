@@ -245,7 +245,7 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.15.0 (2026-09-05)
 
 - New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.
 
@@ -274,10 +274,6 @@ beszel.0.
 - Fixed: when the adapter cannot start — credentials to re-enter after an upgrade, or an invalid Hub URL — every system is now marked offline instead of keeping the previous run's green dot
 - Changed: the three fleet summary states for systems total, online and all-up now exist from the installation on — a fresh install with an unreachable Hub shows 0 and false instead of nothing
 - Changed: ioBroker Admin 8.0.11 or newer is required, in line with the current ioBroker stable repository — older Admin installations must be updated before installing this version
-
-### 0.12.2 (2026-08-27) — stable
-
-- Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
