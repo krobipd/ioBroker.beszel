@@ -83,7 +83,7 @@ Detail options stay greyed out until their category's main metric is enabled, an
 |                 | Peak values                                           | off     |
 | **Disk**        | Disk Usage (% and GB)                                 | on      |
 |                 | Read/Write Speed                                      | on      |
-|                 | I/O load (utilization, read/write wait times)         | off     |
+|                 | I/O load (utilization, wait times, totals since boot) | off     |
 |                 | Additional Filesystems                                | off     |
 |                 | Peak values                                           | off     |
 | **Network**     | Network Traffic (Upload / Download MB/s)              | on      |
@@ -92,6 +92,7 @@ Detail options stay greyed out until their category's main metric is enabled, an
 | **Temperature** | Temperature (hottest sensors avg + hottest single)    | on      |
 |                 | Individual Temperature Sensors                        | off     |
 | **Fans**        | Fan Speeds (rpm, Beszel 0.18.8+, Linux hosts)         | off     |
+| **ZFS**         | ZFS Pools (usage, throughput, health; Beszel 0.19.0+) | off     |
 | **GPU**         | GPU Metrics (Usage, Memory, Power)                    | off     |
 |                 | GPU details (engines, package power)                  | off     |
 | **Containers**  | Container Monitoring incl. network (Docker / Podman)  | off     |
@@ -153,13 +154,16 @@ beszel.0.
         │   ├── percent              — Disk usage (%)
         │   ├── used                 — Disk used (GB)
         │   ├── total                — Disk total (GB)
+        │   ├── name *               — Root disk name set on the agent (Beszel 0.19.0+)
         │   ├── read                 — Disk read (MB/s)
         │   ├── write                — Disk write (MB/s)
         │   ├── read_peak *          — Peak read in interval (MB/s)
         │   ├── write_peak *         — Peak write in interval (MB/s)
         │   ├── io_util *            — I/O utilization (%)
         │   ├── io_await_read *      — Read wait time (ms)
-        │   └── io_await_write *     — Write wait time (ms)
+        │   ├── io_await_write *     — Write wait time (ms)
+        │   ├── total_read *         — Read since boot (GB, Beszel 0.19.0+)
+        │   └── total_write *        — Written since boot (GB, Beszel 0.19.0+)
         ├── network/                  — Network metrics
         │   ├── sent                 — Upload (MB/s)
         │   ├── recv                 — Download (MB/s)
@@ -189,7 +193,17 @@ beszel.0.
         │       ├── disk_used        — Used (GB)
         │       ├── disk_total       — Total (GB)
         │       ├── read_speed       — Read (MB/s)
-        │       └── write_speed      — Write (MB/s)
+        │       ├── write_speed      — Write (MB/s)
+        │       ├── total_read *     — Read since boot (GB, Beszel 0.19.0+)
+        │       └── total_write *    — Written since boot (GB, Beszel 0.19.0+)
+        ├── zfs/ *                    — ZFS pools (Beszel 0.19.0+), one channel per pool
+        │   └── <pool>/
+        │       ├── disk_percent     — Used (%)
+        │       ├── disk_used        — Used (GB)
+        │       ├── disk_total       — Size (GB)
+        │       ├── read_speed       — Read (MB/s)
+        │       ├── write_speed      — Write (MB/s)
+        │       └── health           — Pool health (ONLINE, DEGRADED, …)
         └── containers/ *             — Docker/Podman containers
             └── {container_name}/
                 ├── status           — Container status
@@ -231,6 +245,10 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.
+
 ### 0.14.2 (2026-09-05)
 
 - Changed: Internal cleanup. No user-facing changes.

@@ -283,6 +283,13 @@ describe("coerce", () => {
       expect(coerceSystem({ name: "server", status: "up" })).to.be.null;
     });
 
+    it("keeps the root disk's custom name from the system info (v0.19.0) and drops a non-string", () => {
+      const sys = coerceSystem({ id: "abc", name: "server", status: "up", info: { u: 1, rdn: "nvme0n1" } });
+      expect(sys?.info.rdn).to.equal("nvme0n1");
+      const bad = coerceSystem({ id: "abc", name: "server", status: "up", info: { u: 1, rdn: 7 } });
+      expect(bad?.info.rdn).to.be.undefined;
+    });
+
     it("returns null when name is missing", () => {
       expect(coerceSystem({ id: "abc", status: "up" })).to.be.null;
     });
@@ -414,6 +421,26 @@ describe("coerce", () => {
       const s = coerceSystemStats({ cpu: 10 });
       expect(s.f).to.be.undefined;
       expect(s.bats).to.be.undefined;
+    });
+
+    it("coerces the ZFS pool map (v0.19.0): numbers, health word, garbage pools become empty objects", () => {
+      const s = coerceSystemStats({
+        z: { tank: { d: 7452, du: 3100.25, rb: 5242880, wb: 1048576, h: "ONLINE" }, weird: { d: "big", h: 42 } },
+      });
+      expect(s.z?.tank).to.deep.equal({ d: 7452, du: 3100.25, rb: 5242880, wb: 1048576, h: "ONLINE" });
+      expect(s.z?.weird).to.deep.equal({});
+    });
+
+    it("coerces the cumulative disk I/O tuple and leaves it undefined when absent or malformed", () => {
+      expect(coerceSystemStats({ diot: [100, 200] }).diot).to.deep.equal([100, 200]);
+      expect(coerceSystemStats({ diot: [100] }).diot).to.be.undefined;
+      expect(coerceSystemStats({ cpu: 1 }).diot).to.be.undefined;
+      expect(coerceSystemStats({ cpu: 1 }).z).to.be.undefined;
+    });
+
+    it("coerces per-filesystem cumulative counters (tr/tw) alongside the rates", () => {
+      const s = coerceSystemStats({ efs: { data: { d: 10, du: 5, r: 1, w: 2, tr: 300, tw: 400 } } });
+      expect(s.efs?.data).to.deep.equal({ d: 10, du: 5, r: 1, w: 2, tr: 300, tw: 400 });
     });
 
     it("coerces cpub breakdown array", () => {

@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.14.2",
     "news": {
+      "NEXT": {
+        "en": "New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.",
+        "de": "Neu: ZFS-Pools mit Belegung, Durchsatz und Zustand als zuschaltbare Metrik, der Name der Systemfestplatte und Lese-/Schreibsummen für Datenträger und Dateisysteme mit Beszel 0.19.0.",
+        "ru": "Новое: пулы ZFS с заполнением, скоростью и состоянием как включаемая метрика, имя системного диска и суммарные объёмы чтения/записи для дисков и файловых систем с Beszel 0.19.0.",
+        "pt": "Novo: pools ZFS com ocupação, débito e estado como métrica opcional, o nome do disco raiz e totais de leitura/escrita para discos e sistemas de ficheiros com o Beszel 0.19.0.",
+        "nl": "Nieuw: ZFS-pools met gebruik, doorvoer en gezondheid als inschakelbare metriek, de naam van de rootschijf en lees-/schrijftotalen voor schijven en bestandssystemen met Beszel 0.19.0.",
+        "fr": "Nouveau : pools ZFS avec occupation, débit et état en métrique optionnelle, le nom du disque racine et les totaux lecture/écriture des disques et systèmes de fichiers avec Beszel 0.19.0.",
+        "it": "Novità: pool ZFS con occupazione, velocità e stato come metrica opzionale, il nome del disco radice e i totali di lettura/scrittura per dischi e file system con Beszel 0.19.0.",
+        "es": "Nuevo: pools ZFS con ocupación, velocidad y estado como métrica opcional, el nombre del disco raíz y los totales de lectura/escritura de discos y sistemas de archivos con Beszel 0.19.0.",
+        "pl": "Nowość: pule ZFS z zajętością, przepustowością i stanem jako opcjonalna metryka, nazwa dysku głównego oraz łączne odczyty i zapisy dysków i systemów plików z Beszel 0.19.0.",
+        "uk": "Нове: пули ZFS із заповненням, швидкістю та станом як увімкнена за бажанням метрика, назва системного диска та сумарні обсяги читання/запису для дисків і файлових систем із Beszel 0.19.0.",
+        "zh-cn": "新增：ZFS 存储池的使用量、吞吐量和健康状态作为可选指标，根磁盘名称，以及 Beszel 0.19.0 下磁盘和文件系统的累计读写总量。"
+      },
       "0.14.2": {
         "en": "Internal cleanup. No user-facing changes.",
         "de": "Interne Aufräumarbeiten. Keine Änderungen für Nutzer.",
@@ -80,19 +93,6 @@
         "pl": "W zaktualizowanej instalacji systemy naprawdę przestają być pokazywane jako online po zatrzymaniu adaptera, a ich licznik spada do zera.",
         "uk": "В оновленій інсталяції системи справді перестають показуватися як онлайн після зупинки адаптера, а їхній лічильник падає до нуля.",
         "zh-cn": "在已升级的安装中，停止适配器后系统确实不再显示为在线，其在线数量也随之归零。"
-      },
-      "0.12.0": {
-        "en": "A system stopped claiming to be online while the adapter is stopped or cannot reach the Hub — its status then reads \"Unknown\".",
-        "de": "Ein System behauptet nicht mehr, online zu sein, während der Adapter gestoppt ist oder den Hub nicht erreicht — der Status steht dann auf „Unknown\".",
-        "ru": "Система больше не выдаёт себя за работающую, пока адаптер остановлен или не может связаться с хабом — её статус тогда показывает «Unknown».",
-        "pt": "Um sistema deixa de afirmar que está online enquanto o adaptador está parado ou não alcança o Hub — o estado passa então a \"Unknown\".",
-        "nl": "Een systeem beweert niet langer online te zijn terwijl de adapter is gestopt of de Hub niet bereikt — de status staat dan op \"Unknown\".",
-        "fr": "Un système ne prétend plus être en ligne pendant que l'adaptateur est arrêté ou n'atteint pas le Hub — son état passe alors à « Unknown ».",
-        "it": "Un sistema non dichiara più di essere online mentre l'adapter è fermo o non raggiunge l'Hub: lo stato passa quindi a \"Unknown\".",
-        "es": "Un sistema ya no afirma estar en línea mientras el adaptador está detenido o no alcanza el Hub: su estado pasa entonces a \"Unknown\".",
-        "pl": "System nie twierdzi już, że jest online, gdy adapter jest zatrzymany lub nie łączy się z Hubem — jego stan wskazuje wtedy „Unknown\".",
-        "uk": "Система більше не стверджує, що вона онлайн, поки адаптер зупинено або він не може зв'язатися з хабом — її стан тоді показує «Unknown».",
-        "zh-cn": "当适配器已停止或无法连接 Hub 时，系统不再声称自己在线——其状态此时显示为“Unknown”。"
       }
     },
     "plugins": {
@@ -414,6 +414,7 @@
     "metrics_networkInterfaces": false,
     "metrics_networkPeak": false,
     "metrics_gpuDetails": false,
-    "metrics_fans": false
+    "metrics_fans": false,
+    "metrics_zfs": false
   }
 }

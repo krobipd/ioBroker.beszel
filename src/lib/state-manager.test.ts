@@ -177,6 +177,7 @@ function allMetricsConfig(overrides: Partial<AdapterConfig> = {}): AdapterConfig
     metrics_containers: true,
     metrics_battery: true,
     metrics_fans: true,
+    metrics_zfs: true,
     ...overrides,
   };
 }
@@ -206,6 +207,7 @@ function noMetricsConfig(): AdapterConfig {
     metrics_containers: false,
     metrics_battery: false,
     metrics_fans: false,
+    metrics_zfs: false,
   };
 }
 
@@ -921,6 +923,116 @@ describe("StateManager", () => {
   });
 
   // -----------------------------------------------------------------------
+  // updateSystem — ZFS pools (v0.15.0, Beszel 0.19.0)
+  describe("updateSystem — ZFS pools (v0.15.0, Beszel 0.19.0)", () => {
+    // Shape as the Hub stores it (system_stats.stats.z, beszel v0.19.0 system.go ZfsPool):
+    // GiB capacities, bytes/s throughput (omitzero → absent when idle), zpool health word.
+    const zfsStats: SystemStats = {
+      ...testStats,
+      z: {
+        tank: { d: 7452, du: 3100.25, rb: 5242880, wb: 1048576, h: "ONLINE" },
+        "backup pool": { d: 1863, du: 1700, h: "DEGRADED" },
+      },
+    };
+
+    it("creates one channel per pool with usage, throughput and health", async () => {
+      await manager.updateSystem(testSystem, zfsStats, [], allMetricsConfig());
+      expect(adapter.objects.get("systems.my_server.zfs")?.type).to.equal("channel");
+      expect(adapter.objects.get("systems.my_server.zfs.tank")?.type).to.equal("channel");
+      expect(adapter.states.get("systems.my_server.zfs.tank.disk_total")?.val).to.equal(7452);
+      expect(adapter.states.get("systems.my_server.zfs.tank.disk_used")?.val).to.equal(3100.25);
+      expect(adapter.states.get("systems.my_server.zfs.tank.disk_percent")?.val).to.equal(42);
+      expect(adapter.states.get("systems.my_server.zfs.tank.read_speed")?.val).to.equal(5);
+      expect(adapter.states.get("systems.my_server.zfs.tank.write_speed")?.val).to.equal(1);
+      expect(adapter.states.get("systems.my_server.zfs.tank.health")?.val).to.equal("ONLINE");
+      expect(adapter.objects.get("systems.my_server.zfs.tank.read_speed")?.common.unit).to.equal("MB/s");
+      expect(adapter.objects.get("systems.my_server.zfs.tank.disk_total")?.common.unit).to.equal("GB");
+    });
+
+    it("keeps the pool name from zpool as the channel name and marks it API-named", async () => {
+      await manager.updateSystem(testSystem, zfsStats, [], allMetricsConfig());
+      const ch = adapter.objects.get("systems.my_server.zfs.backup_pool");
+      expect(ch?.common.name).to.equal("backup pool");
+      expect(ch?.native).to.deep.equal({ nameSource: "api" });
+    });
+
+    it("reads an idle pool as 0 MB/s (the Hub omits zero throughput) and passes DEGRADED through", async () => {
+      await manager.updateSystem(testSystem, zfsStats, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.zfs.backup_pool.read_speed")?.val).to.equal(0);
+      expect(adapter.states.get("systems.my_server.zfs.backup_pool.write_speed")?.val).to.equal(0);
+      expect(adapter.states.get("systems.my_server.zfs.backup_pool.health")?.val).to.equal("DEGRADED");
+      expect(adapter.states.get("systems.my_server.zfs.backup_pool.disk_percent")?.val).to.equal(91);
+    });
+
+    it("gives the health state zpool's words as a states hint with role info.status", async () => {
+      await manager.updateSystem(testSystem, zfsStats, [], allMetricsConfig());
+      const common = adapter.objects.get("systems.my_server.zfs.tank.health")?.common;
+      expect(common?.role).to.equal("info.status");
+      expect(common?.type).to.equal("string");
+      expect((common as { states?: Record<string, string> } | undefined)?.states?.DEGRADED).to.equal("Degraded");
+    });
+
+    it("does not create the group when the toggle is off", async () => {
+      await manager.updateSystem(testSystem, zfsStats, [], allMetricsConfig({ metrics_zfs: false }));
+      expect(adapter.objects.has("systems.my_server.zfs")).to.be.false;
+    });
+
+    it("creates nothing on an older Beszel that never sends pools", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.zfs")).to.be.false;
+    });
+
+    it("prunes a pool that disappeared while another remains", async () => {
+      await manager.updateSystem(testSystem, zfsStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.zfs.backup_pool")).to.be.true;
+      await manager.updateSystem(testSystem, { ...zfsStats, z: { tank: zfsStats.z!.tank } }, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.zfs.backup_pool")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.zfs.tank")).to.be.true;
+    });
+  });
+
+  describe("updateSystem — Beszel 0.19.0 disk additions (v0.15.0)", () => {
+    it("creates cumulative disk totals in GB from the device counters when the Hub sends them", async () => {
+      await manager.updateSystem(
+        testSystem,
+        { ...testStats, diot: [53687091200, 10737418240] },
+        [],
+        allMetricsConfig({ metrics_diskIo: true }),
+      );
+      expect(adapter.states.get("systems.my_server.disk.total_read")?.val).to.equal(50);
+      expect(adapter.states.get("systems.my_server.disk.total_write")?.val).to.equal(10);
+      expect(adapter.objects.get("systems.my_server.disk.total_read")?.common.unit).to.equal("GB");
+    });
+
+    it("creates no totals on an older Beszel (field absent)", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig({ metrics_diskIo: true }));
+      expect(adapter.states.has("systems.my_server.disk.total_read")).to.be.false;
+      expect(adapter.states.has("systems.my_server.disk.total_write")).to.be.false;
+    });
+
+    it("adds per-filesystem totals only when the Hub sends the counters", async () => {
+      const efs = { data: { d: 100, du: 50, r: 1, w: 2, tr: 3221225472, tw: 1073741824 } };
+      await manager.updateSystem(testSystem, { ...testStats, efs }, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.filesystems.data.total_read")?.val).to.equal(3);
+      expect(adapter.states.get("systems.my_server.filesystems.data.total_write")?.val).to.equal(1);
+      const older = { old: { d: 100, du: 50, r: 1, w: 2 } };
+      await manager.updateSystem(testSystem, { ...testStats, efs: older }, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.filesystems.old.total_read")).to.be.false;
+    });
+
+    it("shows the root disk's custom name when the agent reports one", async () => {
+      const system = { ...testSystem, info: { ...testSystem.info, rdn: "nvme0n1" } };
+      await manager.updateSystem(system, testStats, [], allMetricsConfig());
+      expect(adapter.states.get("systems.my_server.disk.name")?.val).to.equal("nvme0n1");
+      expect(adapter.objects.get("systems.my_server.disk.name")?.common.role).to.equal("text");
+    });
+
+    it("creates no name state when the agent has no custom root disk name", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.disk.name")).to.be.false;
+    });
+  });
+
   // updateSystem — fan speeds (v0.11.0, Beszel 0.18.8)
   // -----------------------------------------------------------------------
 
@@ -1810,9 +1922,15 @@ describe("StateManager", () => {
         metrics_extraFs: true,
         metrics_networkInterfaces: true,
         metrics_cpuCores: true,
+        metrics_zfs: true,
       });
       await manager.snapshotExistingStates();
-      await manager.updateSystem(testSystem, richStats(), testContainers, cfg);
+      await manager.updateSystem(
+        testSystem,
+        { ...richStats(), z: { tank: { d: 100, du: 50, rb: 1048576, wb: 0, h: "ONLINE" } } },
+        testContainers,
+        cfg,
+      );
 
       const table = (
         StateManager as unknown as {
@@ -1821,7 +1939,7 @@ describe("StateManager", () => {
       ).DYNAMIC_LEAF_COMMONS;
       const prefix = "systems.my_server.";
       const groups =
-        /^(temperature\.sensors|fans|battery\.batteries|cpu\.cores|network\.interfaces|gpu|filesystems|containers)\./;
+        /^(temperature\.sensors|fans|battery\.batteries|cpu\.cores|network\.interfaces|gpu|filesystems|zfs|containers)\./;
       const missed: string[] = [];
       for (const [id, obj] of adapter.objects) {
         if (obj.type !== "state" || !id.startsWith(prefix)) {
@@ -3093,6 +3211,19 @@ describe("StateManager", () => {
       const afterRestart = await restart();
       await afterRestart.cleanupMetrics("my_server", allMetricsConfig({ metrics_fans: false }));
       expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 2 });
+    });
+
+    it("removes the ZFS pools with their channel when the toggle is switched off (v0.15.0)", async () => {
+      await manager.snapshotExistingStates();
+      const pools: SystemStats = { ...testStats, z: { tank: { d: 100, du: 50, rb: 0, wb: 0, h: "ONLINE" } } };
+      await manager.updateSystem(testSystem, pools, [], allMetricsConfig());
+      manager.takeChangeCounts();
+
+      // Same shape as the fans: the channel holds only dynamic children, so the
+      // toggle-off cleanup must delete the whole `zfs` channel — six pool states go.
+      const afterRestart = await restart();
+      await afterRestart.cleanupMetrics("my_server", allMetricsConfig({ metrics_zfs: false }));
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 6 });
     });
 
     it("counts the SCALAR datapoints a switched-off toggle removes at startup", async () => {

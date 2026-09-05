@@ -83,6 +83,9 @@ export interface AdapterConfig {
   // --- v0.11.0 additions (Beszel 0.18.8) ---
   /** Per-fan RPM states (Beszel 0.18.8+, Linux hwmon) */
   metrics_fans?: boolean;
+  // --- v0.15.0 additions (Beszel 0.19.0) ---
+  /** Per-pool ZFS states: usage, throughput, health (Beszel 0.19.0+) */
+  metrics_zfs?: boolean;
 }
 
 /**
@@ -99,6 +102,8 @@ export interface SystemInfo {
   la?: [number, number, number];
   /** Battery [percent, charge_state] */
   bat?: [number, number];
+  /** Custom root disk name set on the agent (`FILESYSTEM=device__name`), Beszel 0.19.0+ */
+  rdn?: string;
 }
 
 /**
@@ -178,6 +183,29 @@ export interface FsStats {
   r?: number;
   /** write MB/s */
   w?: number;
+  /** cumulative device read bytes (Beszel 0.19.0+, `omitzero`) */
+  tr?: number;
+  /** cumulative device write bytes (Beszel 0.19.0+, `omitzero`) */
+  tw?: number;
+}
+
+/**
+ * Per-pool ZFS metrics of one collection interval (Beszel 0.19.0+, `system_stats.stats.z`).
+ * Verified against beszel v0.19.0 `internal/entities/system/system.go` (`ZfsPool`): capacities in
+ * GiB like the root disk, throughput in bytes/s (`omitzero` — absent when idle), health as the
+ * zpool word (ONLINE, DEGRADED, FAULTED, …).
+ */
+export interface ZfsPoolStats {
+  /** total capacity GiB */
+  d?: number;
+  /** allocated GiB */
+  du?: number;
+  /** read throughput bytes/s */
+  rb?: number;
+  /** write throughput bytes/s */
+  wb?: number;
+  /** pool health word */
+  h?: string;
 }
 
 /**
@@ -282,6 +310,11 @@ export interface SystemStats {
    * `Battery N` fallback — verified against beszel v0.18.8 agent/system.go.
    */
   bats?: Record<string, number>;
+  // --- v0.19.0 additions (both absent on older Beszel versions) ---
+  /** ZFS pools: pool name -> metrics (Beszel 0.19.0+). */
+  z?: Record<string, ZfsPoolStats>;
+  /** Cumulative device counters [read bytes, write bytes] since boot (Beszel 0.19.0+, `omitzero`). */
+  diot?: [number, number];
 }
 
 // Note: `b`/`bm` (Bandwidth) and `dio`/`diom` (DiskIO) are deliberately NOT in

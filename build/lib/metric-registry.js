@@ -24,6 +24,7 @@ __export(metric_registry_exports, {
   METRIC_DEPENDENCIES: () => METRIC_DEPENDENCIES,
   SYSTEM_STATUS_STATES: () => SYSTEM_STATUS_STATES,
   SYSTEM_STATUS_UNKNOWN: () => SYSTEM_STATUS_UNKNOWN,
+  ZFS_HEALTH_STATES: () => ZFS_HEALTH_STATES,
   boolCommon: () => boolCommon,
   buildMetricDefs: () => buildMetricDefs,
   bytesToGib: () => bytesToGib,
@@ -39,7 +40,9 @@ __export(metric_registry_exports, {
   osLabel: () => osLabel,
   percentCommon: () => percentCommon,
   round1: () => round1,
-  textCommon: () => textCommon
+  textCommon: () => textCommon,
+  usedPercent: () => usedPercent,
+  zfsHealthCommon: () => zfsHealthCommon
 });
 module.exports = __toCommonJS(metric_registry_exports);
 var import_i18n = require("./i18n");
@@ -51,6 +54,18 @@ const SYSTEM_STATUS_STATES = {
   pending: "Pending",
   [SYSTEM_STATUS_UNKNOWN]: "Unknown"
 };
+const ZFS_HEALTH_STATES = {
+  ONLINE: "Online",
+  DEGRADED: "Degraded",
+  FAULTED: "Faulted",
+  OFFLINE: "Offline",
+  REMOVED: "Removed",
+  UNAVAIL: "Unavailable",
+  SUSPENDED: "Suspended"
+};
+function zfsHealthCommon() {
+  return { ...textCommon((0, import_i18n.tName)("zfsHealth"), "info.status", (0, import_i18n.tDesc)("descZfsHealth")), states: ZFS_HEALTH_STATES };
+}
 const BATTERY_STATE_CHARGING = 3;
 const CHANNEL_NAME_KEY = {
   info: "channelInfo",
@@ -61,6 +76,7 @@ const CHANNEL_NAME_KEY = {
   temperature: "channelTemperature",
   battery: "channelBattery",
   fans: "channelFans",
+  zfs: "channelZfs",
   // dynamic-group parents + sub-channels
   cores: "channelCores",
   sensors: "channelSensors",
@@ -77,7 +93,9 @@ const DYNAMIC_CHANNEL_TOGGLES = {
   temperature: ["metrics_temperatureDetails"],
   // v0.11.0: the fans channel holds ONLY the dynamic per-fan states — this
   // entry is what makes cleanupMetrics delete the channel when the toggle is off.
-  fans: ["metrics_fans"]
+  fans: ["metrics_fans"],
+  // v0.15.0: same shape for the ZFS pools channel (only dynamic per-pool channels).
+  zfs: ["metrics_zfs"]
 };
 const METRIC_DEPENDENCIES = {
   metrics_loadAvg: "metrics_cpu",
@@ -165,6 +183,9 @@ function finiteTempValues(temps) {
 }
 function round1(x) {
   return Math.round(x * 10) / 10;
+}
+function usedPercent(total, used) {
+  return total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
 }
 function clampPercent(v) {
   return v === null ? null : Math.min(100, Math.max(0, v));
@@ -701,6 +722,52 @@ function buildMetricDefs() {
         return (_a = st == null ? void 0 : st.dw) != null ? _a : null;
       }
     },
+    // Beszel 0.19.0: cumulative device read/write counters (bytes since boot) — a volume,
+    // not a rate; shown in GB like the per-interface totals. Rides on the I/O toggle.
+    // `omitzero` on the wire, so an older Hub creates nothing.
+    {
+      toggle: "metrics_diskIo",
+      channel: "disk",
+      id: "disk.total_read",
+      nameKey: "diskTotalRead",
+      descKey: "descDiskTotalIo",
+      kind: "num",
+      unit: "GB",
+      available: (st) => !!(st == null ? void 0 : st.diot),
+      extract: (_s, st) => {
+        var _a;
+        return bytesToGib((_a = st == null ? void 0 : st.diot) == null ? void 0 : _a[0]);
+      }
+    },
+    {
+      toggle: "metrics_diskIo",
+      channel: "disk",
+      id: "disk.total_write",
+      nameKey: "diskTotalWrite",
+      descKey: "descDiskTotalIo",
+      kind: "num",
+      unit: "GB",
+      available: (st) => !!(st == null ? void 0 : st.diot),
+      extract: (_s, st) => {
+        var _a;
+        return bytesToGib((_a = st == null ? void 0 : st.diot) == null ? void 0 : _a[1]);
+      }
+    },
+    // Beszel 0.19.0: the root disk's custom name (`FILESYSTEM=device__name` on the agent).
+    // Lives in the systems record (`info.rdn`), so it needs no stats; created only when set.
+    {
+      toggle: "metrics_disk",
+      channel: "disk",
+      id: "disk.name",
+      nameKey: "rootDiskName",
+      descKey: "descRootDiskName",
+      kind: "text",
+      available: (_st, sys) => sys.info.rdn != null,
+      extract: (s) => {
+        var _a;
+        return (_a = s.info.rdn) != null ? _a : null;
+      }
+    },
     {
       toggle: "metrics_network",
       channel: "network",
@@ -917,6 +984,7 @@ function buildMetricDefs() {
   METRIC_DEPENDENCIES,
   SYSTEM_STATUS_STATES,
   SYSTEM_STATUS_UNKNOWN,
+  ZFS_HEALTH_STATES,
   boolCommon,
   buildMetricDefs,
   bytesToGib,
@@ -932,6 +1000,8 @@ function buildMetricDefs() {
   osLabel,
   percentCommon,
   round1,
-  textCommon
+  textCommon,
+  usedPercent,
+  zfsHealthCommon
 });
 //# sourceMappingURL=metric-registry.js.map

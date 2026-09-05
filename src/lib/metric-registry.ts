@@ -70,6 +70,28 @@ export const SYSTEM_STATUS_STATES: Record<string, string> = {
 };
 
 /**
+ * `common.states` hint of `zfs.<pool>.health`: zpool's own health words as Beszel 0.19.0
+ * forwards them (`ZfsPool.Health`, from `zpool list -H -o health`). A hint for the UI, not
+ * a filter — a word from a newer ZFS still lands in the state unchanged.
+ */
+export const ZFS_HEALTH_STATES: Record<string, string> = {
+  ONLINE: "Online",
+  DEGRADED: "Degraded",
+  FAULTED: "Faulted",
+  OFFLINE: "Offline",
+  REMOVED: "Removed",
+  UNAVAIL: "Unavailable",
+  SUSPENDED: "Suspended",
+};
+
+/**
+ * StateCommon of a ZFS pool's health word (string, role `info.status`, states hint).
+ */
+export function zfsHealthCommon(): ioBroker.StateCommon {
+  return { ...textCommon(tName("zfsHealth"), "info.status", tDesc("descZfsHealth")), states: ZFS_HEALTH_STATES };
+}
+
+/**
  * Beszel battery charge-state value that means "actively charging"
  * (agent/battery/battery.go enum: 0=unknown 1=empty 2=full 3=charging
  * 4=discharging 5=idle). Used to map `bat[1]` to the `charging` boolean.
@@ -91,6 +113,7 @@ export const CHANNEL_NAME_KEY: Record<string, string> = {
   temperature: "channelTemperature",
   battery: "channelBattery",
   fans: "channelFans",
+  zfs: "channelZfs",
   // dynamic-group parents + sub-channels
   cores: "channelCores",
   sensors: "channelSensors",
@@ -116,6 +139,8 @@ export const DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = 
   // v0.11.0: the fans channel holds ONLY the dynamic per-fan states — this
   // entry is what makes cleanupMetrics delete the channel when the toggle is off.
   fans: ["metrics_fans"],
+  // v0.15.0: same shape for the ZFS pools channel (only dynamic per-pool channels).
+  zfs: ["metrics_zfs"],
 };
 
 /**
@@ -286,6 +311,21 @@ export function finiteTempValues(temps: Record<string, number> | undefined): num
  */
 export function round1(x: number): number {
   return Math.round(x * 10) / 10;
+}
+
+/**
+ * SM8: used/total as a whole percent clamped to [0, 100] — transient `used > total`
+ * (data drift between separate polls) must not push more than 100 % into a state.
+ * null when either side is missing or the total is 0. Shared by the filesystem and
+ * ZFS pool groups.
+ *
+ * @param total Capacity (GB), or null.
+ * @param used Allocated (GB), or null.
+ */
+export function usedPercent(total: number | null, used: number | null): number | null {
+  return total !== null && used !== null && total > 0
+    ? Math.min(100, Math.max(0, Math.round((used / total) * 100)))
+    : null;
 }
 
 /**
@@ -751,6 +791,43 @@ export function buildMetricDefs(): MetricDef[] {
       unit: "MB/s",
       available: hasStats,
       extract: (_s, st) => st?.dw ?? null,
+    },
+    // Beszel 0.19.0: cumulative device read/write counters (bytes since boot) — a volume,
+    // not a rate; shown in GB like the per-interface totals. Rides on the I/O toggle.
+    // `omitzero` on the wire, so an older Hub creates nothing.
+    {
+      toggle: "metrics_diskIo",
+      channel: "disk",
+      id: "disk.total_read",
+      nameKey: "diskTotalRead",
+      descKey: "descDiskTotalIo",
+      kind: "num",
+      unit: "GB",
+      available: st => !!st?.diot,
+      extract: (_s, st) => bytesToGib(st?.diot?.[0]),
+    },
+    {
+      toggle: "metrics_diskIo",
+      channel: "disk",
+      id: "disk.total_write",
+      nameKey: "diskTotalWrite",
+      descKey: "descDiskTotalIo",
+      kind: "num",
+      unit: "GB",
+      available: st => !!st?.diot,
+      extract: (_s, st) => bytesToGib(st?.diot?.[1]),
+    },
+    // Beszel 0.19.0: the root disk's custom name (`FILESYSTEM=device__name` on the agent).
+    // Lives in the systems record (`info.rdn`), so it needs no stats; created only when set.
+    {
+      toggle: "metrics_disk",
+      channel: "disk",
+      id: "disk.name",
+      nameKey: "rootDiskName",
+      descKey: "descRootDiskName",
+      kind: "text",
+      available: (_st, sys) => sys.info.rdn != null,
+      extract: s => s.info.rdn ?? null,
     },
     {
       toggle: "metrics_network",

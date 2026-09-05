@@ -192,5 +192,16 @@
   "descSystemsOnline": "Quanti dei sistemi registrati riportano attualmente «up».",
   "descSystemsTotal": "Quanti sistemi sono registrati sull'hub.",
   "descTemperatureAvg": "Media dei tre sensori più caldi, non di tutti.",
-  "descTemperatureMax": "Lettura del singolo sensore più caldo."
+  "descTemperatureMax": "Lettura del singolo sensore più caldo.",
+  "header_zfs": "ZFS",
+  "metric_zfs": "Pool ZFS",
+  "help_metric_zfs": "Occupazione, velocità di lettura/scrittura e stato di ogni pool ZFS riportato dall'agente (Beszel 0.19.0+).",
+  "channelZfs": "Pool ZFS",
+  "zfsHealth": "Stato",
+  "descZfsHealth": "Stato del pool secondo ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
+  "diskTotalRead": "Totale letto",
+  "diskTotalWrite": "Totale scritto",
+  "descDiskTotalIo": "Volume letto o scritto dall'avvio (contatore del dispositivo), non una velocità.",
+  "rootDiskName": "Nome del disco radice",
+  "descRootDiskName": "Nome del disco radice impostato sull'agente (FILESYSTEM=device__name)."
 }

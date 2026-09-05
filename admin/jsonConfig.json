@@ -454,6 +454,26 @@
           "lg": 6,
           "xl": 6
         },
+        "header_zfs": {
+          "type": "header",
+          "text": "header_zfs",
+          "size": 5,
+          "xs": 12,
+          "sm": 12,
+          "lg": 12,
+          "xl": 12
+        },
+        "metrics_zfs": {
+          "type": "checkbox",
+          "label": "metric_zfs",
+          "help": "help_metric_zfs",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
         "header_gpu": {
           "type": "header",
           "text": "header_gpu",

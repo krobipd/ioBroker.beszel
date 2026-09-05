@@ -133,10 +133,25 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     Beschreibung als Übersetzungsobjekt, jeder feste Name als API-Name). Der Release-Vorlauf
     prüft das Inventar mit Bot- und Flottenregeln und beweist mit dem Inventar des Vorgänger-Tags
     (`INVENTORY_PREVIOUS`), dass ein Update jedes bestehende Objekt erreicht — ohne Server.
+33. **Beszel 0.19.0 (v0.15.0) + `upstream.json`** — Struct-Diff 0.18.8→0.19.0 (Snapshot
+    `Ressourcen/beszel/beszel-0.19.0/`, `VERIFIED-v0.19.0.md`): vier REST-sichtbare Neuerungen, alle
+    `available`-gated (älterer Hub erzeugt nichts). (a) `stats.z` → Gruppe `zfs.<pool>/` (opt-in
+    `metrics_zfs`, eigener Schalter wie Lüfter): `disk_percent/used/total` (GiB wie die Root-Disk,
+    Label GB), `read_speed/write_speed` (Bytes/s → MB/s MiB-basiert; `omitzero` = ruhend = 0, nicht
+    unbekannt), `health` (zpool-Wort, Rolle `info.status`, `common.states` als Hinweis, nie Filter);
+    Pool-Kanal API-benannt. (b) `stats.diot` → `disk.total_read/total_write` (GB, am I/O-Schalter).
+    (c) `efs.*.tr/tw` → `filesystems.<fs>.total_read/total_write` (nur wenn geliefert). (d) `info.rdn`
+    → `disk.name`. `usedPercent()` (SM8) teilen Dateisysteme und Pools. Die Detail-Collection
+    `zfs_pools` (scrub, vdevs, datasets) wird wie `smart_devices`/`systemd_services` NICHT gelesen —
+    bewusst offen, eigener Auftrag. **`upstream.json`** (`github:henrygd/beszel`, `verified`, `watch`,
+    `snapshot`) ist die Deklaration für das Release-Gate A12: eine neuere Beszel-Freigabe blockt das
+    Release mit Notes + Diff, bis die Sichtung gemacht und `verified` gehoben ist — Anlass: 0.14.2
+    ging raus, während 0.19.0 zwei Tage alt war. Mutationstabelle `mutations_beszel_2026-09-05.py`
+    (13, alle gefangen; Z4/Z5 überlebten zuerst → Aufräum-Test + Invarianten-Abdeckung für `zfs`).
 
-## Tests (596 unit + 57 package + 1 integration + 1 inventory = 655)
+## Tests (616 unit + 57 package + 1 integration + 1 inventory = 675)
 
-Zusammensetzung (gemessen): state-manager 253 · coerce 140 · main 94 · beszel-client 66 · message-router 16 · repo-standards 9 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · i18n 7.
+Zusammensetzung (gemessen 2026-09-05): state-manager 271 · coerce 144 · main 94 · beszel-client 66 · message-router 16 · i18n 7 · inventory 6 · repo-standards 12 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · i18n 7.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 

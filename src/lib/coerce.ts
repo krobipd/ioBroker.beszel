@@ -5,6 +5,7 @@ import type {
   BeszelSystemDetailsRecord,
   BeszelSystemStats,
   FsStats,
+  ZfsPoolStats,
   GPUData,
   PocketBaseList,
   SystemDetails,
@@ -263,6 +264,11 @@ function coerceSystemInfo(value: unknown): SystemInfo {
   if (bat) {
     info.bat = [bat[0], bat[1]];
   }
+  // v0.19.0: custom root disk name (`rdn`, omitempty).
+  const rdn = coerceString(obj.rdn);
+  if (rdn !== null) {
+    info.rdn = rdn;
+  }
   return info;
 }
 
@@ -410,12 +416,39 @@ function coerceFsStats(value: unknown): FsStats {
   // D4: all FsStats fields are plain finite numbers — loop like coerceSystemStats
   // rather than four copy-pasted blocks.
   const out: FsStats = {};
-  const NUMBER_FIELDS: (keyof FsStats)[] = ["d", "du", "r", "w"];
+  const NUMBER_FIELDS: (keyof FsStats)[] = ["d", "du", "r", "w", "tr", "tw"];
   for (const k of NUMBER_FIELDS) {
     const n = coerceFiniteNumber(obj[k]);
     if (n !== null) {
       (out as Record<string, number>)[k] = n;
     }
+  }
+  return out;
+}
+
+/**
+ * v0.19.0: one ZFS pool of the `z` map — four finite numbers plus the health word.
+ * Total like coerceFsStats: garbage yields `{}`, never a dropped pool (the pool's
+ * channel still exists on the Hub; the adapter shows what it can read).
+ *
+ * @param value Raw pool object from system_stats.stats.z
+ */
+function coerceZfsPoolStats(value: unknown): ZfsPoolStats {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return {};
+  }
+  const out: ZfsPoolStats = {};
+  const NUMBER_FIELDS: ("d" | "du" | "rb" | "wb")[] = ["d", "du", "rb", "wb"];
+  for (const k of NUMBER_FIELDS) {
+    const n = coerceFiniteNumber(obj[k]);
+    if (n !== null) {
+      out[k] = n;
+    }
+  }
+  const h = coerceString(obj.h, 64);
+  if (h !== null) {
+    out.h = h;
   }
   return out;
 }
@@ -533,6 +566,16 @@ export function coerceSystemStats(value: unknown): SystemStats {
   const bats = coerceNumberMap(obj.bats);
   if (bats) {
     s.bats = bats;
+  }
+  // v0.19.0: ZFS pool map + cumulative disk I/O counters. Both `omitzero`/`omitempty`
+  // on the wire — absent on an older Hub, and absent means "no pools" / "no counters".
+  const z = coerceMapOf(obj.z, coerceZfsPoolStats);
+  if (z) {
+    s.z = z;
+  }
+  const diot = coerceNumberTuple(obj.diot, 2);
+  if (diot) {
+    s.diot = [diot[0], diot[1]];
   }
   // v0.18.7: per-interface [up, down, total up, total down] bytes.
   const niObj = coerceObject(obj.ni);

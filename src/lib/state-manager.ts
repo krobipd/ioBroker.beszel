@@ -12,6 +12,8 @@ import {
   channelName,
   bytesToMib,
   bytesToGib,
+  usedPercent,
+  zfsHealthCommon,
   CHANNEL_NAME_KEY,
   DYNAMIC_CHANNEL_TOGGLES,
   METRIC_DEPENDENCIES,
@@ -973,6 +975,20 @@ export class StateManager {
     { match: /^filesystems\.[^.]+\.disk_total$/, common: () => numCommon(tName("diskTotal"), "GB") },
     { match: /^filesystems\.[^.]+\.read_speed$/, common: () => numCommon(tName("readSpeed"), "MB/s") },
     { match: /^filesystems\.[^.]+\.write_speed$/, common: () => numCommon(tName("writeSpeed"), "MB/s") },
+    {
+      match: /^filesystems\.[^.]+\.total_read$/,
+      common: () => numCommon(tName("diskTotalRead"), "GB", "value", tDesc("descDiskTotalIo")),
+    },
+    {
+      match: /^filesystems\.[^.]+\.total_write$/,
+      common: () => numCommon(tName("diskTotalWrite"), "GB", "value", tDesc("descDiskTotalIo")),
+    },
+    { match: /^zfs\.[^.]+\.disk_percent$/, common: () => percentCommon(tName("diskPercent")) },
+    { match: /^zfs\.[^.]+\.disk_used$/, common: () => numCommon(tName("diskUsed"), "GB") },
+    { match: /^zfs\.[^.]+\.disk_total$/, common: () => numCommon(tName("diskTotal"), "GB") },
+    { match: /^zfs\.[^.]+\.read_speed$/, common: () => numCommon(tName("readSpeed"), "MB/s") },
+    { match: /^zfs\.[^.]+\.write_speed$/, common: () => numCommon(tName("writeSpeed"), "MB/s") },
+    { match: /^zfs\.[^.]+\.health$/, common: () => zfsHealthCommon() },
     { match: /^containers\.[^.]+\.status$/, common: () => textCommon(tName("status")) },
     {
       match: /^containers\.[^.]+\.health$/,
@@ -1247,13 +1263,8 @@ export class StateManager {
 
           const total = fsData.d ?? null;
           const used = fsData.du ?? null;
-          // v0.4.3 (SM8): clamp to [0, 100] — transient `used > total`
-          // (data drift between separate metric polls) shouldn't push > 100%
-          // into the state.
-          const percent =
-            total !== null && used !== null && total > 0
-              ? Math.min(100, Math.max(0, Math.round((used / total) * 100)))
-              : null;
+          // v0.4.3 (SM8): clamped whole percent, shared with the ZFS pools (usedPercent).
+          const percent = usedPercent(total, used);
 
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.disk_percent`,
@@ -1280,6 +1291,62 @@ export class StateManager {
             numCommon(tName("writeSpeed"), "MB/s"),
             fsData.w ?? null,
           );
+          // Beszel 0.19.0: cumulative device counters per filesystem — a volume in GB,
+          // gated on presence so an older Hub creates no empty state.
+          if (fsData.tr !== undefined) {
+            await this.createAndSetState(
+              `${sysId}.filesystems.${safeId}.total_read`,
+              numCommon(tName("diskTotalRead"), "GB", "value", tDesc("descDiskTotalIo")),
+              bytesToGib(fsData.tr),
+            );
+          }
+          if (fsData.tw !== undefined) {
+            await this.createAndSetState(
+              `${sysId}.filesystems.${safeId}.total_write`,
+              numCommon(tName("diskTotalWrite"), "GB", "value", tDesc("descDiskTotalIo")),
+              bytesToGib(fsData.tw),
+            );
+          }
+        },
+      );
+    }
+
+    // ZFS pools (v0.15.0, Beszel 0.19.0+). Pool names come from `zpool list` — shown
+    // as-is (API-named channel). Capacity arrives in GiB like the root disk and is
+    // labelled GB by the same convention; throughput arrives in bytes/s and is shown
+    // as MB/s like every other rate here (MiB-based, US7) — the Hub omits zero, so
+    // absent means idle, not unknown. Health is zpool's own word; `common.states`
+    // is a hint for the UI, never a filter.
+    if (config.metrics_zfs) {
+      await this.syncDynamicGroup(
+        `${sysId}.zfs`,
+        stats.z ? Object.entries(stats.z) : [],
+        "channel",
+        async () => {
+          await this.ensureChannel(`${sysId}.zfs`, channelName("zfs"));
+        },
+        async (safeId, poolName, pool) => {
+          await this.ensureChannel(`${sysId}.zfs.${safeId}`, sanitizeDisplayName(poolName), API_NAMED);
+          const total = pool.d ?? null;
+          const used = pool.du ?? null;
+          await this.createAndSetState(
+            `${sysId}.zfs.${safeId}.disk_percent`,
+            percentCommon(tName("diskPercent")),
+            usedPercent(total, used),
+          );
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_used`, numCommon(tName("diskUsed"), "GB"), used);
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_total`, numCommon(tName("diskTotal"), "GB"), total);
+          await this.createAndSetState(
+            `${sysId}.zfs.${safeId}.read_speed`,
+            numCommon(tName("readSpeed"), "MB/s"),
+            bytesToMib(pool.rb ?? 0),
+          );
+          await this.createAndSetState(
+            `${sysId}.zfs.${safeId}.write_speed`,
+            numCommon(tName("writeSpeed"), "MB/s"),
+            bytesToMib(pool.wb ?? 0),
+          );
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.health`, zfsHealthCommon(), pool.h ?? null);
         },
       );
     }

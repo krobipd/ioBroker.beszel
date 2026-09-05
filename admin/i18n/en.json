@@ -192,5 +192,16 @@
   "descSystemsOnline": "How many of the registered systems currently report \"up\".",
   "descSystemsTotal": "How many systems are registered on the Hub.",
   "descTemperatureAvg": "Average of the three hottest sensors, not of all of them.",
-  "descTemperatureMax": "Reading of the single hottest sensor."
+  "descTemperatureMax": "Reading of the single hottest sensor.",
+  "header_zfs": "ZFS",
+  "metric_zfs": "ZFS Pools",
+  "help_metric_zfs": "Usage, read/write throughput and health for each ZFS pool reported by the agent (Beszel 0.19.0+).",
+  "channelZfs": "ZFS Pools",
+  "zfsHealth": "Health",
+  "descZfsHealth": "Pool health as reported by ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL or SUSPENDED.",
+  "diskTotalRead": "Total Read",
+  "diskTotalWrite": "Total Write",
+  "descDiskTotalIo": "Volume read or written since boot (device counter), not a rate.",
+  "rootDiskName": "Root Disk Name",
+  "descRootDiskName": "Custom name of the root disk set on the agent (FILESYSTEM=device__name)."
 }

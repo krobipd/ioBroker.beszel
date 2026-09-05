@@ -192,5 +192,16 @@
   "descSystemsOnline": "Скільки із зареєстрованих систем зараз повідомляють «up».",
   "descSystemsTotal": "Скільки систем зареєстровано на хабі.",
   "descTemperatureAvg": "Середнє з трьох найгарячіших датчиків, а не з усіх.",
-  "descTemperatureMax": "Показник найгарячішого окремого датчика."
+  "descTemperatureMax": "Показник найгарячішого окремого датчика.",
+  "header_zfs": "ZFS",
+  "metric_zfs": "Пули ZFS",
+  "help_metric_zfs": "Заповнення, швидкість читання/запису та стан кожного пулу ZFS, про який повідомляє агент (Beszel 0.19.0+).",
+  "channelZfs": "Пули ZFS",
+  "zfsHealth": "Стан",
+  "descZfsHealth": "Стан пулу за даними ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL або SUSPENDED.",
+  "diskTotalRead": "Прочитано всього",
+  "diskTotalWrite": "Записано всього",
+  "descDiskTotalIo": "Обсяг прочитаних або записаних даних від завантаження (лічильник пристрою), не швидкість.",
+  "rootDiskName": "Назва системного диска",
+  "descRootDiskName": "Назва системного диска, задана на агенті (FILESYSTEM=device__name)."
 }

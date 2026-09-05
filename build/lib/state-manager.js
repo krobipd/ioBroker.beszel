@@ -804,6 +804,20 @@ class StateManager {
     { match: /^filesystems\.[^.]+\.disk_total$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotal"), "GB") },
     { match: /^filesystems\.[^.]+\.read_speed$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("readSpeed"), "MB/s") },
     { match: /^filesystems\.[^.]+\.write_speed$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("writeSpeed"), "MB/s") },
+    {
+      match: /^filesystems\.[^.]+\.total_read$/,
+      common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotalRead"), "GB", "value", (0, import_i18n.tDesc)("descDiskTotalIo"))
+    },
+    {
+      match: /^filesystems\.[^.]+\.total_write$/,
+      common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotalWrite"), "GB", "value", (0, import_i18n.tDesc)("descDiskTotalIo"))
+    },
+    { match: /^zfs\.[^.]+\.disk_percent$/, common: () => (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("diskPercent")) },
+    { match: /^zfs\.[^.]+\.disk_used$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskUsed"), "GB") },
+    { match: /^zfs\.[^.]+\.disk_total$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotal"), "GB") },
+    { match: /^zfs\.[^.]+\.read_speed$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("readSpeed"), "MB/s") },
+    { match: /^zfs\.[^.]+\.write_speed$/, common: () => (0, import_metric_registry.numCommon)((0, import_i18n.tName)("writeSpeed"), "MB/s") },
+    { match: /^zfs\.[^.]+\.health$/, common: () => (0, import_metric_registry.zfsHealthCommon)() },
     { match: /^containers\.[^.]+\.status$/, common: () => (0, import_metric_registry.textCommon)((0, import_i18n.tName)("status")) },
     {
       match: /^containers\.[^.]+\.health$/,
@@ -1035,7 +1049,7 @@ class StateManager {
           await this.ensureChannel(`${sysId}.filesystems.${safeId}`, (0, import_coerce.sanitizeDisplayName)(fsName), API_NAMED);
           const total = (_a2 = fsData.d) != null ? _a2 : null;
           const used = (_b = fsData.du) != null ? _b : null;
-          const percent = total !== null && used !== null && total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : null;
+          const percent = (0, import_metric_registry.usedPercent)(total, used);
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.disk_percent`,
             (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("diskPercent")),
@@ -1061,6 +1075,54 @@ class StateManager {
             (0, import_metric_registry.numCommon)((0, import_i18n.tName)("writeSpeed"), "MB/s"),
             (_d = fsData.w) != null ? _d : null
           );
+          if (fsData.tr !== void 0) {
+            await this.createAndSetState(
+              `${sysId}.filesystems.${safeId}.total_read`,
+              (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotalRead"), "GB", "value", (0, import_i18n.tDesc)("descDiskTotalIo")),
+              (0, import_metric_registry.bytesToGib)(fsData.tr)
+            );
+          }
+          if (fsData.tw !== void 0) {
+            await this.createAndSetState(
+              `${sysId}.filesystems.${safeId}.total_write`,
+              (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotalWrite"), "GB", "value", (0, import_i18n.tDesc)("descDiskTotalIo")),
+              (0, import_metric_registry.bytesToGib)(fsData.tw)
+            );
+          }
+        }
+      );
+    }
+    if (config.metrics_zfs) {
+      await this.syncDynamicGroup(
+        `${sysId}.zfs`,
+        stats.z ? Object.entries(stats.z) : [],
+        "channel",
+        async () => {
+          await this.ensureChannel(`${sysId}.zfs`, (0, import_metric_registry.channelName)("zfs"));
+        },
+        async (safeId, poolName, pool) => {
+          var _a2, _b, _c, _d, _e;
+          await this.ensureChannel(`${sysId}.zfs.${safeId}`, (0, import_coerce.sanitizeDisplayName)(poolName), API_NAMED);
+          const total = (_a2 = pool.d) != null ? _a2 : null;
+          const used = (_b = pool.du) != null ? _b : null;
+          await this.createAndSetState(
+            `${sysId}.zfs.${safeId}.disk_percent`,
+            (0, import_metric_registry.percentCommon)((0, import_i18n.tName)("diskPercent")),
+            (0, import_metric_registry.usedPercent)(total, used)
+          );
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_used`, (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskUsed"), "GB"), used);
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_total`, (0, import_metric_registry.numCommon)((0, import_i18n.tName)("diskTotal"), "GB"), total);
+          await this.createAndSetState(
+            `${sysId}.zfs.${safeId}.read_speed`,
+            (0, import_metric_registry.numCommon)((0, import_i18n.tName)("readSpeed"), "MB/s"),
+            (0, import_metric_registry.bytesToMib)((_c = pool.rb) != null ? _c : 0)
+          );
+          await this.createAndSetState(
+            `${sysId}.zfs.${safeId}.write_speed`,
+            (0, import_metric_registry.numCommon)((0, import_i18n.tName)("writeSpeed"), "MB/s"),
+            (0, import_metric_registry.bytesToMib)((_d = pool.wb) != null ? _d : 0)
+          );
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.health`, (0, import_metric_registry.zfsHealthCommon)(), (_e = pool.h) != null ? _e : null);
         }
       );
     }

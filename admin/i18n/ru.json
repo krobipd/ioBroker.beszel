@@ -192,5 +192,16 @@
   "descSystemsOnline": "Сколько из зарегистрированных систем сейчас сообщают «up».",
   "descSystemsTotal": "Сколько систем зарегистрировано на хабе.",
   "descTemperatureAvg": "Среднее по трём самым горячим датчикам, а не по всем.",
-  "descTemperatureMax": "Показание самого горячего датчика."
+  "descTemperatureMax": "Показание самого горячего датчика.",
+  "header_zfs": "ZFS",
+  "metric_zfs": "Пулы ZFS",
+  "help_metric_zfs": "Заполнение, скорость чтения/записи и состояние каждого пула ZFS, о котором сообщает агент (Beszel 0.19.0+).",
+  "channelZfs": "Пулы ZFS",
+  "zfsHealth": "Состояние",
+  "descZfsHealth": "Состояние пула по данным ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL или SUSPENDED.",
+  "diskTotalRead": "Прочитано всего",
+  "diskTotalWrite": "Записано всего",
+  "descDiskTotalIo": "Объём прочитанных или записанных данных с момента загрузки (счётчик устройства), не скорость.",
+  "rootDiskName": "Имя системного диска",
+  "descRootDiskName": "Заданное на агенте имя системного диска (FILESYSTEM=device__name)."
 }

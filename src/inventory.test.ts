@@ -50,6 +50,7 @@ describe("object inventory (test/objects.inventory.json)", () => {
     const groups = [
       "temperature.sensors.",
       "fans.",
+      "zfs.",
       "battery.batteries.",
       "cpu.cores.",
       "network.interfaces.",

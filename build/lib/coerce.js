@@ -174,6 +174,10 @@ function coerceSystemInfo(value) {
   if (bat) {
     info.bat = [bat[0], bat[1]];
   }
+  const rdn = coerceString(obj.rdn);
+  if (rdn !== null) {
+    info.rdn = rdn;
+  }
   return info;
 }
 function coerceStatus(value) {
@@ -294,12 +298,31 @@ function coerceFsStats(value) {
     return {};
   }
   const out = {};
-  const NUMBER_FIELDS = ["d", "du", "r", "w"];
+  const NUMBER_FIELDS = ["d", "du", "r", "w", "tr", "tw"];
   for (const k of NUMBER_FIELDS) {
     const n = coerceFiniteNumber(obj[k]);
     if (n !== null) {
       out[k] = n;
     }
+  }
+  return out;
+}
+function coerceZfsPoolStats(value) {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return {};
+  }
+  const out = {};
+  const NUMBER_FIELDS = ["d", "du", "rb", "wb"];
+  for (const k of NUMBER_FIELDS) {
+    const n = coerceFiniteNumber(obj[k]);
+    if (n !== null) {
+      out[k] = n;
+    }
+  }
+  const h = coerceString(obj.h, 64);
+  if (h !== null) {
+    out.h = h;
   }
   return out;
 }
@@ -388,6 +411,14 @@ function coerceSystemStats(value) {
   const bats = coerceNumberMap(obj.bats);
   if (bats) {
     s.bats = bats;
+  }
+  const z = coerceMapOf(obj.z, coerceZfsPoolStats);
+  if (z) {
+    s.z = z;
+  }
+  const diot = coerceNumberTuple(obj.diot, 2);
+  if (diot) {
+    s.diot = [diot[0], diot[1]];
   }
   const niObj = coerceObject(obj.ni);
   if (niObj) {

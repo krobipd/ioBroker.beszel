@@ -1923,6 +1923,43 @@
     "native": {},
     "_id": "beszel.0.systems.homelab_server.disk.io_util"
   },
+  "beszel.0.systems.homelab_server.disk.name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Name der Systemfestplatte",
+        "en": "Root Disk Name",
+        "es": "Nombre del disco raíz",
+        "fr": "Nom du disque racine",
+        "it": "Nome del disco radice",
+        "nl": "Naam van de rootschijf",
+        "pl": "Nazwa dysku głównego",
+        "pt": "Nome do disco raiz",
+        "ru": "Имя системного диска",
+        "uk": "Назва системного диска",
+        "zh-cn": "根磁盘名称"
+      },
+      "desc": {
+        "de": "Auf dem Agenten vergebener Name der Systemfestplatte (FILESYSTEM=device__name).",
+        "en": "Custom name of the root disk set on the agent (FILESYSTEM=device__name).",
+        "es": "Nombre del disco raíz definido en el agente (FILESYSTEM=device__name).",
+        "fr": "Nom du disque racine défini sur l'agent (FILESYSTEM=device__name).",
+        "it": "Nome del disco radice impostato sull'agente (FILESYSTEM=device__name).",
+        "nl": "Op de agent ingestelde naam van de rootschijf (FILESYSTEM=device__name).",
+        "pl": "Nazwa dysku głównego ustawiona w agencie (FILESYSTEM=device__name).",
+        "pt": "Nome do disco raiz definido no agente (FILESYSTEM=device__name).",
+        "ru": "Заданное на агенте имя системного диска (FILESYSTEM=device__name).",
+        "uk": "Назва системного диска, задана на агенті (FILESYSTEM=device__name).",
+        "zh-cn": "在代理上设置的根磁盘名称（FILESYSTEM=device__name）。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.name"
+  },
   "beszel.0.systems.homelab_server.disk.percent": {
     "type": "state",
     "common": {
@@ -2076,6 +2113,82 @@
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.disk.total"
+  },
+  "beszel.0.systems.homelab_server.disk.total_read": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gelesen gesamt",
+        "en": "Total Read",
+        "es": "Total leído",
+        "fr": "Total lu",
+        "it": "Totale letto",
+        "nl": "Totaal gelezen",
+        "pl": "Łącznie odczytano",
+        "pt": "Total lido",
+        "ru": "Прочитано всего",
+        "uk": "Прочитано всього",
+        "zh-cn": "累计读取"
+      },
+      "desc": {
+        "de": "Seit dem Systemstart gelesene bzw. geschriebene Datenmenge (Gerätezähler), keine Rate.",
+        "en": "Volume read or written since boot (device counter), not a rate.",
+        "es": "Volumen leído o escrito desde el arranque (contador del dispositivo), no una velocidad.",
+        "fr": "Volume lu ou écrit depuis le démarrage (compteur du périphérique), pas un débit.",
+        "it": "Volume letto o scritto dall'avvio (contatore del dispositivo), non una velocità.",
+        "nl": "Hoeveelheid gelezen of geschreven sinds het opstarten (apparaatteller), geen snelheid.",
+        "pl": "Ilość danych odczytanych lub zapisanych od uruchomienia (licznik urządzenia), nie szybkość.",
+        "pt": "Volume lido ou escrito desde o arranque (contador do dispositivo), não uma taxa.",
+        "ru": "Объём прочитанных или записанных данных с момента загрузки (счётчик устройства), не скорость.",
+        "uk": "Обсяг прочитаних або записаних даних від завантаження (лічильник пристрою), не швидкість.",
+        "zh-cn": "自启动以来读取或写入的数据量（设备计数器），不是速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.total_read"
+  },
+  "beszel.0.systems.homelab_server.disk.total_write": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geschrieben gesamt",
+        "en": "Total Write",
+        "es": "Total escrito",
+        "fr": "Total écrit",
+        "it": "Totale scritto",
+        "nl": "Totaal geschreven",
+        "pl": "Łącznie zapisano",
+        "pt": "Total escrito",
+        "ru": "Записано всего",
+        "uk": "Записано всього",
+        "zh-cn": "累计写入"
+      },
+      "desc": {
+        "de": "Seit dem Systemstart gelesene bzw. geschriebene Datenmenge (Gerätezähler), keine Rate.",
+        "en": "Volume read or written since boot (device counter), not a rate.",
+        "es": "Volumen leído o escrito desde el arranque (contador del dispositivo), no una velocidad.",
+        "fr": "Volume lu ou écrit depuis le démarrage (compteur du périphérique), pas un débit.",
+        "it": "Volume letto o scritto dall'avvio (contatore del dispositivo), non una velocità.",
+        "nl": "Hoeveelheid gelezen of geschreven sinds het opstarten (apparaatteller), geen snelheid.",
+        "pl": "Ilość danych odczytanych lub zapisanych od uruchomienia (licznik urządzenia), nie szybkość.",
+        "pt": "Volume lido ou escrito desde o arranque (contador do dispositivo), não uma taxa.",
+        "ru": "Объём прочитанных или записанных данных с момента загрузки (счётчик устройства), не скорость.",
+        "uk": "Обсяг прочитаних або записаних даних від завантаження (лічильник пристрою), не швидкість.",
+        "zh-cn": "自启动以来读取或写入的数据量（设备计数器），不是速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.disk.total_write"
   },
   "beszel.0.systems.homelab_server.disk.used": {
     "type": "state",
@@ -2372,6 +2485,82 @@
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.read_speed"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.total_read": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gelesen gesamt",
+        "en": "Total Read",
+        "es": "Total leído",
+        "fr": "Total lu",
+        "it": "Totale letto",
+        "nl": "Totaal gelezen",
+        "pl": "Łącznie odczytano",
+        "pt": "Total lido",
+        "ru": "Прочитано всего",
+        "uk": "Прочитано всього",
+        "zh-cn": "累计读取"
+      },
+      "desc": {
+        "de": "Seit dem Systemstart gelesene bzw. geschriebene Datenmenge (Gerätezähler), keine Rate.",
+        "en": "Volume read or written since boot (device counter), not a rate.",
+        "es": "Volumen leído o escrito desde el arranque (contador del dispositivo), no una velocidad.",
+        "fr": "Volume lu ou écrit depuis le démarrage (compteur du périphérique), pas un débit.",
+        "it": "Volume letto o scritto dall'avvio (contatore del dispositivo), non una velocità.",
+        "nl": "Hoeveelheid gelezen of geschreven sinds het opstarten (apparaatteller), geen snelheid.",
+        "pl": "Ilość danych odczytanych lub zapisanych od uruchomienia (licznik urządzenia), nie szybkość.",
+        "pt": "Volume lido ou escrito desde o arranque (contador do dispositivo), não uma taxa.",
+        "ru": "Объём прочитанных или записанных данных с момента загрузки (счётчик устройства), не скорость.",
+        "uk": "Обсяг прочитаних або записаних даних від завантаження (лічильник пристрою), не швидкість.",
+        "zh-cn": "自启动以来读取或写入的数据量（设备计数器），不是速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.total_read"
+  },
+  "beszel.0.systems.homelab_server.filesystems.mnt_data.total_write": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geschrieben gesamt",
+        "en": "Total Write",
+        "es": "Total escrito",
+        "fr": "Total écrit",
+        "it": "Totale scritto",
+        "nl": "Totaal geschreven",
+        "pl": "Łącznie zapisano",
+        "pt": "Total escrito",
+        "ru": "Записано всего",
+        "uk": "Записано всього",
+        "zh-cn": "累计写入"
+      },
+      "desc": {
+        "de": "Seit dem Systemstart gelesene bzw. geschriebene Datenmenge (Gerätezähler), keine Rate.",
+        "en": "Volume read or written since boot (device counter), not a rate.",
+        "es": "Volumen leído o escrito desde el arranque (contador del dispositivo), no una velocidad.",
+        "fr": "Volume lu ou écrit depuis le démarrage (compteur du périphérique), pas un débit.",
+        "it": "Volume letto o scritto dall'avvio (contatore del dispositivo), non una velocità.",
+        "nl": "Hoeveelheid gelezen of geschreven sinds het opstarten (apparaatteller), geen snelheid.",
+        "pl": "Ilość danych odczytanych lub zapisanych od uruchomienia (licznik urządzenia), nie szybkość.",
+        "pt": "Volume lido ou escrito desde o arranque (contador do dispositivo), não uma taxa.",
+        "ru": "Объём прочитанных или записанных данных с момента загрузки (счётчик устройства), не скорость.",
+        "uk": "Обсяг прочитаних або записаних даних від завантаження (лічильник пристрою), не швидкість.",
+        "zh-cn": "自启动以来读取或写入的数据量（设备计数器），不是速率。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.filesystems.mnt_data.total_write"
   },
   "beszel.0.systems.homelab_server.filesystems.mnt_data.write_speed": {
     "type": "state",
@@ -3960,5 +4149,391 @@
       "nameSource": "api"
     },
     "_id": "beszel.0.systems.homelab_server.temperature.sensors.nvme_composite"
+  },
+  "beszel.0.systems.homelab_server.zfs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "ZFS-Pools",
+        "en": "ZFS Pools",
+        "es": "Pools ZFS",
+        "fr": "Pools ZFS",
+        "it": "Pool ZFS",
+        "nl": "ZFS-pools",
+        "pl": "Pule ZFS",
+        "pt": "Pools ZFS",
+        "ru": "Пулы ZFS",
+        "uk": "Пули ZFS",
+        "zh-cn": "ZFS 存储池"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool": {
+    "type": "channel",
+    "common": {
+      "name": "backup pool"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.disk_percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte %",
+        "en": "Disk %",
+        "es": "Disco %",
+        "fr": "Disque %",
+        "it": "Disco %",
+        "nl": "Schijf %",
+        "pl": "Dysk %",
+        "pt": "Disco %",
+        "ru": "Диск %",
+        "uk": "Диск %",
+        "zh-cn": "磁盘使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.disk_percent"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.disk_total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte gesamt",
+        "en": "Disk Total",
+        "es": "Disco total",
+        "fr": "Disque total",
+        "it": "Disco totale",
+        "nl": "Schijf totaal",
+        "pl": "Dysk łącznie",
+        "pt": "Disco total",
+        "ru": "Диск всего",
+        "uk": "Диск усього",
+        "zh-cn": "总磁盘"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.disk_total"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.disk_used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte belegt",
+        "en": "Disk Used",
+        "es": "Disco usado",
+        "fr": "Disque utilisé",
+        "it": "Disco usato",
+        "nl": "Schijf gebruikt",
+        "pl": "Dysk użyty",
+        "pt": "Disco usado",
+        "ru": "Диск использовано",
+        "uk": "Диск використано",
+        "zh-cn": "已用磁盘"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.disk_used"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.health": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Zustand",
+        "en": "Health",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Gezondheid",
+        "pl": "Stan",
+        "pt": "Estado",
+        "ru": "Состояние",
+        "uk": "Стан",
+        "zh-cn": "健康状态"
+      },
+      "desc": {
+        "de": "Zustand des Pools laut ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL oder SUSPENDED.",
+        "en": "Pool health as reported by ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL or SUSPENDED.",
+        "es": "Estado del pool según ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
+        "fr": "État du pool selon ZFS : ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
+        "it": "Stato del pool secondo ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
+        "nl": "Toestand van de pool volgens ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL of SUSPENDED.",
+        "pl": "Stan puli według ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL lub SUSPENDED.",
+        "pt": "Estado do pool segundo o ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
+        "ru": "Состояние пула по данным ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL или SUSPENDED.",
+        "uk": "Стан пулу за даними ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL або SUSPENDED.",
+        "zh-cn": "ZFS 报告的存储池健康状态：ONLINE、DEGRADED、FAULTED、OFFLINE、REMOVED、UNAVAIL 或 SUSPENDED。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "ONLINE": "Online",
+        "DEGRADED": "Degraded",
+        "FAULTED": "Faulted",
+        "OFFLINE": "Offline",
+        "REMOVED": "Removed",
+        "UNAVAIL": "Unavailable",
+        "SUSPENDED": "Suspended"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.health"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.read_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Lesegeschwindigkeit",
+        "en": "Read Speed",
+        "es": "Velocidad de lectura",
+        "fr": "Vitesse de lecture",
+        "it": "Velocità di lettura",
+        "nl": "Leessnelheid",
+        "pl": "Prędkość odczytu",
+        "pt": "Velocidade de leitura",
+        "ru": "Скорость чтения",
+        "uk": "Швидкість читання",
+        "zh-cn": "读取速度"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.read_speed"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.write_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schreibgeschwindigkeit",
+        "en": "Write Speed",
+        "es": "Velocidad de escritura",
+        "fr": "Vitesse d'écriture",
+        "it": "Velocità di scrittura",
+        "nl": "Schrijfsnelheid",
+        "pl": "Prędkość zapisu",
+        "pt": "Velocidade de escrita",
+        "ru": "Скорость записи",
+        "uk": "Швидкість запису",
+        "zh-cn": "写入速度"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.write_speed"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank": {
+    "type": "channel",
+    "common": {
+      "name": "tank"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.zfs.tank"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.disk_percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte %",
+        "en": "Disk %",
+        "es": "Disco %",
+        "fr": "Disque %",
+        "it": "Disco %",
+        "nl": "Schijf %",
+        "pl": "Dysk %",
+        "pt": "Disco %",
+        "ru": "Диск %",
+        "uk": "Диск %",
+        "zh-cn": "磁盘使用率"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.disk_percent"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.disk_total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte gesamt",
+        "en": "Disk Total",
+        "es": "Disco total",
+        "fr": "Disque total",
+        "it": "Disco totale",
+        "nl": "Schijf totaal",
+        "pl": "Dysk łącznie",
+        "pt": "Disco total",
+        "ru": "Диск всего",
+        "uk": "Диск усього",
+        "zh-cn": "总磁盘"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.disk_total"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.disk_used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Festplatte belegt",
+        "en": "Disk Used",
+        "es": "Disco usado",
+        "fr": "Disque utilisé",
+        "it": "Disco usato",
+        "nl": "Schijf gebruikt",
+        "pl": "Dysk użyty",
+        "pt": "Disco usado",
+        "ru": "Диск использовано",
+        "uk": "Диск використано",
+        "zh-cn": "已用磁盘"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.disk_used"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.health": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Zustand",
+        "en": "Health",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Gezondheid",
+        "pl": "Stan",
+        "pt": "Estado",
+        "ru": "Состояние",
+        "uk": "Стан",
+        "zh-cn": "健康状态"
+      },
+      "desc": {
+        "de": "Zustand des Pools laut ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL oder SUSPENDED.",
+        "en": "Pool health as reported by ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL or SUSPENDED.",
+        "es": "Estado del pool según ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
+        "fr": "État du pool selon ZFS : ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
+        "it": "Stato del pool secondo ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
+        "nl": "Toestand van de pool volgens ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL of SUSPENDED.",
+        "pl": "Stan puli według ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL lub SUSPENDED.",
+        "pt": "Estado do pool segundo o ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
+        "ru": "Состояние пула по данным ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL или SUSPENDED.",
+        "uk": "Стан пулу за даними ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL або SUSPENDED.",
+        "zh-cn": "ZFS 报告的存储池健康状态：ONLINE、DEGRADED、FAULTED、OFFLINE、REMOVED、UNAVAIL 或 SUSPENDED。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "ONLINE": "Online",
+        "DEGRADED": "Degraded",
+        "FAULTED": "Faulted",
+        "OFFLINE": "Offline",
+        "REMOVED": "Removed",
+        "UNAVAIL": "Unavailable",
+        "SUSPENDED": "Suspended"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.health"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.read_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Lesegeschwindigkeit",
+        "en": "Read Speed",
+        "es": "Velocidad de lectura",
+        "fr": "Vitesse de lecture",
+        "it": "Velocità di lettura",
+        "nl": "Leessnelheid",
+        "pl": "Prędkość odczytu",
+        "pt": "Velocidade de leitura",
+        "ru": "Скорость чтения",
+        "uk": "Швидкість читання",
+        "zh-cn": "读取速度"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.read_speed"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.write_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schreibgeschwindigkeit",
+        "en": "Write Speed",
+        "es": "Velocidad de escritura",
+        "fr": "Vitesse d'écriture",
+        "it": "Velocità di scrittura",
+        "nl": "Schrijfsnelheid",
+        "pl": "Prędkość zapisu",
+        "pt": "Velocidade de escrita",
+        "ru": "Скорость записи",
+        "uk": "Швидкість запису",
+        "zh-cn": "写入速度"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB/s",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.write_speed"
   }
 }
