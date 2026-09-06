@@ -251,10 +251,10 @@ beszel.0.
 ### **WORK IN PROGRESS**
 
 - Fixed: switching a metric group off now really empties it — a system that was offline at the time kept the empty channel and got it back after every restart
-- Fixed: an object-database hiccup during startup no longer leaves the instance running without ever polling again
+- Fixed: a stumble while starting no longer leaves the adapter alive but silent — it keeps going and updates your values as usual
 - Changed: the status words of a system, of a ZFS pool and of a container are shown in your ioBroker language instead of English
 - Changed: a container's health is now a proper status datapoint with its list of possible values, like the system status next to it
-- Changed: the adapter reads the object tree once at startup and answers from that, instead of asking the database again for every disabled metric of every system
+- Improved: starting up puts far less load on the ioBroker database, which shows most with many systems or many metrics switched off
 - Changed: user documentation now covers the ZFS pools, the root disk name and the read/write totals
 
 ### 0.15.0 (2026-09-05)

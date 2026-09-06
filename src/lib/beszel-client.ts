@@ -59,6 +59,21 @@ export function hostnameForRequest(hostname: string): string {
 }
 
 /**
+ * Port to hand to the socket connect. `URL.port` is the EMPTY STRING when the URL
+ * carries no explicit port (`http://hub/`), and handing that to Node means port 0 —
+ * a connect that can never succeed. The scheme's default fills in instead.
+ *
+ * Exported so the rule can be measured directly: a test that instead points the client
+ * at `http://127.0.0.1` and expects "connection refused" measures the machine it runs
+ * on, not this rule — the GitHub Windows runner answers HTTP 404 on port 80.
+ *
+ * @param parsedUrl Parsed Hub URL
+ */
+export function portForRequest(parsedUrl: URL): number {
+  return parsedUrl.port ? Number(parsedUrl.port) : parsedUrl.protocol === "https:" ? 443 : 80;
+}
+
+/**
  * HTTP client for the Beszel PocketBase REST API.
  * Uses only Node.js built-in http/https — no extra dependencies.
  */
@@ -423,7 +438,7 @@ export class BeszelClient {
 
       const options: http.RequestOptions = {
         hostname: hostnameForRequest(parsedUrl.hostname),
-        port: parsedUrl.port || (isHttps ? 443 : 80),
+        port: portForRequest(parsedUrl),
         path: parsedUrl.pathname + parsedUrl.search,
         method,
         headers,

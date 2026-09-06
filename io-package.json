@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.15.0",
     "news": {
+      "NEXT": {
+        "en": "Deleted metric groups stay deleted, a hiccup at startup no longer leaves the adapter without polling, and status words follow your ioBroker language.",
+        "de": "Abgeschaltete Metrikgruppen bleiben verschwunden, ein Stolperer beim Start legt das Abfragen nicht mehr lahm, und die Statuswörter folgen deiner ioBroker-Sprache.",
+        "ru": "Отключённые группы метрик больше не возвращаются, сбой при запуске не оставляет адаптер без опроса, а слова состояния следуют языку ioBroker.",
+        "pt": "Grupos de métricas desativados deixam de reaparecer, uma falha no arranque já não deixa o adaptador sem consultas e as palavras de estado seguem o idioma do ioBroker.",
+        "nl": "Uitgeschakelde metriekgroepen komen niet meer terug, een hapering bij het starten laat de adapter niet zonder polling achter en statuswoorden volgen je ioBroker-taal.",
+        "fr": "Les groupes de métriques désactivés ne reviennent plus, un incident au démarrage ne laisse plus l'adaptateur sans interrogation et les mots d'état suivent la langue d'ioBroker.",
+        "it": "I gruppi di metriche disattivati non tornano più, un intoppo all'avvio non lascia l'adapter senza interrogazioni e le parole di stato seguono la lingua di ioBroker.",
+        "es": "Los grupos de métricas desactivados ya no reaparecen, un tropiezo al arrancar no deja el adaptador sin consultas y las palabras de estado siguen el idioma de ioBroker.",
+        "pl": "Wyłączone grupy metryk już nie wracają, potknięcie przy starcie nie zostawia adaptera bez odpytywania, a słowa stanu podążają za językiem ioBrokera.",
+        "uk": "Вимкнені групи метрик більше не повертаються, збій під час запуску не залишає адаптер без опитування, а слова стану відповідають мові ioBroker.",
+        "zh-cn": "已关闭的指标分组不再重新出现，启动时的故障不会让适配器停止轮询，系统、ZFS 池和容器的状态文字改为跟随 ioBroker 语言显示。"
+      },
       "0.15.0": {
         "en": "New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.",
         "de": "Neu: ZFS-Pools mit Belegung, Durchsatz und Zustand als zuschaltbare Metrik, der Name der Systemfestplatte und Lese-/Schreibsummen für Datenträger und Dateisysteme mit Beszel 0.19.0.",
@@ -80,19 +93,6 @@
         "pl": "Pierwszy start po aktualizacji nie zapisuje już ostrzeżeń ani błędu w dzienniku, gdy instancja sama się poprawia i restartuje.",
         "uk": "Перший запуск після оновлення більше не записує попередження та помилку до журналу, поки екземпляр виправляється й перезапускається.",
         "zh-cn": "更新后的首次启动不再在日志中写入警告和错误，实例会自行更正并重启。"
-      },
-      "0.12.1": {
-        "en": "On an upgraded installation the systems now really do stop showing as online when the adapter is stopped, and the online count drops to zero with them.",
-        "de": "Auf einer aktualisierten Installation stehen die Systeme beim Stoppen des Adapters jetzt tatsächlich nicht mehr auf online, und die Anzahl fällt mit ihnen auf null.",
-        "ru": "В обновлённой установке системы теперь действительно перестают отображаться как работающие при остановке адаптера, а их счётчик падает до нуля.",
-        "pt": "Numa instalação atualizada, os sistemas deixam mesmo de aparecer como online quando o adaptador é parado, e a contagem desce a zero com eles.",
-        "nl": "Op een bijgewerkte installatie worden de systemen bij het stoppen van de adapter nu echt niet meer als online getoond, en de teller valt met hen terug naar nul.",
-        "fr": "Sur une installation mise à jour, les systèmes cessent réellement d'apparaître en ligne à l'arrêt de l'adaptateur, et leur compteur tombe à zéro avec eux.",
-        "it": "Su un'installazione aggiornata i sistemi smettono davvero di risultare online quando l'adapter viene fermato e il conteggio scende a zero con loro.",
-        "es": "En una instalación actualizada, los sistemas dejan realmente de aparecer en línea al detener el adaptador, y su recuento baja a cero con ellos.",
-        "pl": "W zaktualizowanej instalacji systemy naprawdę przestają być pokazywane jako online po zatrzymaniu adaptera, a ich licznik spada do zera.",
-        "uk": "В оновленій інсталяції системи справді перестають показуватися як онлайн після зупинки адаптера, а їхній лічильник падає до нуля.",
-        "zh-cn": "在已升级的安装中，停止适配器后系统确实不再显示为在线，其在线数量也随之归零。"
       }
     },
     "plugins": {

@@ -1,5 +1,5 @@
 import * as http from "node:http";
-import { BeszelClient, hostnameForRequest } from "./beszel-client";
+import { BeszelClient, hostnameForRequest, portForRequest } from "./beszel-client";
 
 // ---------------------------------------------------------------------------
 // Test HTTP server — simulates Beszel PocketBase API
@@ -1644,17 +1644,19 @@ describe("BeszelClient", () => {
   });
 
   describe("default ports", () => {
-    it("a Hub URL without a port falls back to the scheme's default", async () => {
-      // `parsedUrl.port` is "" for `http://host/` — without the fallback the request
-      // would go to port 0. Nothing on port 80 here, so the measurable proof is that the
-      // connection is attempted against 80 and refused, not that it silently succeeds.
-      const client = new BeszelClient("http://127.0.0.1", "admin", "secret", 2000);
-      const result = await client.checkConnection();
-      expect(result.success).to.equal(false);
-      expect(result.message, "must have tried the default port, not port 0").to.match(
-        /ECONNREFUSED|ETIMEDOUT|EACCES|timed out/i,
-      );
-    }, 10000);
+    it("a Hub URL without a port falls back to the scheme's default", () => {
+      // `URL.port` is "" without an explicit port — handing that to Node means port 0,
+      // a connect that can never succeed. Measured on the rule itself: pointing a client
+      // at `http://127.0.0.1` and expecting "connection refused" would measure the
+      // machine instead (the GitHub Windows runner answers HTTP 404 on port 80).
+      expect(portForRequest(new URL("http://127.0.0.1/")), "http default").to.equal(80);
+      expect(portForRequest(new URL("https://hub.example/")), "https default").to.equal(443);
+    });
+
+    it("an explicit port still wins over the scheme's default", () => {
+      expect(portForRequest(new URL("http://127.0.0.1:8090/"))).to.equal(8090);
+      expect(portForRequest(new URL("https://hub.example:8443/"))).to.equal(8443);
+    });
   });
 
   // -----------------------------------------------------------------------
