@@ -114,7 +114,7 @@ Adapter reicht es unverändert weiter, ein Wort aus einem neueren ZFS kommt also
 es nicht in der Auswahlliste der Admin steht.
 
 Braucht Beszel 0.19.0 oder neuer. Die Detaildaten eines Pools (Scrub-Zustand, vdevs, Datasets)
-liegen in einer eigenen Sammlung auf dem Hub und werden nicht gelesen.
+liegen in einer eigenen Sammlung auf dem Hub — dafür den Schalter **ZFS-Details** einschalten (siehe unten).
 
 ## GPU
 

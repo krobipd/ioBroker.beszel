@@ -142,8 +142,8 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     Pool-Kanal API-benannt. (b) `stats.diot` → `disk.total_read/total_write` (GB, am I/O-Schalter).
     (c) `efs.*.tr/tw` → `filesystems.<fs>.total_read/total_write` (nur wenn geliefert). (d) `info.rdn`
     → `disk.name`. `usedPercent()` (SM8) teilen Dateisysteme und Pools. Die Detail-Collection
-    `zfs_pools` (scrub, vdevs, datasets) wird wie `smart_devices`/`systemd_services` NICHT gelesen —
-    bewusst offen, eigener Auftrag. **`upstream.json`** (`github:henrygd/beszel`, `verified`, `watch`,
+    `zfs_pools` (scrub, vdevs, datasets) blieb hier zunächst ungelesen wie `smart_devices` und
+    `systemd_services` — **mit v0.17.0 erledigt, siehe Design 43**. **`upstream.json`** (`github:henrygd/beszel`, `verified`, `watch`,
     `snapshot`) ist die Deklaration für das Release-Gate A12: eine neuere Beszel-Freigabe blockt das
     Release mit Notes + Diff, bis die Sichtung gemacht und `verified` gehoben ist — Anlass: 0.14.2
     ging raus, während 0.19.0 zwei Tage alt war. Mutationstabelle `mutations_beszel_2026-09-05.py`

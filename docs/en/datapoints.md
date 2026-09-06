@@ -108,7 +108,7 @@ what the pool moved in the last collection interval — an idle pool reads 0, no
 unchanged, so a word from a newer ZFS arrives intact even if it is not in the list the admin offers.
 
 Needs Beszel 0.19.0 or newer. The pool's detail data (scrub state, vdevs, datasets) lives in a
-separate collection on the Hub and is not read.
+separate collection on the Hub — switch on **ZFS details** for it (see below).
 
 ## GPU
 
