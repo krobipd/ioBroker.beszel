@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.16.0",
+    "version": "0.17.0",
     "news": {
-      "NEXT": {
+      "0.17.0": {
         "en": "SMART data, ZFS pool details and systemd service details are available as opt-in metrics; the two slow sources are read every 15 minutes.",
         "de": "SMART-Daten, ZFS-Pool-Details und systemd-Dienst-Details sind als zuschaltbare Metriken verfügbar; die zwei langsamen Quellen werden alle 15 Minuten gelesen.",
         "ru": "Данные SMART, детали пулов ZFS и детали служб systemd доступны как включаемые метрики; два медленных источника читаются раз в 15 минут.",
@@ -93,19 +93,6 @@
         "pl": "Adresy IPv6 Huba działają; zatrzymanie podczas odpytania nie zapisuje fałszywego błędu; systemy pozostają offline, gdy adapter nie startuje; stany podsumowania istnieją od instalacji.",
         "uk": "IPv6-адреси хаба працюють; зупинка під час опитування не пише хибну помилку; системи залишаються офлайн, якщо адаптер не запускається; зведені стани існують від моменту встановлення.",
         "zh-cn": "支持 IPv6 Hub 地址；轮询期间停止不再记录错误的报错；适配器无法启动时各系统保持离线；汇总状态自安装起即存在。"
-      },
-      "0.12.2": {
-        "en": "The first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.",
-        "de": "Der erste Start nach einem Update schreibt keine Warnungen und keinen Fehler mehr ins Protokoll, während sich die Instanz korrigiert und neu startet.",
-        "ru": "Первый запуск после обновления больше не пишет предупреждения и ошибку в журнал, пока экземпляр исправляется и перезапускается.",
-        "pt": "O primeiro arranque após uma atualização já não coloca avisos e um erro no registo enquanto a instância se corrige e reinicia.",
-        "nl": "De eerste start na een update zet geen waarschuwingen en fout meer in het logboek terwijl de instantie zichzelf corrigeert en herstart.",
-        "fr": "Le premier démarrage après une mise à jour n'inscrit plus d'avertissements ni d'erreur dans le journal pendant que l'instance se corrige et redémarre.",
-        "it": "Il primo avvio dopo un aggiornamento non scrive più avvisi e un errore nel registro mentre l'istanza si corregge e si riavvia.",
-        "es": "El primer arranque tras una actualización ya no escribe avisos ni un error en el registro mientras la instancia se corrige y reinicia.",
-        "pl": "Pierwszy start po aktualizacji nie zapisuje już ostrzeżeń ani błędu w dzienniku, gdy instancja sama się poprawia i restartuje.",
-        "uk": "Перший запуск після оновлення більше не записує попередження та помилку до журналу, поки екземпляр виправляється й перезапускається.",
-        "zh-cn": "更新后的首次启动不再在日志中写入警告和错误，实例会自行更正并重启。"
       }
     },
     "plugins": {

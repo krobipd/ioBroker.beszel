@@ -284,7 +284,7 @@ beszel.0.
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 0.17.0 (2026-09-06)
 
 - New: SMART data per drive as an opt-in metric — the drive's own overall verdict plus temperature, capacity, power-on hours and power cycles
 - New: ZFS pool details as an opt-in metric — scrub status, per-vdev error counters and the datasets of each pool
@@ -311,16 +311,6 @@ beszel.0.
 ### 0.14.1 (2026-09-04)
 
 - Fixed: a system that is offline right now kept the old datapoint names and got no descriptions — the update reached only systems the Hub had a current reading for
-
-### 0.14.0 (2026-09-04)
-
-- New: user documentation in the repository, in English and German — setup step by step, what every metric switch creates, and the questions that keep coming up
-- New: every datapoint whose meaning is not obvious now carries a short explanation in all eleven languages — the top-3 temperature average, peak values, I/O wait times and more
-- Fixed: the counts of total, online and all-up systems were shown in English on nine of the eleven languages
-- Fixed: corrected names and descriptions now reach installations that already have the datapoints, instead of only new installations
-- Fixed: a value that the Hub stopped delivering was reset to empty while the adapter kept running, but stayed on its old reading after a restart — now it is reset in both cases
-- Changed: a system the Hub has no reading for keeps its last measured values instead of having them cleared, matching what the individual sensors, fans and containers already did
-- Changed: the datapoint "Legacy state migration completed" disappears from the object tree — it never said anything about a monitored system
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
