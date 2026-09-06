@@ -212,9 +212,9 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     gegen einen `undefined`-Schalter liefen und nichts prüften. Dazu die Invariante
     **Manifest ↔ Admin-UI ↔ Code**: die drei Schalterlisten müssen deckungsgleich sein.
 
-## Tests (652 unit + 58 package + 1 integration + 1 inventory = 712)
+## Tests (653 unit + 58 package + 1 integration + 1 inventory = 713)
 
-Zusammensetzung (gemessen 2026-09-06 nach dem Vollaudit): state-manager 298 · coerce 146 · main 98 · beszel-client 69 · message-router 16 · repo-standards 12 · i18n 7 · inventory 6 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version). Deckung **99,2 % Stmts · 98,6 % Branch · 97,1 % Funcs**; `src/lib` 100 % Funktionen, `state-manager.ts` 100 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server, `?? ""` auf einer garantiert gesetzten Map-Id) oder Test-Seam/Bootstrap in `main.ts`.
+Zusammensetzung (gemessen 2026-09-06 nach dem Vollaudit + dem Port-Test des Release-Laufs): state-manager 298 · coerce 146 · main 98 · beszel-client 70 · message-router 16 · repo-standards 12 · i18n 7 · inventory 6 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version). Deckung **99,2 % Stmts · 98,6 % Branch · 97,1 % Funcs**; `src/lib` 100 % Funktionen, `state-manager.ts` 100 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server, `?? ""` auf einer garantiert gesetzten Map-Id) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 
