@@ -145,3 +145,34 @@ wenn der Hub den Wert liefert.
 Leerlauf oder entlädt. Die Werte je Akku brauchen Beszel 0.18.8 oder neuer; eine Maschine mit einem
 einzigen Akku bekommt genau diesen einen Eintrag, ohne Schwelle, die beim Entfernen eines zweiten
 Akkus die Kinder löschen würde.
+
+## SMART-Geräte
+
+| Schalter     | Datenpunkte                                                                                                                            | Hinweise                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| SMART-Geräte | `smart.<Gerät>.state`, `.model`, `.serial`, `.firmware`, `.interface`, `.temperature`, `.capacity`, `.power_on_hours`, `.power_cycles` | braucht smartctl auf dem Host; alle 15 Min gelesen |
+
+`state` ist das Gesamturteil des Laufwerks selbst (`PASSED` / `FAILED`) — ein sterbendes
+Laufwerk sagt es hier zuerst. Eine Spalte, die smartctl nicht gefüllt hat, bleibt leer,
+statt eine Null zu melden, die wie ein Messwert aussieht.
+
+## ZFS-Pool-Details
+
+| Schalter    | Datenpunkte                                                                          | Hinweise                                        |
+| ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| ZFS-Details | `zfs.<Pool>.scrub_state`, `.scrub_progress`, `.scrub_errors`                         | braucht den ZFS-Schalter                        |
+| ZFS-Details | `zfs.<Pool>.vdevs.<Vdev>.state`, `.read_errors`, `.write_errors`, `.checksum_errors` | gezählt seit dem letzten Zurücksetzen des Pools |
+| ZFS-Details | `zfs.<Pool>.datasets.<Dataset>.used`, `.avail`, `.mountpoint`                        | GB                                              |
+
+Der Hub frischt diese Details etwa stündlich auf, der Adapter liest sie deshalb höchstens
+alle 15 Minuten — Belegung und Zustand der Pools im Minutentakt stehen weiter oben in der
+ZFS-Gruppe.
+
+## systemd-Dienst-Details
+
+| Schalter       | Datenpunkte                                                                           | Hinweise                             |
+| -------------- | ------------------------------------------------------------------------------------- | ------------------------------------ |
+| Dienst-Details | `services.<Unit>.state`, `.sub_state`, `.cpu`, `.cpu_peak`, `.memory`, `.memory_peak` | braucht den Schalter Systemd-Dienste |
+
+Ein Kanal je Unit — auf einem gut gefüllten Host sind das viele Datenpunkte. `state` und
+`sub_state` tragen das systemd-Wort (`active`, `running`, …), nicht die Zahl des Hubs.

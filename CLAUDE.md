@@ -212,9 +212,31 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     gegen einen `undefined`-Schalter liefen und nichts prüften. Dazu die Invariante
     **Manifest ↔ Admin-UI ↔ Code**: die drei Schalterlisten müssen deckungsgleich sein.
 
-## Tests (653 unit + 58 package + 1 integration + 1 inventory = 713)
+43. **Die drei Detail-Collections (v0.17.0)** — `zfs_pools`, `smart_devices` und
+    `systemd_services` waren die letzten Sammlungen des Hubs, die der Adapter nicht las.
+    Alle drei tragen dieselbe Leseregel wie `system_stats` (`systemScopedReadRule`,
+    `internal/hub/collections.go` der gebündelten 0.19.0), die Zugangsdaten reichen also.
+    Drei neue Schalter: **`metrics_zfsDetails`** (hängt an `metrics_zfs`) für Scrub-Status,
+    Vdev-Fehlerzähler und Datasets je Pool · **`metrics_smart`** (eigenständig, wie Lüfter
+    und ZFS: eigene Agent-Quelle) für das SMART-Gesamturteil samt Temperatur, Kapazität,
+    Betriebsstunden und Einschaltvorgängen · **`metrics_servicesDetails`** (hängt an
+    `metrics_services`) für Zustand, Unterzustand, CPU und Speicher je systemd-Unit.
+    **Zwei Taktarten:** `systemd_services` schreibt der Hub bei JEDER Agent-Messung neu,
+    also wird es wie die Container in jedem Poll gelesen; `zfs_pools` frischt der Hub etwa
+    stündlich auf (`system_zfs.go:zfsFetchInterval`) und `smart_devices` noch seltener —
+    beide laufen deshalb über `DETAIL_REFRESH_MS` (15 min). **`SystemExtras`** trägt die
+    drei Listen je System: ein FEHLENDES Feld heißt „diese Runde nicht gelesen" und lässt
+    die Datenpunkte stehen, eine LEERE Liste heißt „nichts da" und räumt auf — dieselbe
+    Unterscheidung wie `containersAvailable`. Die Enums werden als WORT geschrieben
+    (`active`, `running`), nicht als die Zahl des Hubs; `attributes` der SMART-Tabelle
+    bleibt bewusst ungelesen (herstellerspezifischer Blob, dessen Schlüssel je Gerät
+    anders heißen — ein Adapter benennt keine Datenpunkte, die er nicht erklären kann).
+    Die Pool-Ebene prunt weiterhin ALLEIN der Minutentakt aus `stats.z`: zwei Pruner auf
+    einer Basis würden sich um jeden Pool streiten, den der andere noch nicht gesehen hat.
 
-Zusammensetzung (gemessen 2026-09-06 nach dem Vollaudit + dem Port-Test des Release-Laufs): state-manager 298 · coerce 146 · main 98 · beszel-client 70 · message-router 16 · repo-standards 12 · i18n 7 · inventory 6 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version). Deckung **99,2 % Stmts · 98,6 % Branch · 97,1 % Funcs**; `src/lib` 100 % Funktionen, `state-manager.ts` 100 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server, `?? ""` auf einer garantiert gesetzten Map-Id) oder Test-Seam/Bootstrap in `main.ts`.
+## Tests (685 unit + 58 package + 1 integration + 1 inventory = 745)
+
+Zusammensetzung (gemessen 2026-09-06 nach den drei Detail-Collections): state-manager 314 · coerce 158 · main 102 · beszel-client 70 · message-router 16 · repo-standards 12 · i18n 7 · inventory 6 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version). Deckung **99,2 % Stmts · 98,6 % Branch · 97,1 % Funcs**; `src/lib` 100 % Funktionen, `state-manager.ts` 100 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server, `?? ""` auf einer garantiert gesetzten Map-Id) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 

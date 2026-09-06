@@ -3,6 +3,19 @@
     "name": "beszel",
     "version": "0.16.0",
     "news": {
+      "NEXT": {
+        "en": "SMART data, ZFS pool details and systemd service details are available as opt-in metrics; the two slow sources are read every 15 minutes.",
+        "de": "SMART-Daten, ZFS-Pool-Details und systemd-Dienst-Details sind als zuschaltbare Metriken verfügbar; die zwei langsamen Quellen werden alle 15 Minuten gelesen.",
+        "ru": "Данные SMART, детали пулов ZFS и детали служб systemd доступны как включаемые метрики; два медленных источника читаются раз в 15 минут.",
+        "pt": "Dados SMART, detalhes de pools ZFS e detalhes de serviços systemd estão disponíveis como métricas opcionais; as duas fontes lentas são lidas a cada 15 minutos.",
+        "nl": "SMART-gegevens, ZFS-pooldetails en systemd-dienstdetails zijn beschikbaar als inschakelbare metrieken; de twee trage bronnen worden elke 15 minuten gelezen.",
+        "fr": "Les données SMART, les détails des pools ZFS et ceux des services systemd sont disponibles en métriques optionnelles ; les deux sources lentes sont lues toutes les 15 minutes.",
+        "it": "Dati SMART, dettagli dei pool ZFS e dettagli dei servizi systemd sono disponibili come metriche opzionali; le due fonti lente vengono lette ogni 15 minuti.",
+        "es": "Los datos SMART, los detalles de los pools ZFS y los de los servicios de systemd están disponibles como métricas opcionales; las dos fuentes lentas se leen cada 15 minutos.",
+        "pl": "Dane SMART, szczegóły pul ZFS i szczegóły usług systemd są dostępne jako metryki opcjonalne; dwa wolne źródła są odczytywane co 15 minut.",
+        "uk": "Дані SMART, деталі пулів ZFS та деталі служб systemd доступні як вмикані метрики; два повільні джерела читаються раз на 15 хвилин.",
+        "zh-cn": "SMART 数据、ZFS 存储池详情和 systemd 服务详情现已作为可选指标提供；两个慢速数据源每 15 分钟读取一次。"
+      },
       "0.16.0": {
         "en": "Deleted metric groups stay deleted, a hiccup at startup no longer leaves the adapter without polling, and status words follow your ioBroker language.",
         "de": "Abgeschaltete Metrikgruppen bleiben verschwunden, ein Stolperer beim Start legt das Abfragen nicht mehr lahm, und die Statuswörter folgen deiner ioBroker-Sprache.",
@@ -416,6 +429,9 @@
     "metrics_networkPeak": false,
     "metrics_gpuDetails": false,
     "metrics_fans": false,
-    "metrics_zfs": false
+    "metrics_zfs": false,
+    "metrics_zfsDetails": false,
+    "metrics_smart": false,
+    "metrics_servicesDetails": false
   }
 }

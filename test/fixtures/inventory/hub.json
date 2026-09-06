@@ -178,5 +178,67 @@
       "memory": 0,
       "image": "restic/restic:0.17"
     }
+  ],
+  "zfs_pools": [
+    {
+      "id": "zfs00000000001",
+      "system": "sysfull01",
+      "name": "tank",
+      "health": "ONLINE",
+      "size": 4000000000000,
+      "alloc": 1500000000000,
+      "free": 2500000000000,
+      "scrub": {
+        "state": "FINISHED",
+        "progress": "repaired 0B in 01:02:03 with 0 errors",
+        "errors": 0
+      },
+      "vdevs": [
+        {
+          "name": "mirror-0",
+          "state": "ONLINE",
+          "readErrs": 0,
+          "writeErrs": 0,
+          "checksumErrs": 0
+        }
+      ],
+      "datasets": [
+        {
+          "name": "tank/media",
+          "used": 1073741824,
+          "avail": 2147483648,
+          "mount": "/tank/media"
+        }
+      ]
+    }
+  ],
+  "smart_devices": [
+    {
+      "id": "smart000000001",
+      "system": "sysfull01",
+      "name": "/dev/sda",
+      "model": "Samsung SSD 870 EVO",
+      "state": "PASSED",
+      "capacity": 1000204886016,
+      "temp": 34,
+      "firmware": "SVT01B6Q",
+      "serial": "S5Y2NJ0R000001",
+      "type": "sat",
+      "hours": 12345,
+      "cycles": 87
+    }
+  ],
+  "systemd_services": [
+    {
+      "id": "svc00000000001",
+      "system": "sysfull01",
+      "name": "ssh.service",
+      "state": 0,
+      "sub": 1,
+      "cpu": 0.4,
+      "cpuPeak": 2.1,
+      "memory": 10485760,
+      "memPeak": 20971520
+    }
   ]
 }

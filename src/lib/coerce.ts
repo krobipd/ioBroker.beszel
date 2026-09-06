@@ -1,6 +1,11 @@
 import type {
   AuthResponse,
   BeszelContainer,
+  SmartDevice,
+  SystemdService,
+  ZfsDataset,
+  ZfsPoolDetail,
+  ZfsVdev,
   BeszelSystem,
   BeszelSystemDetailsRecord,
   BeszelSystemStats,
@@ -810,4 +815,181 @@ export function coerceAuthResponse(value: unknown): AuthResponse | null {
   // Only the token is consumed (kept in memory for the Authorization header);
   // the user `record` from the auth response is intentionally not surfaced.
   return { token };
+}
+
+/**
+ * One `zfs_pools` row → {@link ZfsPoolDetail}. The three JSON columns arrive as parsed
+ * values from PocketBase; every one of them is optional in the Go struct (`omitempty`),
+ * so a pool without a scrub or without datasets simply yields empty lists — never a
+ * datapoint carrying an invented zero.
+ *
+ * @param value Raw record from the collection
+ */
+export function coerceZfsPoolDetail(value: unknown): ZfsPoolDetail | null {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const id = coerceString(obj.id);
+  const system = coerceString(obj.system);
+  const name = coerceString(obj.name);
+  if (id === null || system === null || name === null) {
+    return null;
+  }
+  const detail: ZfsPoolDetail = { id, system, name, vdevs: [], datasets: [] };
+
+  const scrub = coerceObject(obj.scrub);
+  if (scrub) {
+    const state = coerceString(scrub.state);
+    const progress = coerceString(scrub.progress);
+    const errors = coerceFiniteNumber(scrub.errors);
+    if (state !== null) {
+      detail.scrubState = state;
+    }
+    if (progress !== null) {
+      detail.scrubProgress = progress;
+    }
+    if (errors !== null) {
+      detail.scrubErrors = errors;
+    }
+  }
+
+  if (Array.isArray(obj.vdevs)) {
+    for (const raw of obj.vdevs) {
+      const v = coerceObject(raw);
+      const vname = v ? coerceString(v.name) : null;
+      if (!v || vname === null) {
+        continue;
+      }
+      const vdev: ZfsVdev = {
+        name: vname,
+        readErrors: coerceFiniteNumber(v.readErrs) ?? 0,
+        writeErrors: coerceFiniteNumber(v.writeErrs) ?? 0,
+        checksumErrors: coerceFiniteNumber(v.checksumErrs) ?? 0,
+      };
+      const vstate = coerceString(v.state);
+      if (vstate !== null) {
+        vdev.state = vstate;
+      }
+      detail.vdevs.push(vdev);
+    }
+  }
+
+  if (Array.isArray(obj.datasets)) {
+    for (const raw of obj.datasets) {
+      const d = coerceObject(raw);
+      const dname = d ? coerceString(d.name) : null;
+      if (!d || dname === null) {
+        continue;
+      }
+      const ds: ZfsDataset = { name: dname };
+      const used = coerceFiniteNumber(d.used);
+      const avail = coerceFiniteNumber(d.avail);
+      const mount = coerceString(d.mount);
+      if (used !== null) {
+        ds.used = used;
+      }
+      if (avail !== null) {
+        ds.avail = avail;
+      }
+      if (mount !== null) {
+        ds.mountpoint = mount;
+      }
+      detail.datasets.push(ds);
+    }
+  }
+  return detail;
+}
+
+/**
+ * One `smart_devices` row → {@link SmartDevice}. Every column except the identity is
+ * optional: smartctl reports different sets per transport (an NVMe drive has no
+ * `cycles`, a USB bridge often has no `temp`), so an absent column yields no datapoint
+ * rather than a zero that looks like a measurement.
+ *
+ * @param value Raw record from the collection
+ */
+export function coerceSmartDevice(value: unknown): SmartDevice | null {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const id = coerceString(obj.id);
+  const system = coerceString(obj.system);
+  const name = coerceString(obj.name);
+  if (id === null || system === null || name === null) {
+    return null;
+  }
+  const device: SmartDevice = { id, system, name };
+  // Assigned one by one rather than through a keyed loop: a loop needs a cast to
+  // write into the typed object, and a cast is exactly what turns a renamed field
+  // into a silent no-op instead of a compile error.
+  const state = coerceString(obj.state);
+  const model = coerceString(obj.model);
+  const serial = coerceString(obj.serial);
+  const firmware = coerceString(obj.firmware);
+  const kind = coerceString(obj.type);
+  const temperature = coerceFiniteNumber(obj.temp);
+  const capacity = coerceFiniteNumber(obj.capacity);
+  const hours = coerceFiniteNumber(obj.hours);
+  const cycles = coerceFiniteNumber(obj.cycles);
+  if (state !== null) {
+    device.state = state;
+  }
+  if (model !== null) {
+    device.model = model;
+  }
+  if (serial !== null) {
+    device.serial = serial;
+  }
+  if (firmware !== null) {
+    device.firmware = firmware;
+  }
+  if (kind !== null) {
+    device.type = kind;
+  }
+  if (temperature !== null) {
+    device.temperature = temperature;
+  }
+  if (capacity !== null) {
+    device.capacity = capacity;
+  }
+  if (hours !== null) {
+    device.hours = hours;
+  }
+  if (cycles !== null) {
+    device.cycles = cycles;
+  }
+  return device;
+}
+
+/**
+ * One `systemd_services` row → {@link SystemdService}. The hub writes every column of a
+ * batch in ONE insert, so `?? 0` here is the shape of the table, not a guess: a row
+ * without `cpu` cannot exist (`internal/hub/systems/system.go:337`).
+ *
+ * @param value Raw record from the collection
+ */
+export function coerceSystemdService(value: unknown): SystemdService | null {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const id = coerceString(obj.id);
+  const system = coerceString(obj.system);
+  const name = coerceString(obj.name);
+  if (id === null || system === null || name === null) {
+    return null;
+  }
+  return {
+    id,
+    system,
+    name,
+    state: coerceFiniteNumber(obj.state) ?? 0,
+    sub: coerceFiniteNumber(obj.sub) ?? 0,
+    cpu: coerceFiniteNumber(obj.cpu) ?? 0,
+    cpuPeak: coerceFiniteNumber(obj.cpuPeak) ?? 0,
+    memory: coerceFiniteNumber(obj.memory) ?? 0,
+    memPeak: coerceFiniteNumber(obj.memPeak) ?? 0,
+  };
 }

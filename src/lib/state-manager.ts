@@ -5,6 +5,8 @@ import {
   buildMetricDefs,
   commonFor,
   containerHealthLabel,
+  serviceStateLabel,
+  serviceSubLabel,
   percentCommon,
   numCommon,
   textCommon,
@@ -24,7 +26,17 @@ import {
   SYSTEM_STATUS_UNKNOWN,
 } from "./metric-registry";
 import type { LocalizedName, MetricDef } from "./metric-registry";
-import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "./types";
+import type {
+  AdapterConfig,
+  BeszelContainer,
+  BeszelSystem,
+  SmartDevice,
+  SystemStats,
+  SystemdService,
+  ZfsDataset,
+  ZfsPoolDetail,
+  ZfsVdev,
+} from "./types";
 
 /**
  * Objects whose name comes from the Hub, the agent or the OS — sensors, fans, batteries,
@@ -35,6 +47,21 @@ import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemStats } from "
  * languages for one text. Design 31.
  */
 const API_NAMED = { nameSource: "api" } as const;
+
+/**
+ * v0.17.0 — the records of the three detail collections that belong to ONE system,
+ * already filtered by the poll. A field left `undefined` means "not read this round",
+ * which is deliberately different from an empty array: an empty array prunes, `undefined`
+ * leaves the existing datapoints untouched (same rule as `containersAvailable`).
+ */
+export interface SystemExtras {
+  /** `zfs_pools` records of this system */
+  zfsPools?: ZfsPoolDetail[];
+  /** `smart_devices` records of this system */
+  smartDevices?: SmartDevice[];
+  /** `systemd_services` records of this system */
+  systemdServices?: SystemdService[];
+}
 
 /**
  * Flat state ids used before 0.3.0, when every metric lived directly under the
@@ -606,6 +633,7 @@ export class StateManager {
    * @param containersAvailable F1: whether the container fetch succeeded this poll. `false`
    *   (403 / timeout) means "unknown" — the container tree is left untouched (frozen), never
    *   pruned. Defaults to `true` so unit tests exercising other metrics need not pass it.
+   * @param extras Records of the three detail collections belonging to this system; a field left out means "not read this round" and freezes those datapoints.
    */
   public async updateSystem(
     system: BeszelSystem,
@@ -613,6 +641,7 @@ export class StateManager {
     containers: BeszelContainer[],
     rawConfig: AdapterConfig,
     containersAvailable = true,
+    extras: SystemExtras = {},
   ): Promise<void> {
     // Detail toggles inherit their category's base toggle (off category → off
     // detail). Applied once here so applyMetrics + updateDynamicStats + the
@@ -704,6 +733,20 @@ export class StateManager {
     // prunes, with the H2 two-poll debounce.
     if (config.metrics_containers && containersAvailable) {
       await this.updateContainers(sysId, containers);
+    }
+
+    // v0.17.0 — the three extra collections. Each one is skipped unless its records were
+    // actually fetched this round (`undefined` = not read, e.g. slow cadence or a failed
+    // request): the same rule as the containers above — no reading must never look like
+    // "nothing there" to a pruner.
+    if (config.metrics_zfs && config.metrics_zfsDetails && extras.zfsPools) {
+      await this.updateZfsDetails(sysId, extras.zfsPools);
+    }
+    if (config.metrics_smart && extras.smartDevices) {
+      await this.updateSmartDevices(sysId, extras.smartDevices);
+    }
+    if (config.metrics_services && config.metrics_servicesDetails && extras.systemdServices) {
+      await this.updateSystemdServices(sysId, extras.systemdServices);
     }
   }
 
@@ -853,6 +896,26 @@ export class StateManager {
     // power_package state + engines channel of every GPU behind forever —
     // the only detail toggle without a cleanup branch. The per-GPU ids are
     // dynamic, so enumerate the existing GPU channels from the snapshot.
+    // v0.17.0: the same shape one level deeper — ZFS DETAILS off while the ZFS group
+    // stays on. The per-pool ids are dynamic, so the pool channels are enumerated from
+    // the snapshot exactly like the GPUs below.
+    if (config.metrics_zfs && !config.metrics_zfsDetails) {
+      const zfsBase = `${sysId}.zfs`;
+      for (const id of StateManager.idsUnder(this.knownChannelIds, zfsBase)) {
+        const child = id.slice(`${zfsBase}.`.length);
+        // Direct pool channels only (`zfs.<pool>`), not their vdevs/datasets channels.
+        if (!child || child.includes(".")) {
+          continue;
+        }
+        const pool = `${zfsBase}.${child}`;
+        await this.deleteStateIfKnown(`${pool}.scrub_state`);
+        await this.deleteStateIfKnown(`${pool}.scrub_progress`);
+        await this.deleteStateIfKnown(`${pool}.scrub_errors`);
+        await this.deleteChannelIfExists(`${pool}.vdevs`);
+        await this.deleteChannelIfExists(`${pool}.datasets`);
+      }
+    }
+
     if (config.metrics_gpu && !config.metrics_gpuDetails) {
       const gpuBase = `${sysId}.gpu`;
       for (const id of StateManager.idsUnder(this.knownChannelIds, gpuBase)) {
@@ -1315,6 +1378,127 @@ export class StateManager {
         },
       );
     }
+  }
+
+  /**
+   * v0.17.0 — ZFS pool DETAILS from the `zfs_pools` collection: scrub state, the vdev
+   * error counters and the datasets. Deliberately does NOT prune the pool level: the
+   * per-poll summary in {@link updateDynamicStats} already owns `<sys>.zfs`, and two
+   * pruners on one base would fight over every pool the other one has not seen yet.
+   * Each subgroup below a pool prunes its own base.
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   * @param details Pool detail records of THIS system (already filtered).
+   */
+  private async updateZfsDetails(sysId: string, details: ZfsPoolDetail[]): Promise<void> {
+    const seen = new Set<string>();
+    for (const pool of details) {
+      const safeId = this.resolveChildId(pool.name, pool.name, seen);
+      if (!safeId) {
+        continue;
+      }
+      const base = `${sysId}.zfs.${safeId}`;
+      await this.ensureChannel(`${sysId}.zfs`, channelName("zfs"));
+      await this.ensureChannel(base, sanitizeDisplayName(pool.name), API_NAMED);
+
+      await this.createAndSetState(`${base}.scrub_state`, leafCommon("scrubState"), pool.scrubState ?? null);
+      await this.createAndSetState(`${base}.scrub_progress`, leafCommon("scrubProgress"), pool.scrubProgress ?? "");
+      await this.createAndSetState(`${base}.scrub_errors`, leafCommon("scrubErrors"), pool.scrubErrors ?? null);
+
+      await this.syncDynamicGroup(
+        `${base}.vdevs`,
+        pool.vdevs.map(v => [v.name, v] as [string, ZfsVdev]),
+        "channel",
+        async () => {
+          await this.ensureChannel(`${base}.vdevs`, channelName("vdevs"));
+        },
+        async (vdevId, rawName, vdev) => {
+          const vb = `${base}.vdevs.${vdevId}`;
+          await this.ensureChannel(vb, sanitizeDisplayName(rawName), API_NAMED);
+          await this.createAndSetState(`${vb}.state`, leafCommon("vdevState"), vdev.state ?? null);
+          await this.createAndSetState(`${vb}.read_errors`, leafCommon("vdevRead"), vdev.readErrors);
+          await this.createAndSetState(`${vb}.write_errors`, leafCommon("vdevWrite"), vdev.writeErrors);
+          await this.createAndSetState(`${vb}.checksum_errors`, leafCommon("vdevChecksum"), vdev.checksumErrors);
+        },
+      );
+
+      await this.syncDynamicGroup(
+        `${base}.datasets`,
+        pool.datasets.map(d => [d.name, d] as [string, ZfsDataset]),
+        "channel",
+        async () => {
+          await this.ensureChannel(`${base}.datasets`, channelName("datasets"));
+        },
+        async (dsId, rawName, ds) => {
+          const db = `${base}.datasets.${dsId}`;
+          await this.ensureChannel(db, sanitizeDisplayName(rawName), API_NAMED);
+          await this.createAndSetState(`${db}.used`, leafCommon("datasetUsed"), bytesToGib(ds.used));
+          await this.createAndSetState(`${db}.avail`, leafCommon("datasetAvail"), bytesToGib(ds.avail));
+          await this.createAndSetState(`${db}.mountpoint`, leafCommon("datasetMount"), ds.mountpoint ?? "");
+        },
+      );
+    }
+  }
+
+  /**
+   * v0.17.0 — SMART devices from the `smart_devices` collection. Every column except the
+   * device node is optional (smartctl reports different sets per transport), so a value
+   * the Hub does not carry yields `null` rather than a zero that reads like a measurement.
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   * @param devices SMART records of THIS system (already filtered).
+   */
+  private async updateSmartDevices(sysId: string, devices: SmartDevice[]): Promise<void> {
+    await this.syncDynamicGroup(
+      `${sysId}.smart`,
+      devices.map(d => [d.name, d] as [string, SmartDevice]),
+      "channel",
+      async () => {
+        await this.ensureChannel(`${sysId}.smart`, channelName("smart"));
+      },
+      async (safeId, rawName, dev) => {
+        const b = `${sysId}.smart.${safeId}`;
+        await this.ensureChannel(b, sanitizeDisplayName(rawName), API_NAMED);
+        await this.createAndSetState(`${b}.state`, leafCommon("smartState"), dev.state ?? null);
+        await this.createAndSetState(`${b}.model`, leafCommon("smartModel"), dev.model ?? "");
+        await this.createAndSetState(`${b}.serial`, leafCommon("smartSerial"), dev.serial ?? "");
+        await this.createAndSetState(`${b}.firmware`, leafCommon("smartFirmware"), dev.firmware ?? "");
+        await this.createAndSetState(`${b}.interface`, leafCommon("smartType"), dev.type ?? "");
+        await this.createAndSetState(`${b}.temperature`, leafCommon("smartTemp"), dev.temperature ?? null);
+        await this.createAndSetState(`${b}.capacity`, leafCommon("smartCapacity"), bytesToGib(dev.capacity));
+        await this.createAndSetState(`${b}.power_on_hours`, leafCommon("smartHours"), dev.hours ?? null);
+        await this.createAndSetState(`${b}.power_cycles`, leafCommon("smartCycles"), dev.cycles ?? null);
+      },
+    );
+  }
+
+  /**
+   * v0.17.0 — systemd units from the `systemd_services` collection. The two enums are
+   * written as their WORD, like the container health next to them: the number is the
+   * Hub's storage detail, the word is what a user reads and what `common.states` lists.
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   * @param services Unit records of THIS system (already filtered).
+   */
+  private async updateSystemdServices(sysId: string, services: SystemdService[]): Promise<void> {
+    await this.syncDynamicGroup(
+      `${sysId}.services`,
+      services.map(u => [u.name, u] as [string, SystemdService]),
+      "channel",
+      async () => {
+        await this.ensureChannel(`${sysId}.services`, channelName("services"));
+      },
+      async (safeId, rawName, unit) => {
+        const b = `${sysId}.services.${safeId}`;
+        await this.ensureChannel(b, sanitizeDisplayName(rawName), API_NAMED);
+        await this.createAndSetState(`${b}.state`, leafCommon("serviceState"), serviceStateLabel(unit.state));
+        await this.createAndSetState(`${b}.sub_state`, leafCommon("serviceSub"), serviceSubLabel(unit.sub));
+        await this.createAndSetState(`${b}.cpu`, leafCommon("serviceCpu"), unit.cpu);
+        await this.createAndSetState(`${b}.cpu_peak`, leafCommon("serviceCpuPeak"), unit.cpuPeak);
+        await this.createAndSetState(`${b}.memory`, leafCommon("serviceMem"), bytesToMib(unit.memory));
+        await this.createAndSetState(`${b}.memory_peak`, leafCommon("serviceMemPeak"), bytesToMib(unit.memPeak));
+      },
+    );
   }
 
   /**

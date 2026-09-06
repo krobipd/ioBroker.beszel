@@ -56,6 +56,12 @@ function startFakeHub() {
         reply(200, list(FIXTURE.system_details));
       } else if (url.includes("/api/collections/containers/records")) {
         reply(200, list(FIXTURE.containers));
+      } else if (url.includes("/api/collections/zfs_pools/records")) {
+        reply(200, list(FIXTURE.zfs_pools));
+      } else if (url.includes("/api/collections/smart_devices/records")) {
+        reply(200, list(FIXTURE.smart_devices));
+      } else if (url.includes("/api/collections/systemd_services/records")) {
+        reply(200, list(FIXTURE.systemd_services));
       } else {
         reply(404, JSON.stringify({ message: "not found" }));
       }

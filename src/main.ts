@@ -15,7 +15,15 @@ import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
 import { tDesc, tName } from "./lib/i18n";
 import { SYSTEM_STATUS_UNKNOWN } from "./lib/metric-registry";
 import { StateManager } from "./lib/state-manager";
+import type { SystemExtras } from "./lib/state-manager";
 import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails } from "./lib/types";
+
+/**
+ * How often the two SLOW detail collections (`zfs_pools`, `smart_devices`) are read.
+ * The Hub refreshes ZFS details roughly hourly (`system_zfs.go:zfsFetchInterval`) and
+ * SMART data even more rarely, so a per-poll read would be load without new data.
+ */
+const DETAIL_REFRESH_MS = 15 * 60 * 1000;
 
 /**
  * Beszel adapter — polls a Beszel Hub (PocketBase) and mirrors systems,
@@ -66,6 +74,14 @@ export class BeszelAdapter extends utils.Adapter {
   private unloaded = false;
   private lastSystemCount = 0;
   private lastErrorCode = "";
+  /**
+   * v0.17.0: the two SLOW detail collections (`zfs_pools`, `smart_devices`). The Hub
+   * refreshes ZFS details roughly hourly (`system_zfs.go:zfsFetchInterval`) and SMART data
+   * even more rarely, so reading them on every 60s poll would be pure load on the Hub for
+   * data that cannot have changed. `systemd_services` is NOT in here — the Hub rewrites
+   * that table on every agent sample, so it is read with the containers.
+   */
+  private lastDetailFetch = 0;
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   private containersUnavailable = false;
   private authFailCount = 0;
@@ -623,6 +639,13 @@ export class BeszelAdapter extends utils.Adapter {
         }
       }
 
+      // v0.17.0: the three extra collections. `systemd_services` follows the containers
+      // (the Hub rewrites it on every agent sample); the two detail collections run on a
+      // slow cadence — reading them every 60s would ask the Hub for data it refreshes
+      // roughly hourly. Each failure is non-fatal: the group is simply not passed on,
+      // which freezes its datapoints instead of pruning them.
+      const extrasBySystem = await this.fetchExtras(config);
+
       // v0.4.3 (SM5): pre-resolve safeNames deterministically so collisions
       // between two systems with the same sanitized name get suffixed
       // disambiguation BEFORE the parallel update fan-out.
@@ -646,6 +669,7 @@ export class BeszelAdapter extends utils.Adapter {
               containersBySystem.get(system.id) ?? [],
               config,
               containersAvailable,
+              extrasBySystem.get(system.id) ?? {},
             );
             this.failedSystems.delete(system.id);
           } catch (err) {
@@ -701,6 +725,91 @@ export class BeszelAdapter extends utils.Adapter {
     } finally {
       this.isPolling = false;
     }
+  }
+
+  /**
+   * v0.17.0 — the three extra collections, grouped by system id.
+   *
+   * `systemd_services` is read on EVERY poll: the Hub rewrites that table on every agent
+   * sample, so it is live data like the containers. `zfs_pools` and `smart_devices` are
+   * read at most every {@link DETAIL_REFRESH_MS} — the Hub refreshes ZFS details roughly
+   * hourly and SMART data even more rarely, so a 60s read would be load without new data.
+   *
+   * Each fetch is guarded on its own: a collection an older Hub does not have (404) or a
+   * request that fails must not cost the other two, and must not look like "no records"
+   * to the pruner — the group is then simply absent from the result.
+   *
+   * @param config Adapter configuration.
+   * @returns Extras by system id (empty map when every toggle is off).
+   */
+  private async fetchExtras(config: AdapterConfig): Promise<Map<string, SystemExtras>> {
+    const out = new Map<string, SystemExtras>();
+    const put = <K extends keyof SystemExtras>(
+      systemId: string,
+      key: K,
+      value: NonNullable<SystemExtras[K]>[0],
+    ): void => {
+      const entry = out.get(systemId) ?? {};
+      const list = (entry[key] ?? []) as NonNullable<SystemExtras[K]>;
+      (list as unknown[]).push(value);
+      entry[key] = list;
+      out.set(systemId, entry);
+    };
+    const seed = <K extends keyof SystemExtras>(key: K): void => {
+      for (const entry of out.values()) {
+        entry[key] = entry[key] ?? [];
+      }
+    };
+
+    const wantServices = config.metrics_services && config.metrics_servicesDetails;
+    const wantZfs = config.metrics_zfs && config.metrics_zfsDetails;
+    const wantSmart = config.metrics_smart;
+    if (!wantServices && !wantZfs && !wantSmart) {
+      return out;
+    }
+
+    if (wantServices) {
+      try {
+        for (const unit of await this.client!.getSystemdServices()) {
+          put(unit.system, "systemdServices", unit);
+        }
+        seed("systemdServices");
+      } catch (err) {
+        this.log.debug(`systemd_services fetch failed (non-fatal): ${errText(err)}`);
+      }
+    }
+
+    const dueForDetails = Date.now() - this.lastDetailFetch >= DETAIL_REFRESH_MS;
+    if (!dueForDetails) {
+      return out;
+    }
+    let any = false;
+    if (wantZfs) {
+      try {
+        for (const pool of await this.client!.getZfsPoolDetails()) {
+          put(pool.system, "zfsPools", pool);
+        }
+        seed("zfsPools");
+        any = true;
+      } catch (err) {
+        this.log.debug(`zfs_pools fetch failed (non-fatal): ${errText(err)}`);
+      }
+    }
+    if (wantSmart) {
+      try {
+        for (const dev of await this.client!.getSmartDevices()) {
+          put(dev.system, "smartDevices", dev);
+        }
+        seed("smartDevices");
+        any = true;
+      } catch (err) {
+        this.log.debug(`smart_devices fetch failed (non-fatal): ${errText(err)}`);
+      }
+    }
+    if (any) {
+      this.lastDetailFetch = Date.now();
+    }
+    return out;
   }
 
   /**

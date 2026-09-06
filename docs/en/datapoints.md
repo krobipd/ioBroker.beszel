@@ -139,3 +139,33 @@ provides it.
 idle or discharging. Per-battery levels need Beszel 0.18.8 or newer; a machine with a single
 battery gets that one entry, with no threshold that would delete the children when a second
 battery is removed.
+
+## SMART devices
+
+| Switch        | Datapoints                                                                                                                              | Notes                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| SMART devices | `smart.<device>.state`, `.model`, `.serial`, `.firmware`, `.interface`, `.temperature`, `.capacity`, `.power_on_hours`, `.power_cycles` | needs smartctl on the host; read every 15 min |
+
+`state` is the drive's own overall verdict (`PASSED` / `FAILED`) — a failing drive says so
+here before it dies. A column smartctl did not fill stays empty rather than reporting a
+zero that looks like a measurement.
+
+## ZFS pool details
+
+| Switch      | Datapoints                                                                           | Notes                                   |
+| ----------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
+| ZFS details | `zfs.<pool>.scrub_state`, `.scrub_progress`, `.scrub_errors`                         | needs the ZFS switch                    |
+| ZFS details | `zfs.<pool>.vdevs.<vdev>.state`, `.read_errors`, `.write_errors`, `.checksum_errors` | counted since the pool was last cleared |
+| ZFS details | `zfs.<pool>.datasets.<dataset>.used`, `.avail`, `.mountpoint`                        | GB                                      |
+
+The Hub refreshes these details about once an hour, so the adapter reads them every 15
+minutes at most — the per-minute pool usage and health stay in the ZFS group above.
+
+## systemd service details
+
+| Switch          | Datapoints                                                                            | Notes                             |
+| --------------- | ------------------------------------------------------------------------------------- | --------------------------------- |
+| Service details | `services.<unit>.state`, `.sub_state`, `.cpu`, `.cpu_peak`, `.memory`, `.memory_peak` | needs the Systemd Services switch |
+
+One channel per unit — on a busy host that is a lot of datapoints. `state` and `sub_state`
+carry the systemd word (`active`, `running`, …), not the Hub's number.

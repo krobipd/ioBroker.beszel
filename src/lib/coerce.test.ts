@@ -21,6 +21,9 @@ import {
   sanitizeDisplayName,
   shouldFetchSystemDetails,
   validateHubUrl,
+  coerceSmartDevice,
+  coerceSystemdService,
+  coerceZfsPoolDetail,
 } from "./coerce";
 
 describe("coerce", () => {
@@ -1089,6 +1092,164 @@ describe("coerce", () => {
       expect(isPlaintextRemoteUrl(null)).to.be.false;
       expect(isPlaintextRemoteUrl(undefined)).to.be.false;
       expect(isPlaintextRemoteUrl("not a url")).to.be.false;
+    });
+  });
+});
+
+describe("detail collections (v0.17.0)", () => {
+  describe("coerceZfsPoolDetail", () => {
+    it("reads scrub, vdevs and datasets", () => {
+      const d = coerceZfsPoolDetail({
+        id: "z1",
+        system: "s1",
+        name: "tank",
+        scrub: { state: "SCANNING", progress: "12.3% done", errors: 2 },
+        vdevs: [{ name: "mirror-0", state: "DEGRADED", readErrs: 1, writeErrs: 2, checksumErrs: 3 }],
+        datasets: [{ name: "tank/media", used: 10, avail: 20, mount: "/tank/media" }],
+      });
+      expect(d?.scrubState).to.equal("SCANNING");
+      expect(d?.scrubProgress).to.equal("12.3% done");
+      expect(d?.scrubErrors).to.equal(2);
+      expect(d?.vdevs).to.deep.equal([
+        { name: "mirror-0", state: "DEGRADED", readErrors: 1, writeErrors: 2, checksumErrors: 3 },
+      ]);
+      expect(d?.datasets).to.deep.equal([{ name: "tank/media", used: 10, avail: 20, mountpoint: "/tank/media" }]);
+    });
+
+    it("a pool without scrub, vdevs or datasets yields empty lists, not zeros", () => {
+      // Every one of the three columns is `omitempty` in the Go struct — a pool that
+      // never ran a scrub must not report "0 errors" as if it had.
+      const d = coerceZfsPoolDetail({ id: "z1", system: "s1", name: "tank" });
+      expect(d?.scrubState, "no invented scrub state").to.equal(undefined);
+      expect(d?.scrubErrors, "no invented error count").to.equal(undefined);
+      expect(d?.vdevs).to.deep.equal([]);
+      expect(d?.datasets).to.deep.equal([]);
+    });
+
+    it("a scrub that reports no error count says nothing, not zero", () => {
+      // `errors` is `omitempty` in the Go struct: a running scrub that has not counted
+      // yet must not read as "0 errors found" — that is a result, and there is none.
+      const d = coerceZfsPoolDetail({
+        id: "z",
+        system: "s",
+        name: "t",
+        scrub: { state: "SCANNING", progress: "1% done" },
+      });
+      expect(d?.scrubState).to.equal("SCANNING");
+      expect(d?.scrubErrors, "no invented error count").to.equal(undefined);
+    });
+
+    it("a vdev without counters counts as zero — the columns are omitempty, not absent", () => {
+      const d = coerceZfsPoolDetail({ id: "z", system: "s", name: "t", vdevs: [{ name: "sda" }] });
+      expect(d?.vdevs[0]).to.deep.equal({ name: "sda", readErrors: 0, writeErrors: 0, checksumErrors: 0 });
+    });
+
+    it("drops nameless entries instead of creating a datapoint called undefined", () => {
+      const d = coerceZfsPoolDetail({
+        id: "z",
+        system: "s",
+        name: "t",
+        vdevs: [{ state: "ONLINE" }, { name: "ok" }],
+        datasets: ["nonsense", { name: "keep" }],
+      });
+      expect(d?.vdevs.map(v => v.name)).to.deep.equal(["ok"]);
+      expect(d?.datasets.map(x => x.name)).to.deep.equal(["keep"]);
+    });
+
+    it("rejects a row without identity", () => {
+      expect(coerceZfsPoolDetail({ system: "s", name: "t" })).to.equal(null);
+      expect(coerceZfsPoolDetail("nonsense")).to.equal(null);
+    });
+  });
+
+  describe("coerceSmartDevice", () => {
+    it("reads every column smartctl filled in", () => {
+      const d = coerceSmartDevice({
+        id: "d1",
+        system: "s1",
+        name: "/dev/sda",
+        state: "PASSED",
+        model: "Samsung SSD 870",
+        serial: "S1",
+        firmware: "F1",
+        type: "sat",
+        temp: 34,
+        capacity: 1000,
+        hours: 5,
+        cycles: 7,
+      });
+      expect(d).to.deep.equal({
+        id: "d1",
+        system: "s1",
+        name: "/dev/sda",
+        state: "PASSED",
+        model: "Samsung SSD 870",
+        serial: "S1",
+        firmware: "F1",
+        type: "sat",
+        temperature: 34,
+        capacity: 1000,
+        hours: 5,
+        cycles: 7,
+      });
+    });
+
+    it("an EMPTY column is no column — a USB bridge without a serial gets no datapoint", () => {
+      const d = coerceSmartDevice({ id: "d", system: "s", name: "x", serial: "", model: "M" });
+      expect(d?.serial, "empty string must not become a datapoint").to.equal(undefined);
+      expect(d?.model).to.equal("M");
+    });
+
+    it("an NVMe drive without cycles reports no cycles rather than zero", () => {
+      const d = coerceSmartDevice({ id: "d", system: "s", name: "nvme0", temp: 40 });
+      expect(d?.cycles).to.equal(undefined);
+      expect(d?.temperature).to.equal(40);
+    });
+  });
+
+  describe("coerceSystemdService", () => {
+    it("reads the whole row", () => {
+      const u = coerceSystemdService({
+        id: "u1",
+        system: "s1",
+        name: "ssh.service",
+        state: 0,
+        sub: 1,
+        cpu: 0.5,
+        cpuPeak: 2,
+        memory: 100,
+        memPeak: 200,
+      });
+      expect(u).to.deep.equal({
+        id: "u1",
+        system: "s1",
+        name: "ssh.service",
+        state: 0,
+        sub: 1,
+        cpu: 0.5,
+        cpuPeak: 2,
+        memory: 100,
+        memPeak: 200,
+      });
+    });
+
+    it("falls back to zero — the Hub writes every column of a batch in one insert", () => {
+      const u = coerceSystemdService({ id: "u", system: "s", name: "x" });
+      expect(u).to.deep.equal({
+        id: "u",
+        system: "s",
+        name: "x",
+        state: 0,
+        sub: 0,
+        cpu: 0,
+        cpuPeak: 0,
+        memory: 0,
+        memPeak: 0,
+      });
+    });
+
+    it("rejects a row without identity", () => {
+      expect(coerceSystemdService({ system: "s" })).to.equal(null);
     });
   });
 });

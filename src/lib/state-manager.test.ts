@@ -21,12 +21,21 @@ import {
   CONTAINER_HEALTH_UNKNOWN,
   DYNAMIC_CHANNEL_TOGGLES,
   DYNAMIC_LEAF_PATTERNS,
+  scrubStates,
+  smartStates,
+  serviceStates,
+  serviceSubStates,
+  serviceStateLabel,
+  serviceSubLabel,
+  SERVICE_STATE_LABELS,
+  SERVICE_SUB_LABELS,
   DYNAMIC_SUBCHANNEL_TOGGLES,
   LEAF_COMMONS,
   leafCommon,
   METRIC_DEPENDENCIES,
 } from "./metric-registry";
 import { StateManager } from "./state-manager";
+import type { SystemExtras } from "./state-manager";
 import type { AdapterConfig, BeszelSystem, BeszelContainer, SystemStats } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -1960,6 +1969,10 @@ describe("StateManager", () => {
         metrics_networkInterfaces: true,
         metrics_cpuCores: true,
         metrics_zfs: true,
+        metrics_zfsDetails: true,
+        metrics_smart: true,
+        metrics_services: true,
+        metrics_servicesDetails: true,
       });
       await manager.snapshotExistingStates();
       await manager.updateSystem(
@@ -1967,11 +1980,13 @@ describe("StateManager", () => {
         { ...richStats(), z: { tank: { d: 100, du: 50, rb: 1048576, wb: 0, h: "ONLINE" } } },
         testContainers,
         cfg,
+        true,
+        richExtras(),
       );
 
       const prefix = "systems.my_server.";
       const groups =
-        /^(temperature\.sensors|fans|battery\.batteries|cpu\.cores|network\.interfaces|gpu|filesystems|zfs|containers)\./;
+        /^(temperature\.sensors|fans|battery\.batteries|cpu\.cores|network\.interfaces|gpu|filesystems|zfs|containers|smart|services)\./;
       const missed: string[] = [];
       for (const [id, obj] of adapter.objects) {
         if (obj.type !== "state" || !id.startsWith(prefix)) {
@@ -3083,6 +3098,59 @@ describe("StateManager", () => {
   // v0.16.0 — a deleted channel stays deleted
   // -----------------------------------------------------------------------
 
+  /**
+   * v0.17.0 — one record of each detail collection, filled so that EVERY new leaf
+   * appears in the tree. The invariant test above walks exactly this tree, so a leaf
+   * added without a pattern is caught here rather than at a user's installation.
+   *
+   * @returns Extras for `updateSystem`.
+   */
+  function richExtras(): SystemExtras {
+    return {
+      zfsPools: [
+        {
+          id: "z1",
+          system: "sys-1",
+          name: "tank",
+          scrubState: "FINISHED",
+          scrubProgress: "repaired 0B in 00:12:34",
+          scrubErrors: 0,
+          vdevs: [{ name: "mirror-0", state: "ONLINE", readErrors: 0, writeErrors: 0, checksumErrors: 1 }],
+          datasets: [{ name: "tank/media", used: 1073741824, avail: 2147483648, mountpoint: "/tank/media" }],
+        },
+      ],
+      smartDevices: [
+        {
+          id: "s1",
+          system: "sys-1",
+          name: "/dev/sda",
+          state: "PASSED",
+          model: "Samsung SSD 870",
+          serial: "S123",
+          firmware: "SVT01B6Q",
+          type: "sat",
+          temperature: 34,
+          capacity: 1000204886016,
+          hours: 12345,
+          cycles: 87,
+        },
+      ],
+      systemdServices: [
+        {
+          id: "u1",
+          system: "sys-1",
+          name: "ssh.service",
+          state: 0,
+          sub: 1,
+          cpu: 0.4,
+          cpuPeak: 2.1,
+          memory: 10485760,
+          memPeak: 20971520,
+        },
+      ],
+    };
+  }
+
   describe("channel bookkeeping (v0.16.0)", () => {
     it("a channel cleanupMetrics deleted does NOT come back on a system without stats", async () => {
       // The bug: `knownChannelIds` was filled by the startup snapshot and never pruned,
@@ -3806,6 +3874,242 @@ describe("StateManager", () => {
       await afterRestart.migrateLegacyStates([]);
       expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 0 });
     });
+  });
+});
+
+describe("detail collections (v0.17.0)", () => {
+  let adapter: ReturnType<typeof createMockAdapter>;
+  let manager: StateManager;
+
+  beforeEach(async () => {
+    adapter = createMockAdapter();
+    manager = new StateManager(adapter as never);
+    await manager.snapshotExistingStates();
+  });
+
+  const cfg = (over: Partial<AdapterConfig> = {}): AdapterConfig =>
+    metricsConfig(false, {
+      metrics_zfs: true,
+      metrics_zfsDetails: true,
+      metrics_smart: true,
+      metrics_services: true,
+      metrics_servicesDetails: true,
+      ...over,
+    });
+
+  const extras = (): SystemExtras => ({
+    zfsPools: [
+      {
+        id: "z1",
+        system: "sys-1",
+        name: "tank",
+        scrubState: "FINISHED",
+        scrubProgress: "repaired 0B",
+        scrubErrors: 0,
+        vdevs: [{ name: "mirror-0", state: "ONLINE", readErrors: 0, writeErrors: 0, checksumErrors: 2 }],
+        datasets: [{ name: "tank/media", used: 1073741824, avail: 2147483648, mountpoint: "/tank/media" }],
+      },
+    ],
+    smartDevices: [
+      { id: "s1", system: "sys-1", name: "/dev/sda", state: "PASSED", temperature: 34, hours: 100, cycles: 7 },
+    ],
+    systemdServices: [
+      {
+        id: "u1",
+        system: "sys-1",
+        name: "ssh.service",
+        state: 0,
+        sub: 1,
+        cpu: 1,
+        cpuPeak: 2,
+        memory: 1048576,
+        memPeak: 2097152,
+      },
+    ],
+  });
+
+  it("creates the three trees from the extra collections", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    const ids = [...adapter.objects.keys()];
+    expect(ids).to.include("systems.my_server.zfs.tank.scrub_state");
+    expect(ids).to.include("systems.my_server.zfs.tank.vdevs.mirror_0.checksum_errors");
+    expect(ids).to.include("systems.my_server.zfs.tank.datasets.tank_media.used");
+    expect(ids).to.include("systems.my_server.smart.dev_sda.power_on_hours");
+    expect(ids).to.include("systems.my_server.services.ssh_service.sub_state");
+  });
+
+  it("writes the enum WORD, not the Hub's number", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    expect(adapter.states.get("systems.my_server.services.ssh_service.state")?.val).to.equal("active");
+    expect(adapter.states.get("systems.my_server.services.ssh_service.sub_state")?.val).to.equal("running");
+  });
+
+  it("converts the byte columns the way the rest of the tree does", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    // 1 GiB used / 2 GiB available, memory in MB like the containers.
+    expect(adapter.states.get("systems.my_server.zfs.tank.datasets.tank_media.used")?.val).to.equal(1);
+    expect(adapter.states.get("systems.my_server.zfs.tank.datasets.tank_media.avail")?.val).to.equal(2);
+    expect(adapter.states.get("systems.my_server.services.ssh_service.memory")?.val).to.equal(1);
+  });
+
+  it("a group that was not read this round is left alone, not pruned", async () => {
+    // `undefined` means "not fetched" (slow cadence, failed request) — the same rule the
+    // containers follow. An empty array would prune; absence must not.
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, {});
+    expect([...adapter.objects.keys()]).to.include("systems.my_server.smart.dev_sda.state");
+  });
+
+  it("an EMPTY result prunes — that is a real 'nothing there'", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, { smartDevices: [] });
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, { smartDevices: [] });
+    expect([...adapter.objects.keys()].filter(id => id.startsWith("systems.my_server.smart"))).to.deep.equal([]);
+  });
+
+  it("each toggle gates its own group", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg({ metrics_smart: false }), true, extras());
+    const ids = [...adapter.objects.keys()];
+    expect(
+      ids.some(id => id.startsWith("systems.my_server.smart")),
+      "smart off",
+    ).to.equal(false);
+    expect(ids).to.include("systems.my_server.services.ssh_service.state");
+  });
+
+  it("the ZFS details follow their base toggle", async () => {
+    // The base off must take the detail with it — `effectiveConfig` enforces the same
+    // grey-out the admin shows, so a detail can never create states on its own.
+    await manager.updateSystem(testSystem, richStats(), [], cfg({ metrics_zfs: false }), true, extras());
+    expect([...adapter.objects.keys()].some(id => id.includes(".zfs.tank.scrub_state"))).to.equal(false);
+  });
+
+  it("the services details follow their base toggle", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg({ metrics_services: false }), true, extras());
+    expect([...adapter.objects.keys()].some(id => id.startsWith("systems.my_server.services."))).to.equal(false);
+  });
+
+  it("switching the ZFS DETAILS off at startup clears them but keeps the pool", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    await manager.cleanupMetrics("my_server", cfg({ metrics_zfsDetails: false }));
+    const ids = [...adapter.objects.keys()];
+    expect(
+      ids.some(id => id.includes("zfs.tank.scrub_state")),
+      "scrub gone",
+    ).to.equal(false);
+    expect(
+      ids.some(id => id.includes("zfs.tank.vdevs")),
+      "vdevs gone",
+    ).to.equal(false);
+    expect(
+      ids.some(id => id.includes("zfs.tank.datasets")),
+      "datasets gone",
+    ).to.equal(false);
+    expect(ids, "the pool channel itself stays").to.include("systems.my_server.zfs.tank");
+  });
+
+  it("switching the service details off at startup removes the whole channel", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    await manager.cleanupMetrics("my_server", cfg({ metrics_servicesDetails: false }));
+    expect([...adapter.objects.keys()].some(id => id.startsWith("systems.my_server.services"))).to.equal(false);
+  });
+
+  it("switching SMART off at startup removes the whole channel", async () => {
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    await manager.cleanupMetrics("my_server", cfg({ metrics_smart: false }));
+    expect([...adapter.objects.keys()].some(id => id.startsWith("systems.my_server.smart"))).to.equal(false);
+  });
+
+  it("a pool the DETAIL records do not mention survives — the minute poll owns that level", async () => {
+    // Two pruners on `<sys>.zfs` would fight: the detail collection refreshes hourly, so
+    // a pool the summary already knows would vanish and come back every 15 minutes.
+    await manager.updateSystem(
+      testSystem,
+      {
+        ...richStats(),
+        z: { tank: { d: 100, du: 50, rb: 0, wb: 0, h: "ONLINE" }, spare: { d: 10, du: 1, rb: 0, wb: 0, h: "ONLINE" } },
+      },
+      [],
+      cfg(),
+      true,
+      extras(),
+    );
+    const ids = [...adapter.objects.keys()];
+    expect(ids, "the pool without a detail record stays").to.include("systems.my_server.zfs.spare.disk_percent");
+    expect(ids, "and the one with details got them").to.include("systems.my_server.zfs.tank.scrub_state");
+  });
+
+  it("the new value lists carry the TRANSLATED label, not a hardcoded English word", () => {
+    // The i18n mock echoes the key, so a label that still reads "Passed" is a hardcoded
+    // string — exactly the half of the fleet standard that plain-string alone misses.
+    expect(smartStates().PASSED).to.equal("smartPassed");
+    expect(smartStates().FAILED).to.equal("smartFailed");
+    expect(scrubStates().SCANNING).to.equal("scrubScanning");
+    expect(serviceStates().active).to.equal("svcActive");
+    expect(serviceSubStates().running).to.equal("subRunning");
+  });
+
+  it("the two paths hand out the SAME leaf definition for a detail datapoint", async () => {
+    // Sentinel proof, like the one for the interface leaves: replace one table entry and
+    // demand that creation AND refresh deliver the replacement. A dropped call line leaves
+    // gate, linter and type check green (fakeroku lesson).
+    const original = LEAF_COMMONS.smartHours;
+    const sentinel = (): ioBroker.StateCommon => ({
+      name: { en: "sentinel" },
+      type: "number",
+      role: "value",
+      read: true,
+      write: false,
+      unit: "sentinel-h",
+    });
+    (LEAF_COMMONS as Record<string, unknown>).smartHours = sentinel;
+    try {
+      await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+      expect(
+        adapter.objects.get("systems.my_server.smart.dev_sda.power_on_hours")?.common.unit,
+        "creation path must read the table",
+      ).to.equal("sentinel-h");
+
+      const fresh = new StateManager(adapter as never);
+      await fresh.snapshotExistingStates();
+      await fresh.updateSystem(testSystem, undefined, [], cfg(), true, {});
+      expect(
+        adapter.objects.get("systems.my_server.smart.dev_sda.power_on_hours")?.common.unit,
+        "refresh path must read the table too",
+      ).to.equal("sentinel-h");
+    } finally {
+      (LEAF_COMMONS as Record<string, unknown>).smartHours = original;
+    }
+  });
+
+  it("the two enum label tables floor and fall back like the container health does", () => {
+    expect(serviceStateLabel(0)).to.equal("active");
+    expect(serviceStateLabel(2)).to.equal("failed");
+    expect(serviceStateLabel(2.7), "a fractional index must not fall through").to.equal("failed");
+    expect(serviceStateLabel(99)).to.equal("unknown");
+    expect(serviceSubLabel(1)).to.equal("running");
+    expect(serviceSubLabel(-1)).to.equal("unknown");
+  });
+
+  it("every new value list is plain strings — a translation object takes the admin down", () => {
+    for (const [label, states] of [
+      ["scrub", scrubStates()],
+      ["smart", smartStates()],
+      ["service state", serviceStates()],
+      ["service sub-state", serviceSubStates()],
+    ] as [string, Record<string, string>][]) {
+      for (const [key, value] of Object.entries(states)) {
+        expect(typeof value, `${label}.${key} must be a plain string (React #31)`).to.equal("string");
+      }
+    }
+    expect(Object.keys(scrubStates()), "keys are the words the Hub stores").to.deep.equal([
+      "NONE",
+      "SCANNING",
+      "FINISHED",
+      "CANCELED",
+    ]);
+    expect(Object.keys(serviceStates())).to.deep.equal([...SERVICE_STATE_LABELS, "unknown"]);
+    expect(Object.keys(serviceSubStates())).to.deep.equal([...SERVICE_SUB_LABELS]);
   });
 });
 

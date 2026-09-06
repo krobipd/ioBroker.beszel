@@ -3995,6 +3995,523 @@
     "native": {},
     "_id": "beszel.0.systems.homelab_server.network.sent_peak"
   },
+  "beszel.0.systems.homelab_server.services": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Dienste",
+        "en": "Services",
+        "es": "Servicios",
+        "fr": "Services",
+        "it": "Servizi",
+        "nl": "Diensten",
+        "pl": "Usługi",
+        "pt": "Serviços",
+        "ru": "Службы",
+        "uk": "Служби",
+        "zh-cn": "服务"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service": {
+    "type": "channel",
+    "common": {
+      "name": "ssh.service"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service.cpu": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU",
+        "en": "CPU",
+        "es": "CPU",
+        "fr": "Processeur",
+        "it": "CPU",
+        "nl": "CPU",
+        "pl": "CPU",
+        "pt": "CPU",
+        "ru": "ЦП",
+        "uk": "ЦП",
+        "zh-cn": "CPU"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service.cpu"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service.cpu_peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CPU-Spitze",
+        "en": "CPU peak",
+        "es": "Pico de CPU",
+        "fr": "Pic processeur",
+        "it": "Picco CPU",
+        "nl": "CPU-piek",
+        "pl": "Szczyt CPU",
+        "pt": "Pico de CPU",
+        "ru": "Пик ЦП",
+        "uk": "Пік ЦП",
+        "zh-cn": "CPU 峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Messintervall, nicht der aktuelle Wert.",
+        "en": "Highest value within the sample window, not the current one.",
+        "es": "Valor máximo en la ventana de muestreo, no el actual.",
+        "fr": "Valeur maximale dans la fenêtre de mesure, pas la valeur actuelle.",
+        "it": "Valore massimo nella finestra di campionamento, non quello attuale.",
+        "nl": "Hoogste waarde binnen het meetinterval, niet de huidige.",
+        "pl": "Wartość szczytowa w oknie pomiaru, nie bieżąca.",
+        "pt": "Valor máximo na janela de amostragem, não o atual.",
+        "ru": "Максимум за интервал измерения, а не текущее значение.",
+        "uk": "Найвище значення в інтервалі вимірювання, а не поточне.",
+        "zh-cn": "采样窗口内的最高值，而非当前值。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service.cpu_peak"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service.memory": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher",
+        "en": "Memory",
+        "es": "Memoria",
+        "fr": "Mémoire",
+        "it": "Memoria",
+        "nl": "Geheugen",
+        "pl": "Pamięć",
+        "pt": "Memória",
+        "ru": "Память",
+        "uk": "Пам'ять",
+        "zh-cn": "内存"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service.memory"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service.memory_peak": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Speicher-Spitze",
+        "en": "Memory peak",
+        "es": "Pico de memoria",
+        "fr": "Pic mémoire",
+        "it": "Picco memoria",
+        "nl": "Geheugenpiek",
+        "pl": "Szczyt pamięci",
+        "pt": "Pico de memória",
+        "ru": "Пик памяти",
+        "uk": "Пік пам'яті",
+        "zh-cn": "内存峰值"
+      },
+      "desc": {
+        "de": "Höchstwert im Messintervall, nicht der aktuelle Wert.",
+        "en": "Highest value within the sample window, not the current one.",
+        "es": "Valor máximo en la ventana de muestreo, no el actual.",
+        "fr": "Valeur maximale dans la fenêtre de mesure, pas la valeur actuelle.",
+        "it": "Valore massimo nella finestra di campionamento, non quello attuale.",
+        "nl": "Hoogste waarde binnen het meetinterval, niet de huidige.",
+        "pl": "Wartość szczytowa w oknie pomiaru, nie bieżąca.",
+        "pt": "Valor máximo na janela de amostragem, não o atual.",
+        "ru": "Максимум за интервал измерения, а не текущее значение.",
+        "uk": "Найвище значення в інтервалі вимірювання, а не поточне.",
+        "zh-cn": "采样窗口内的最高值，而非当前值。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "MB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service.memory_peak"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service.state": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Zustand",
+        "en": "State",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Stan",
+        "pt": "Estado",
+        "ru": "Состояние",
+        "uk": "Стан",
+        "zh-cn": "状态"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "failed": "Failed",
+        "activating": "Starting",
+        "deactivating": "Stopping",
+        "reloading": "Reloading",
+        "unknown": "Unknown"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service.state"
+  },
+  "beszel.0.systems.homelab_server.services.ssh_service.sub_state": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Unterzustand",
+        "en": "Sub-state",
+        "es": "Subestado",
+        "fr": "Sous-état",
+        "it": "Sotto-stato",
+        "nl": "Substatus",
+        "pl": "Podstan",
+        "pt": "Subestado",
+        "ru": "Подсостояние",
+        "uk": "Підстан",
+        "zh-cn": "子状态"
+      },
+      "desc": {
+        "de": "Der feinere Zustand, den systemd neben dem Hauptzustand meldet (läuft, beendet, tot).",
+        "en": "The finer state systemd reports next to the main one (running, exited, dead).",
+        "es": "El estado más fino que systemd informa junto al principal (en ejecución, salido, detenido).",
+        "fr": "L'état plus fin que systemd indique à côté du principal (en cours, terminé, arrêté).",
+        "it": "Lo stato più fine che systemd riporta accanto a quello principale (in esecuzione, uscito, fermo).",
+        "nl": "De fijnere status die systemd naast de hoofdstatus meldt (actief, afgesloten, gestopt).",
+        "pl": "Dokładniejszy stan, który systemd zgłasza obok głównego (działa, zakończony, zatrzymany).",
+        "pt": "O estado mais fino que o systemd reporta ao lado do principal (a correr, terminado, parado).",
+        "ru": "Более точное состояние, которое systemd сообщает рядом с основным (работает, завершён, остановлен).",
+        "uk": "Точніший стан, який systemd повідомляє поряд з основним (працює, завершено, зупинено).",
+        "zh-cn": "systemd 在主状态之外报告的更细状态（运行中、已退出、已停止）。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "dead": "Dead",
+        "running": "Running",
+        "exited": "Exited",
+        "failed": "Failed",
+        "unknown": "Unknown"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.services.ssh_service.sub_state"
+  },
+  "beszel.0.systems.homelab_server.smart": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "SMART",
+        "en": "SMART",
+        "es": "SMART",
+        "fr": "SMART",
+        "it": "SMART",
+        "nl": "SMART",
+        "pl": "SMART",
+        "pt": "SMART",
+        "ru": "SMART",
+        "uk": "SMART",
+        "zh-cn": "SMART"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda": {
+    "type": "channel",
+    "common": {
+      "name": "/dev/sda"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.capacity": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kapazität",
+        "en": "Capacity",
+        "es": "Capacidad",
+        "fr": "Capacité",
+        "it": "Capacità",
+        "nl": "Capaciteit",
+        "pl": "Pojemność",
+        "pt": "Capacidade",
+        "ru": "Ёмкость",
+        "uk": "Ємність",
+        "zh-cn": "容量"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.capacity"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.firmware": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Firmware",
+        "en": "Firmware",
+        "es": "Firmware",
+        "fr": "Micrologiciel",
+        "it": "Firmware",
+        "nl": "Firmware",
+        "pl": "Firmware",
+        "pt": "Firmware",
+        "ru": "Прошивка",
+        "uk": "Прошивка",
+        "zh-cn": "固件"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.firmware"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.interface": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schnittstelle",
+        "en": "Interface",
+        "es": "Interfaz",
+        "fr": "Interface",
+        "it": "Interfaccia",
+        "nl": "Interface",
+        "pl": "Interfejs",
+        "pt": "Interface",
+        "ru": "Интерфейс",
+        "uk": "Інтерфейс",
+        "zh-cn": "接口"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.interface"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modell",
+        "en": "Model",
+        "es": "Modelo",
+        "fr": "Modèle",
+        "it": "Modello",
+        "nl": "Model",
+        "pl": "Model",
+        "pt": "Modelo",
+        "ru": "Модель",
+        "uk": "Модель",
+        "zh-cn": "型号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.model"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.power_cycles": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Einschaltvorgänge",
+        "en": "Power cycles",
+        "es": "Ciclos de encendido",
+        "fr": "Cycles d'alimentation",
+        "it": "Cicli di accensione",
+        "nl": "Inschakelcycli",
+        "pl": "Cykle zasilania",
+        "pt": "Ciclos de energia",
+        "ru": "Циклы включения",
+        "uk": "Цикли живлення",
+        "zh-cn": "通电次数"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.power_cycles"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.power_on_hours": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebsstunden",
+        "en": "Power-on hours",
+        "es": "Horas de encendido",
+        "fr": "Heures de fonctionnement",
+        "it": "Ore di funzionamento",
+        "nl": "Bedrijfsuren",
+        "pl": "Godziny pracy",
+        "pt": "Horas ligado",
+        "ru": "Часы работы",
+        "uk": "Години роботи",
+        "zh-cn": "通电小时数"
+      },
+      "desc": {
+        "de": "Stunden, die das Laufwerk über seine gesamte Lebensdauer eingeschaltet war.",
+        "en": "Hours the drive has been powered on over its whole life.",
+        "es": "Horas que la unidad ha estado encendida durante toda su vida.",
+        "fr": "Heures pendant lesquelles le disque a été sous tension sur toute sa vie.",
+        "it": "Ore in cui il disco è stato acceso nell'intero ciclo di vita.",
+        "nl": "Uren dat de schijf gedurende zijn hele leven aan stond.",
+        "pl": "Godziny, przez które dysk był włączony przez cały okres życia.",
+        "pt": "Horas que o disco esteve ligado durante toda a sua vida.",
+        "ru": "Часы, в течение которых накопитель был включён за всю жизнь.",
+        "uk": "Години, протягом яких накопичувач був увімкнений за весь час.",
+        "zh-cn": "硬盘一生中的累计通电小时数。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "h",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.power_on_hours"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.serial": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Seriennummer",
+        "en": "Serial number",
+        "es": "Número de serie",
+        "fr": "Numéro de série",
+        "it": "Numero di serie",
+        "nl": "Serienummer",
+        "pl": "Numer seryjny",
+        "pt": "Número de série",
+        "ru": "Серийный номер",
+        "uk": "Серійний номер",
+        "zh-cn": "序列号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.serial"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.state": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "SMART-Status",
+        "en": "SMART status",
+        "es": "Estado SMART",
+        "fr": "État SMART",
+        "it": "Stato SMART",
+        "nl": "SMART-status",
+        "pl": "Stan SMART",
+        "pt": "Estado SMART",
+        "ru": "Состояние SMART",
+        "uk": "Стан SMART",
+        "zh-cn": "SMART 状态"
+      },
+      "desc": {
+        "de": "Das Gesamturteil des Laufwerks selbst — ein sterbendes Laufwerk sagt es hier zuerst.",
+        "en": "The drive's own overall verdict — a failing drive says so here before it dies.",
+        "es": "El veredicto global del propio disco — un disco que falla lo dice aquí primero.",
+        "fr": "Le verdict global du disque lui-même — un disque mourant le signale ici en premier.",
+        "it": "Il verdetto complessivo del disco stesso — un disco in avaria lo dice qui per primo.",
+        "nl": "Het eigen totaaloordeel van de schijf — een stervende schijf meldt het hier eerst.",
+        "pl": "Ogólny werdykt samego dysku — psujący się dysk mówi o tym najpierw tutaj.",
+        "pt": "O veredicto global do próprio disco — um disco a falhar diz-lo aqui primeiro.",
+        "ru": "Общий вердикт самого накопителя — отказывающий диск сообщает об этом здесь первым.",
+        "uk": "Загальний вердикт самого накопичувача — диск, що виходить з ладу, повідомляє це першим.",
+        "zh-cn": "硬盘自身的总体判定——即将损坏的硬盘会先在此报告。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "PASSED": "Passed",
+        "FAILED": "Failed"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.state"
+  },
+  "beszel.0.systems.homelab_server.smart.dev_sda.temperature": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Temperatur",
+        "en": "Temperature",
+        "es": "Temperatura",
+        "fr": "Température",
+        "it": "Temperatura",
+        "nl": "Temperatuur",
+        "pl": "Temperatura",
+        "pt": "Temperatura",
+        "ru": "Температура",
+        "uk": "Температура",
+        "zh-cn": "温度"
+      },
+      "type": "number",
+      "role": "value.temperature",
+      "unit": "°C",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.smart.dev_sda.temperature"
+  },
   "beszel.0.systems.homelab_server.temperature": {
     "type": "channel",
     "common": {
@@ -4384,6 +4901,110 @@
     },
     "_id": "beszel.0.systems.homelab_server.zfs.tank"
   },
+  "beszel.0.systems.homelab_server.zfs.tank.datasets": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Datasets",
+        "en": "Datasets",
+        "es": "Conjuntos de datos",
+        "fr": "Jeux de données",
+        "it": "Dataset",
+        "nl": "Datasets",
+        "pl": "Zbiory danych",
+        "pt": "Conjuntos de dados",
+        "ru": "Наборы данных",
+        "uk": "Набори даних",
+        "zh-cn": "数据集"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.datasets"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media": {
+    "type": "channel",
+    "common": {
+      "name": "tank/media"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media.avail": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Verfügbar",
+        "en": "Available",
+        "es": "Disponible",
+        "fr": "Disponible",
+        "it": "Disponibile",
+        "nl": "Beschikbaar",
+        "pl": "Dostępne",
+        "pt": "Disponível",
+        "ru": "Доступно",
+        "uk": "Доступно",
+        "zh-cn": "可用"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media.avail"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media.mountpoint": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Einhängepunkt",
+        "en": "Mount point",
+        "es": "Punto de montaje",
+        "fr": "Point de montage",
+        "it": "Punto di mount",
+        "nl": "Koppelpunt",
+        "pl": "Punkt montowania",
+        "pt": "Ponto de montagem",
+        "ru": "Точка монтирования",
+        "uk": "Точка монтування",
+        "zh-cn": "挂载点"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media.mountpoint"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media.used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Belegt",
+        "en": "Used",
+        "es": "Usado",
+        "fr": "Utilisé",
+        "it": "Usato",
+        "nl": "Gebruikt",
+        "pl": "Zajęte",
+        "pt": "Utilizado",
+        "ru": "Использовано",
+        "uk": "Використано",
+        "zh-cn": "已用"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "GB",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.datasets.tank_media.used"
+  },
   "beszel.0.systems.homelab_server.zfs.tank.disk_percent": {
     "type": "state",
     "common": {
@@ -4531,6 +5152,288 @@
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.zfs.tank.read_speed"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.scrub_errors": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Scrub-Fehler",
+        "en": "Scrub errors",
+        "es": "Errores del scrub",
+        "fr": "Erreurs du scrub",
+        "it": "Errori dello scrub",
+        "nl": "Scrubfouten",
+        "pl": "Błędy scrubu",
+        "pt": "Erros do scrub",
+        "ru": "Ошибки scrub",
+        "uk": "Помилки scrub",
+        "zh-cn": "Scrub 错误数"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.scrub_errors"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.scrub_progress": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Scrub-Fortschritt",
+        "en": "Scrub progress",
+        "es": "Progreso del scrub",
+        "fr": "Progression du scrub",
+        "it": "Avanzamento dello scrub",
+        "nl": "Scrubvoortgang",
+        "pl": "Postęp scrubu",
+        "pt": "Progresso do scrub",
+        "ru": "Ход scrub",
+        "uk": "Хід scrub",
+        "zh-cn": "Scrub 进度"
+      },
+      "desc": {
+        "de": "Freitext, den der Pool während eines laufenden Scrubs meldet; leer, wenn keiner läuft.",
+        "en": "Free text the pool reports while a scrub runs, empty when none is running.",
+        "es": "Texto libre que el pool informa durante un scrub; vacío si no hay ninguno.",
+        "fr": "Texte libre que le pool signale pendant un scrub ; vide si aucun ne tourne.",
+        "it": "Testo libero che il pool riporta durante uno scrub; vuoto se non ne è in corso.",
+        "nl": "Vrije tekst die de pool meldt tijdens een scrub; leeg als er geen loopt.",
+        "pl": "Tekst, który pula zgłasza w trakcie scrubu; pusty, gdy żaden nie trwa.",
+        "pt": "Texto livre que o pool reporta durante um scrub; vazio quando nenhum decorre.",
+        "ru": "Произвольный текст, который пул сообщает во время проверки; пусто, если она не идёт.",
+        "uk": "Довільний текст, який пул повідомляє під час перевірки; порожньо, якщо її немає.",
+        "zh-cn": "存储池在 scrub 运行期间报告的自由文本；无 scrub 时为空。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.scrub_progress"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.scrub_state": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Scrub-Status",
+        "en": "Scrub status",
+        "es": "Estado del scrub",
+        "fr": "État du scrub",
+        "it": "Stato dello scrub",
+        "nl": "Scrubstatus",
+        "pl": "Stan scrubu",
+        "pt": "Estado do scrub",
+        "ru": "Состояние scrub",
+        "uk": "Стан scrub",
+        "zh-cn": "Scrub 状态"
+      },
+      "desc": {
+        "de": "Was der letzte Scrub oder Resilver dieses Pools getan hat.",
+        "en": "What the last scrub or resilver of this pool did.",
+        "es": "Qué hizo el último scrub o resilver de este pool.",
+        "fr": "Ce qu'a fait le dernier scrub ou resilver de ce pool.",
+        "it": "Cosa ha fatto l'ultimo scrub o resilver di questo pool.",
+        "nl": "Wat de laatste scrub of resilver van deze pool deed.",
+        "pl": "Co zrobił ostatni scrub lub resilver tej puli.",
+        "pt": "O que o último scrub ou resilver deste pool fez.",
+        "ru": "Что сделала последняя проверка (scrub) или ресилвер этого пула.",
+        "uk": "Що зробила остання перевірка (scrub) або ресилвер цього пулу.",
+        "zh-cn": "该存储池最近一次 scrub 或 resilver 的结果。"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "NONE": "No scrub",
+        "SCANNING": "Running",
+        "FINISHED": "Finished",
+        "CANCELED": "Canceled"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.scrub_state"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.vdevs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Vdevs",
+        "en": "Vdevs",
+        "es": "Vdevs",
+        "fr": "Vdevs",
+        "it": "Vdev",
+        "nl": "Vdevs",
+        "pl": "Vdevy",
+        "pt": "Vdevs",
+        "ru": "Vdev",
+        "uk": "Vdev",
+        "zh-cn": "Vdev"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.vdevs"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0": {
+    "type": "channel",
+    "common": {
+      "name": "mirror-0"
+    },
+    "native": {
+      "nameSource": "api"
+    },
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.checksum_errors": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Prüfsummenfehler",
+        "en": "Checksum errors",
+        "es": "Errores de suma de verificación",
+        "fr": "Erreurs de somme de contrôle",
+        "it": "Errori di checksum",
+        "nl": "Checksumfouten",
+        "pl": "Błędy sum kontrolnych",
+        "pt": "Erros de checksum",
+        "ru": "Ошибки контрольных сумм",
+        "uk": "Помилки контрольних сум",
+        "zh-cn": "校验和错误"
+      },
+      "desc": {
+        "de": "Gezählt seit dem letzten Zurücksetzen des Pools, nicht seit dem Start.",
+        "en": "Counted since the pool was last cleared, not since boot.",
+        "es": "Contado desde el último borrado del pool, no desde el arranque.",
+        "fr": "Compté depuis la dernière remise à zéro du pool, pas depuis le démarrage.",
+        "it": "Contato dall'ultimo azzeramento del pool, non dall'avvio.",
+        "nl": "Geteld sinds de pool voor het laatst is gewist, niet sinds het opstarten.",
+        "pl": "Liczone od ostatniego wyzerowania puli, nie od uruchomienia.",
+        "pt": "Contado desde a última limpeza do pool, não desde o arranque.",
+        "ru": "Считается с момента последнего сброса пула, а не с загрузки.",
+        "uk": "Рахується з моменту останнього скидання пулу, а не із завантаження.",
+        "zh-cn": "自上次清除存储池计数起累计，而非自开机起。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.checksum_errors"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.read_errors": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Lesefehler",
+        "en": "Read errors",
+        "es": "Errores de lectura",
+        "fr": "Erreurs de lecture",
+        "it": "Errori di lettura",
+        "nl": "Leesfouten",
+        "pl": "Błędy odczytu",
+        "pt": "Erros de leitura",
+        "ru": "Ошибки чтения",
+        "uk": "Помилки читання",
+        "zh-cn": "读取错误"
+      },
+      "desc": {
+        "de": "Gezählt seit dem letzten Zurücksetzen des Pools, nicht seit dem Start.",
+        "en": "Counted since the pool was last cleared, not since boot.",
+        "es": "Contado desde el último borrado del pool, no desde el arranque.",
+        "fr": "Compté depuis la dernière remise à zéro du pool, pas depuis le démarrage.",
+        "it": "Contato dall'ultimo azzeramento del pool, non dall'avvio.",
+        "nl": "Geteld sinds de pool voor het laatst is gewist, niet sinds het opstarten.",
+        "pl": "Liczone od ostatniego wyzerowania puli, nie od uruchomienia.",
+        "pt": "Contado desde a última limpeza do pool, não desde o arranque.",
+        "ru": "Считается с момента последнего сброса пула, а не с загрузки.",
+        "uk": "Рахується з моменту останнього скидання пулу, а не із завантаження.",
+        "zh-cn": "自上次清除存储池计数起累计，而非自开机起。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.read_errors"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.state": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Zustand",
+        "en": "State",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Stan",
+        "pt": "Estado",
+        "ru": "Состояние",
+        "uk": "Стан",
+        "zh-cn": "状态"
+      },
+      "type": "string",
+      "role": "info.status",
+      "read": true,
+      "write": false,
+      "states": {
+        "ONLINE": "Online",
+        "DEGRADED": "Degraded",
+        "FAULTED": "Faulted",
+        "OFFLINE": "Offline",
+        "REMOVED": "Removed",
+        "UNAVAIL": "Unavailable",
+        "SUSPENDED": "Suspended"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.state"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.write_errors": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Schreibfehler",
+        "en": "Write errors",
+        "es": "Errores de escritura",
+        "fr": "Erreurs d'écriture",
+        "it": "Errori di scrittura",
+        "nl": "Schrijffouten",
+        "pl": "Błędy zapisu",
+        "pt": "Erros de escrita",
+        "ru": "Ошибки записи",
+        "uk": "Помилки запису",
+        "zh-cn": "写入错误"
+      },
+      "desc": {
+        "de": "Gezählt seit dem letzten Zurücksetzen des Pools, nicht seit dem Start.",
+        "en": "Counted since the pool was last cleared, not since boot.",
+        "es": "Contado desde el último borrado del pool, no desde el arranque.",
+        "fr": "Compté depuis la dernière remise à zéro du pool, pas depuis le démarrage.",
+        "it": "Contato dall'ultimo azzeramento del pool, non dall'avvio.",
+        "nl": "Geteld sinds de pool voor het laatst is gewist, niet sinds het opstarten.",
+        "pl": "Liczone od ostatniego wyzerowania puli, nie od uruchomienia.",
+        "pt": "Contado desde a última limpeza do pool, não desde o arranque.",
+        "ru": "Считается с момента последнего сброса пула, а не с загрузки.",
+        "uk": "Рахується з моменту останнього скидання пулу, а не із завантаження.",
+        "zh-cn": "自上次清除存储池计数起累计，而非自开机起。"
+      },
+      "type": "number",
+      "role": "value",
+      "unit": "",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.vdevs.mirror_0.write_errors"
   },
   "beszel.0.systems.homelab_server.zfs.tank.write_speed": {
     "type": "state",

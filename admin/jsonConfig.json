@@ -166,6 +166,18 @@
           "lg": 6,
           "xl": 6
         },
+        "metrics_servicesDetails": {
+          "type": "checkbox",
+          "label": "metric_servicesDetails",
+          "help": "help_metric_servicesDetails",
+          "default": false,
+          "disabled": "!data.metrics_services",
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
         "header_cpu": {
           "type": "header",
           "text": "header_cpu",
@@ -467,6 +479,38 @@
           "type": "checkbox",
           "label": "metric_zfs",
           "help": "help_metric_zfs",
+          "default": false,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "metrics_zfsDetails": {
+          "type": "checkbox",
+          "label": "metric_zfsDetails",
+          "help": "help_metric_zfsDetails",
+          "default": false,
+          "disabled": "!data.metrics_zfs",
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
+        "header_smart": {
+          "type": "header",
+          "text": "header_smart",
+          "size": 5,
+          "xs": 12,
+          "sm": 12,
+          "lg": 12,
+          "xl": 12
+        },
+        "metrics_smart": {
+          "type": "checkbox",
+          "label": "metric_smart",
+          "help": "help_metric_smart",
           "default": false,
           "xs": 12,
           "sm": 12,

@@ -132,6 +132,87 @@ export function containerHealthLabel(index: number): string {
 }
 
 /**
+ * Scrub words the agent reads out of `zpool status` (`internal/entities/zfs`: NONE,
+ * SCANNING, FINISHED, CANCELED). The KEYS are those words — that is what lands in the
+ * state; only the labels follow the system language.
+ */
+export function scrubStates(): Record<string, string> {
+  return {
+    NONE: tState("scrubNone"),
+    SCANNING: tState("scrubScanning"),
+    FINISHED: tState("scrubFinished"),
+    CANCELED: tState("scrubCanceled"),
+  };
+}
+
+/** `common.states` of a SMART device's overall verdict (smartctl: PASSED / FAILED). */
+export function smartStates(): Record<string, string> {
+  return { PASSED: tState("smartPassed"), FAILED: tState("smartFailed") };
+}
+
+/**
+ * systemd unit states in the hub's order (`internal/entities/systemd`: 0 active,
+ * 1 inactive, 2 failed, 3 activating, 4 deactivating, 5 reloading).
+ */
+export const SERVICE_STATE_LABELS = [
+  "active",
+  "inactive",
+  "failed",
+  "activating",
+  "deactivating",
+  "reloading",
+] as const;
+
+/** systemd sub-states in the hub's order (0 dead, 1 running, 2 exited, 3 failed, 4 unknown). */
+export const SERVICE_SUB_LABELS = ["dead", "running", "exited", "failed", "unknown"] as const;
+
+/** Written when the Hub sends an index outside the two label lists. */
+export const SERVICE_UNKNOWN = "unknown";
+
+/** `common.states` of `services.<unit>.state`. */
+export function serviceStates(): Record<string, string> {
+  return {
+    active: tState("svcActive"),
+    inactive: tState("svcInactive"),
+    failed: tState("svcFailed"),
+    activating: tState("svcActivating"),
+    deactivating: tState("svcDeactivating"),
+    reloading: tState("svcReloading"),
+    [SERVICE_UNKNOWN]: tState("subUnknown"),
+  };
+}
+
+/** `common.states` of `services.<unit>.sub_state`. */
+export function serviceSubStates(): Record<string, string> {
+  return {
+    dead: tState("subDead"),
+    running: tState("subRunning"),
+    exited: tState("subExited"),
+    failed: tState("subFailed"),
+    unknown: tState("subUnknown"),
+  };
+}
+
+/**
+ * Index → systemd state word. Floors like {@link containerHealthLabel}: the column is a
+ * number in the schema and nothing forbids a fractional value reaching it.
+ *
+ * @param index State index as the Hub stores it
+ */
+export function serviceStateLabel(index: number): string {
+  return SERVICE_STATE_LABELS[Math.floor(index)] ?? SERVICE_UNKNOWN;
+}
+
+/**
+ * Index → systemd sub-state word.
+ *
+ * @param index Sub-state index as the Hub stores it
+ */
+export function serviceSubLabel(index: number): string {
+  return SERVICE_SUB_LABELS[Math.floor(index)] ?? SERVICE_UNKNOWN;
+}
+
+/**
  * StateCommon of a container's health word (string, role `info.status`, states hint).
  */
 export function containerHealthCommon(): ioBroker.StateCommon {
@@ -180,6 +261,11 @@ export const CHANNEL_NAME_KEY = {
   engines: "channelEngines",
   filesystems: "channelFilesystems",
   containers: "channelContainers",
+  // v0.17.0: the three detail collections (zfs_pools / smart_devices / systemd_services)
+  vdevs: "zfsVdevs",
+  datasets: "zfsDatasets",
+  smart: "smart",
+  services: "services",
 } as const satisfies Record<string, I18nKey>;
 
 /** Last path segment of a channel the ADAPTER names (i.e. a key of {@link CHANNEL_NAME_KEY}). */
@@ -219,6 +305,9 @@ export const DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = 
   gpu: ["metrics_gpu"],
   filesystems: ["metrics_extraFs"],
   containers: ["metrics_containers"],
+  // v0.17.0: two more channels that hold nothing but their dynamic children.
+  smart: ["metrics_smart"],
+  services: ["metrics_servicesDetails"],
 };
 
 /**
@@ -262,6 +351,11 @@ export const METRIC_DEPENDENCIES = {
   metrics_networkPeak: "metrics_network",
   metrics_temperatureDetails: "metrics_temperature",
   metrics_gpuDetails: "metrics_gpu",
+  // v0.17.0: the ZFS detail collection extends the ZFS group, the systemd unit
+  // detail extends the services metric. `metrics_smart` has no base — SMART is its
+  // own agent source, like fans and the ZFS group itself.
+  metrics_zfsDetails: "metrics_zfs",
+  metrics_servicesDetails: "metrics_services",
 } satisfies Partial<Record<keyof AdapterConfig, keyof AdapterConfig>>;
 
 /**
@@ -591,6 +685,43 @@ export const LEAF_COMMONS = {
   containerMemory: () => numCommon(tName("containerMemory"), "MB"),
   containerImage: () => textCommon(tName("containerImage")),
   containerNetwork: () => numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
+  // v0.17.0 — ZFS pool details (`zfs_pools`)
+  scrubState: () => ({
+    ...textCommon(tName("scrubState"), "info.status", tDesc("descScrubState")),
+    states: scrubStates(),
+  }),
+  scrubProgress: () => textCommon(tName("scrubProgress"), "text", tDesc("descScrubProgress")),
+  scrubErrors: () => numCommon(tName("scrubErrors"), "", "value"),
+  vdevState: () => ({ ...textCommon(tName("vdevState"), "info.status"), states: zfsHealthStates() }),
+  vdevRead: () => numCommon(tName("vdevRead"), "", "value", tDesc("descVdevErrors")),
+  vdevWrite: () => numCommon(tName("vdevWrite"), "", "value", tDesc("descVdevErrors")),
+  vdevChecksum: () => numCommon(tName("vdevChecksum"), "", "value", tDesc("descVdevErrors")),
+  datasetUsed: () => numCommon(tName("datasetUsed"), "GB"),
+  datasetAvail: () => numCommon(tName("datasetAvail"), "GB"),
+  datasetMount: () => textCommon(tName("datasetMount"), "text"),
+  // v0.17.0 — SMART devices (`smart_devices`)
+  smartState: () => ({
+    ...textCommon(tName("smartState"), "info.status", tDesc("descSmartState")),
+    states: smartStates(),
+  }),
+  smartModel: () => textCommon(tName("smartModel"), "text"),
+  smartSerial: () => textCommon(tName("smartSerial"), "text"),
+  smartFirmware: () => textCommon(tName("smartFirmware"), "text"),
+  smartType: () => textCommon(tName("smartType"), "text"),
+  smartTemp: () => numCommon(tName("smartTemp"), "°C", "value.temperature"),
+  smartCapacity: () => numCommon(tName("smartCapacity"), "GB"),
+  smartHours: () => numCommon(tName("smartHours"), "h", "value", tDesc("descSmartHours")),
+  smartCycles: () => numCommon(tName("smartCycles"), "", "value"),
+  // v0.17.0 — systemd units (`systemd_services`)
+  serviceState: () => ({ ...textCommon(tName("serviceState"), "info.status"), states: serviceStates() }),
+  serviceSub: () => ({
+    ...textCommon(tName("serviceSub"), "info.status", tDesc("descServiceSub")),
+    states: serviceSubStates(),
+  }),
+  serviceCpu: () => percentCommon(tName("serviceCpu")),
+  serviceCpuPeak: () => percentCommon(tName("serviceCpuPeak"), "value", tDesc("descServicePeak")),
+  serviceMem: () => numCommon(tName("serviceMem"), "MB"),
+  serviceMemPeak: () => numCommon(tName("serviceMemPeak"), "MB", "value", tDesc("descServicePeak")),
 } satisfies Record<string, (arg?: string) => ioBroker.StateCommon>;
 
 /** Id of a leaf in {@link LEAF_COMMONS} — a typo is a compile error at both call sites. */
@@ -631,6 +762,32 @@ export const DYNAMIC_LEAF_PATTERNS: { id: DynamicLeafId; match: RegExp }[] = [
   { id: "containerMemory", match: /^containers\.[^.]+\.memory$/ },
   { id: "containerImage", match: /^containers\.[^.]+\.image$/ },
   { id: "containerNetwork", match: /^containers\.[^.]+\.network$/ },
+  // v0.17.0 — details of the three extra collections
+  { id: "scrubState", match: /^zfs\.[^.]+\.scrub_state$/ },
+  { id: "scrubProgress", match: /^zfs\.[^.]+\.scrub_progress$/ },
+  { id: "scrubErrors", match: /^zfs\.[^.]+\.scrub_errors$/ },
+  { id: "vdevState", match: /^zfs\.[^.]+\.vdevs\.[^.]+\.state$/ },
+  { id: "vdevRead", match: /^zfs\.[^.]+\.vdevs\.[^.]+\.read_errors$/ },
+  { id: "vdevWrite", match: /^zfs\.[^.]+\.vdevs\.[^.]+\.write_errors$/ },
+  { id: "vdevChecksum", match: /^zfs\.[^.]+\.vdevs\.[^.]+\.checksum_errors$/ },
+  { id: "datasetUsed", match: /^zfs\.[^.]+\.datasets\.[^.]+\.used$/ },
+  { id: "datasetAvail", match: /^zfs\.[^.]+\.datasets\.[^.]+\.avail$/ },
+  { id: "datasetMount", match: /^zfs\.[^.]+\.datasets\.[^.]+\.mountpoint$/ },
+  { id: "smartState", match: /^smart\.[^.]+\.state$/ },
+  { id: "smartModel", match: /^smart\.[^.]+\.model$/ },
+  { id: "smartSerial", match: /^smart\.[^.]+\.serial$/ },
+  { id: "smartFirmware", match: /^smart\.[^.]+\.firmware$/ },
+  { id: "smartType", match: /^smart\.[^.]+\.interface$/ },
+  { id: "smartTemp", match: /^smart\.[^.]+\.temperature$/ },
+  { id: "smartCapacity", match: /^smart\.[^.]+\.capacity$/ },
+  { id: "smartHours", match: /^smart\.[^.]+\.power_on_hours$/ },
+  { id: "smartCycles", match: /^smart\.[^.]+\.power_cycles$/ },
+  { id: "serviceState", match: /^services\.[^.]+\.state$/ },
+  { id: "serviceSub", match: /^services\.[^.]+\.sub_state$/ },
+  { id: "serviceCpu", match: /^services\.[^.]+\.cpu$/ },
+  { id: "serviceCpuPeak", match: /^services\.[^.]+\.cpu_peak$/ },
+  { id: "serviceMem", match: /^services\.[^.]+\.memory$/ },
+  { id: "serviceMemPeak", match: /^services\.[^.]+\.memory_peak$/ },
 ];
 
 /**

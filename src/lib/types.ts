@@ -90,6 +90,12 @@ export interface AdapterConfig {
   // --- v0.15.0 additions (Beszel 0.19.0) ---
   /** Per-pool ZFS states: usage, throughput, health (Beszel 0.19.0+) */
   metrics_zfs: boolean;
+  /** v0.17.0: ZFS pool DETAILS from the `zfs_pools` collection (scrub, vdevs, datasets). */
+  metrics_zfsDetails: boolean;
+  /** v0.17.0: SMART devices from the `smart_devices` collection. */
+  metrics_smart: boolean;
+  /** v0.17.0: per-unit systemd detail from the `systemd_services` collection. */
+  metrics_servicesDetails: boolean;
 }
 
 /**
@@ -400,3 +406,120 @@ export interface AuthResponse {
  */
 export type BeszelErrorCode =
   "UNAUTHORIZED" | "FORBIDDEN" | "RATE_LIMITED" | "HTTP_ERROR" | "INVALID_AUTH_RESPONSE" | "ETIMEDOUT";
+
+/**
+ * One row of the Hub's `zfs_pools` collection — the DETAIL record the agent refreshes
+ * hourly, next to the summary the adapter already reads from `stats.z`.
+ *
+ * Verified against the bundled Beszel 0.19.0 source: the hub writes `name`, `health`,
+ * `size`/`alloc`/`free` (bytes) plus the three JSON columns from
+ * `internal/hub/systems/system_zfs.go:upsertZfsPoolRecord`. Read access is the same
+ * `systemScopedReadRule` as `system_stats` (`internal/hub/collections.go`), so the
+ * adapter's existing credentials suffice.
+ */
+export interface ZfsPoolDetail {
+  /** PocketBase record ID */
+  id: string;
+  /** Reference to systems.id */
+  system: string;
+  /** Pool name as `zpool` reports it */
+  name: string;
+  /** Scrub/resilver state: NONE | SCANNING | FINISHED | CANCELED (absent → no scrub info) */
+  scrubState?: string;
+  /** Free-text progress the agent read from `zpool status` (e.g. "12.3% done") */
+  scrubProgress?: string;
+  /** Errors the last scrub found */
+  scrubErrors?: number;
+  /** vdevs of the pool, each with its own error counters */
+  vdevs: ZfsVdev[];
+  /** datasets of the pool */
+  datasets: ZfsDataset[];
+}
+
+/** One vdev of a ZFS pool (mirror, raidz or a leaf disk) with its error counters. */
+export interface ZfsVdev {
+  /** vdev name as `zpool status` prints it (`mirror-0`, `sda`) */
+  name: string;
+  /** ONLINE | DEGRADED | FAULTED | … — same vocabulary as the pool health */
+  state?: string;
+  /** Read errors counted since the pool was last cleared */
+  readErrors: number;
+  /** Write errors counted since the pool was last cleared */
+  writeErrors: number;
+  /** Checksum errors counted since the pool was last cleared */
+  checksumErrors: number;
+}
+
+/** One ZFS dataset with its usage. Bytes as the hub stores them. */
+export interface ZfsDataset {
+  /** Dataset name (`tank/media`) */
+  name: string;
+  /** Used bytes */
+  used?: number;
+  /** Available bytes */
+  avail?: number;
+  /** Mount point, absent for a dataset that is not mounted */
+  mountpoint?: string;
+}
+
+/**
+ * One row of the Hub's `smart_devices` collection. Verified against the bundled 0.19.0
+ * schema (`internal/migrations/0_collections_snapshot_0_19_0.go`): `name`, `model`,
+ * `state`, `capacity`, `temp`, `firmware`, `serial`, `type`, `hours`, `cycles`.
+ * `attributes` (the raw SMART attribute table) is deliberately NOT read — it is a
+ * vendor-specific blob whose keys differ per device, and an adapter cannot name
+ * datapoints it cannot describe.
+ */
+export interface SmartDevice {
+  /** PocketBase record ID */
+  id: string;
+  /** Reference to systems.id */
+  system: string;
+  /** Device node as smartctl names it (`/dev/sda`, `nvme0`) */
+  name: string;
+  /** PASSED | FAILED — the overall SMART verdict */
+  state?: string;
+  /** Device model as smartctl reports it */
+  model?: string;
+  /** Serial number */
+  serial?: string;
+  /** Firmware revision */
+  firmware?: string;
+  /** Transport as smartctl reports it (`sat`, `nvme`, …) */
+  type?: string;
+  /** Device temperature in °C */
+  temperature?: number;
+  /** Capacity in bytes */
+  capacity?: number;
+  /** Power-on hours */
+  hours?: number;
+  /** Power cycle count */
+  cycles?: number;
+}
+
+/**
+ * One row of the Hub's `systemd_services` collection. The hub INSERTs all columns of a
+ * batch in one statement (`internal/hub/systems/system.go:337`), so a row never carries
+ * a missing `state`/`cpu`/`memory`. Only the `list` rule is granted for this collection
+ * — the adapter never fetches a single record, it pages the list like every other one.
+ */
+export interface SystemdService {
+  /** PocketBase record ID */
+  id: string;
+  /** Reference to systems.id */
+  system: string;
+  /** Unit name, e.g. `ssh.service` */
+  name: string;
+  /** 0 active · 1 inactive · 2 failed · 3 activating · 4 deactivating · 5 reloading */
+  state: number;
+  /** 0 dead · 1 running · 2 exited · 3 failed · 4 unknown */
+  sub: number;
+  /** CPU usage in percent */
+  cpu: number;
+  /** Peak CPU usage in percent within the sample window */
+  cpuPeak: number;
+  /** Resident memory in bytes */
+  memory: number;
+  /** Peak resident memory in bytes */
+  memPeak: number;
+}

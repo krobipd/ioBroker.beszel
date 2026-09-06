@@ -4,6 +4,9 @@ import { URL } from "node:url";
 import {
   coerceAuthResponse,
   coerceContainer,
+  coerceSmartDevice,
+  coerceSystemdService,
+  coerceZfsPoolDetail,
   coercePocketBaseList,
   coerceSystem,
   coerceSystemDetailsRecord,
@@ -11,7 +14,16 @@ import {
   errText,
   sanitizeForLog,
 } from "./coerce";
-import type { BeszelContainer, BeszelErrorCode, BeszelSystem, SystemDetails, SystemStats } from "./types";
+import type {
+  BeszelContainer,
+  BeszelErrorCode,
+  BeszelSystem,
+  SmartDevice,
+  SystemDetails,
+  SystemdService,
+  SystemStats,
+  ZfsPoolDetail,
+} from "./types";
 
 const TOKEN_REFRESH_MS = 23 * 60 * 60 * 1000; // 23 hours
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -240,6 +252,42 @@ export class BeszelClient {
       }
     }
     return result;
+  }
+
+  /**
+   * ZFS pool DETAIL records (`zfs_pools`) — scrub state, vdev error counters and
+   * datasets. Separate from the per-poll summary in `stats.z`: the hub refreshes this
+   * collection roughly hourly (`system_zfs.go:zfsFetchInterval`), so the adapter reads
+   * it on a slow cadence rather than every poll.
+   *
+   * Read access is the same `systemScopedReadRule` as `system_stats`.
+   */
+  public async getZfsPoolDetails(): Promise<ZfsPoolDetail[]> {
+    this.log?.debug("HTTP getZfsPoolDetails");
+    return this.fetchAllPages("/api/collections/zfs_pools/records?sort=system%2Cname", coerceZfsPoolDetail);
+  }
+
+  /**
+   * SMART device records (`smart_devices`) — the overall verdict plus model, serial,
+   * temperature, capacity, power-on hours and power cycles. Slow-moving like the ZFS
+   * details, so it shares their cadence.
+   */
+  public async getSmartDevices(): Promise<SmartDevice[]> {
+    this.log?.debug("HTTP getSmartDevices");
+    return this.fetchAllPages("/api/collections/smart_devices/records?sort=system%2Cname", coerceSmartDevice);
+  }
+
+  /**
+   * systemd unit records (`systemd_services`) — state, sub-state, CPU and memory per
+   * unit. The hub rewrites the whole batch on every agent sample, so unlike the two
+   * detail collections above this one is read on every poll, next to the containers.
+   *
+   * ⚠️ Only the `list` rule is granted for this collection (`internal/hub/collections.go`)
+   * — paging the list is the only permitted access, a single-record read is refused.
+   */
+  public async getSystemdServices(): Promise<SystemdService[]> {
+    this.log?.debug("HTTP getSystemdServices");
+    return this.fetchAllPages("/api/collections/systemd_services/records?sort=system%2Cname", coerceSystemdService);
   }
 
   /** Fetch all containers (paginated, B2 v0.4.3) */

@@ -43,6 +43,9 @@ import type { BeszelSystem, SystemDetails, SystemStats } from "./lib/types";
 interface FakeClient {
   getSystems: ReturnType<typeof vi.fn>;
   getContainers: ReturnType<typeof vi.fn>;
+  getZfsPoolDetails: ReturnType<typeof vi.fn>;
+  getSmartDevices: ReturnType<typeof vi.fn>;
+  getSystemdServices: ReturnType<typeof vi.fn>;
   getLatestStats: ReturnType<typeof vi.fn>;
   getSystemDetails: ReturnType<typeof vi.fn>;
   invalidateToken: ReturnType<typeof vi.fn>;
@@ -138,6 +141,9 @@ function setup(configOverrides: Record<string, unknown> = {}): {
   const client: FakeClient = {
     getSystems: vi.fn(() => Promise.resolve([makeSystem()])),
     getContainers: vi.fn(() => Promise.resolve([])),
+    getZfsPoolDetails: vi.fn(() => Promise.resolve([])),
+    getSmartDevices: vi.fn(() => Promise.resolve([])),
+    getSystemdServices: vi.fn(() => Promise.resolve([])),
     getLatestStats: vi.fn(() => Promise.resolve(new Map<string, SystemStats>([["sys001", { cpu: 10 }]]))),
     getSystemDetails: vi.fn(() => Promise.resolve(new Map<string, SystemDetails>())),
     invalidateToken: vi.fn(),
@@ -1368,5 +1374,53 @@ describe("BeszelAdapter clears the stopInstance flag it used to ship with", () =
 
     expect(i.setState).toHaveBeenCalledWith("info.systemsOnline", { val: 0, ack: true });
     expect(i.setState).toHaveBeenCalledWith("info.systemsAllUp", { val: false, ack: true });
+  });
+});
+
+describe("BeszelAdapter — cadence of the detail collections (v0.17.0)", () => {
+  it("reads the two SLOW collections once, not on every poll", async () => {
+    // The Hub refreshes ZFS details roughly hourly and SMART data even more rarely.
+    // Reading them every 60s would be load on the Hub for data that cannot have changed.
+    const { adapter, client } = await setupReady({
+      metrics_zfs: true,
+      metrics_zfsDetails: true,
+      metrics_smart: true,
+    });
+    const i = internalOf(adapter);
+    await i.poll();
+    await i.poll();
+    await i.poll();
+    expect(client.getZfsPoolDetails.mock.calls.length, "zfs_pools once").to.equal(1);
+    expect(client.getSmartDevices.mock.calls.length, "smart_devices once").to.equal(1);
+  });
+
+  it("reads the systemd units on EVERY poll — the Hub rewrites that table every sample", async () => {
+    const { adapter, client } = await setupReady({
+      metrics_services: true,
+      metrics_servicesDetails: true,
+    });
+    const i = internalOf(adapter);
+    await i.poll();
+    await i.poll();
+    expect(client.getSystemdServices.mock.calls.length).to.be.greaterThan(1);
+  });
+
+  it("asks for nothing while all three toggles are off", async () => {
+    const { adapter, client } = await setupReady({});
+    await internalOf(adapter).poll();
+    expect(client.getZfsPoolDetails.mock.calls.length).to.equal(0);
+    expect(client.getSmartDevices.mock.calls.length).to.equal(0);
+    expect(client.getSystemdServices.mock.calls.length).to.equal(0);
+  });
+
+  it("a failing detail fetch costs neither the other collections nor the poll", async () => {
+    const { adapter, client } = await setupReady({
+      metrics_zfs: true,
+      metrics_zfsDetails: true,
+      metrics_smart: true,
+    });
+    client.getZfsPoolDetails.mockImplementationOnce(() => Promise.reject(new Error("404 collection missing")));
+    await internalOf(adapter).poll();
+    expect(client.getSmartDevices.mock.calls.length, "the other one still ran").to.equal(1);
   });
 });

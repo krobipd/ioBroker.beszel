@@ -248,6 +248,13 @@ beszel.0.
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- New: SMART data per drive as an opt-in metric — the drive's own overall verdict plus temperature, capacity, power-on hours and power cycles
+- New: ZFS pool details as an opt-in metric — scrub status, per-vdev error counters and the datasets of each pool
+- New: systemd service details as an opt-in metric — state, sub-state, CPU and memory for every unit the agent reports
+- Improved: the two slow detail sources are read every 15 minutes instead of every poll, so switching them on costs your Hub almost nothing
+
 ### 0.16.0 (2026-09-06)
 
 - Fixed: switching a metric group off now really empties it — a system that was offline at the time kept the empty channel and got it back after every restart
