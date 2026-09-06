@@ -1,5 +1,13 @@
 # Older Changes
 
+## 0.13.0 (2026-09-02)
+
+- Fixed: a Beszel Hub configured by IPv6 address can now be reached — the connection used to fail with a name lookup error because the address kept its square brackets
+- Fixed: stopping the adapter while a poll was still running no longer writes a false "Poll failed" error line to the log, and no longer sends that false error to the error reporting
+- Fixed: when the adapter cannot start — credentials to re-enter after an upgrade, or an invalid Hub URL — every system is now marked offline instead of keeping the previous run's green dot
+- Changed: the three fleet summary states for systems total, online and all-up now exist from the installation on — a fresh install with an unreachable Hub shows 0 and false instead of nothing
+- Changed: ioBroker Admin 8.0.11 or newer is required, in line with the current ioBroker stable repository — older Admin installations must be updated before installing this version
+
 ## 0.12.2 (2026-08-27) — stable
 
 - Fixed: the first start after an update no longer puts warnings and an error into the log while the instance corrects itself and restarts.

@@ -248,7 +248,7 @@ beszel.0.
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 0.16.0 (2026-09-06)
 
 - Fixed: switching a metric group off now really empties it — a system that was offline at the time kept the empty channel and got it back after every restart
 - Fixed: a stumble while starting no longer leaves the adapter alive but silent — it keeps going and updates your values as usual
@@ -278,14 +278,6 @@ beszel.0.
 - Fixed: a value that the Hub stopped delivering was reset to empty while the adapter kept running, but stayed on its old reading after a restart — now it is reset in both cases
 - Changed: a system the Hub has no reading for keeps its last measured values instead of having them cleared, matching what the individual sensors, fans and containers already did
 - Changed: the datapoint "Legacy state migration completed" disappears from the object tree — it never said anything about a monitored system
-
-### 0.13.0 (2026-09-02)
-
-- Fixed: a Beszel Hub configured by IPv6 address can now be reached — the connection used to fail with a name lookup error because the address kept its square brackets
-- Fixed: stopping the adapter while a poll was still running no longer writes a false "Poll failed" error line to the log, and no longer sends that false error to the error reporting
-- Fixed: when the adapter cannot start — credentials to re-enter after an upgrade, or an invalid Hub URL — every system is now marked offline instead of keeping the previous run's green dot
-- Changed: the three fleet summary states for systems total, online and all-up now exist from the installation on — a fresh install with an unreachable Hub shows 0 and false instead of nothing
-- Changed: ioBroker Admin 8.0.11 or newer is required, in line with the current ioBroker stable repository — older Admin installations must be updated before installing this version
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

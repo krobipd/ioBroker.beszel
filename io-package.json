@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.15.0",
+    "version": "0.16.0",
     "news": {
-      "NEXT": {
+      "0.16.0": {
         "en": "Deleted metric groups stay deleted, a hiccup at startup no longer leaves the adapter without polling, and status words follow your ioBroker language.",
         "de": "Abgeschaltete Metrikgruppen bleiben verschwunden, ein Stolperer beim Start legt das Abfragen nicht mehr lahm, und die Statuswörter folgen deiner ioBroker-Sprache.",
         "ru": "Отключённые группы метрик больше не возвращаются, сбой при запуске не оставляет адаптер без опроса, а слова состояния следуют языку ioBroker.",
