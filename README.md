@@ -74,6 +74,7 @@ Detail options stay greyed out until their category's main metric is enabled, an
 | **System**      | Uptime                                                | on      |
 |                 | System info (hardware, OS, agent version)             | off     |
 |                 | Systemd Services (total / failed)                     | off     |
+|                 | Service details (state, CPU, memory per unit)         | off     |
 | **CPU**         | CPU Usage (%)                                         | on      |
 |                 | Load Average (1m / 5m / 15m)                          | on      |
 |                 | CPU Breakdown (User / System / IOWait / Steal / Idle) | off     |
@@ -95,6 +96,8 @@ Detail options stay greyed out until their category's main metric is enabled, an
 |                 | Individual Temperature Sensors                        | off     |
 | **Fans**        | Fan Speeds (rpm, Beszel 0.18.8+, Linux hosts)         | off     |
 | **ZFS**         | ZFS Pools (usage, throughput, health; Beszel 0.19.0+) | off     |
+|                 | ZFS details (scrub, vdev errors, datasets)            | off     |
+| **SMART**       | SMART devices (verdict, temperature, hours, cycles)   | off     |
 | **GPU**         | GPU Metrics (Usage, Memory, Power)                    | off     |
 |                 | GPU details (engines, package power)                  | off     |
 | **Containers**  | Container Monitoring incl. network (Docker / Podman)  | off     |
@@ -205,7 +208,40 @@ beszel.0.
         │       ├── disk_total       — Size (GB)
         │       ├── read_speed       — Read (MB/s)
         │       ├── write_speed      — Write (MB/s)
-        │       └── health           — Pool health (ONLINE, DEGRADED, …)
+        │       ├── health           — Pool health (ONLINE, DEGRADED, …)
+        │       ├── scrub_state *    — Scrub status (NONE/SCANNING/FINISHED/CANCELED)
+        │       ├── scrub_progress * — Scrub progress as the pool reports it
+        │       ├── scrub_errors *   — Errors the last scrub found
+        │       ├── vdevs/ *          — one channel per vdev
+        │       │   └── <vdev>/
+        │       │       ├── state             — Vdev state
+        │       │       ├── read_errors       — Read errors
+        │       │       ├── write_errors      — Write errors
+        │       │       └── checksum_errors   — Checksum errors
+        │       └── datasets/ *       — one channel per dataset
+        │           └── <dataset>/
+        │               ├── used              — Used (GB)
+        │               ├── avail             — Available (GB)
+        │               └── mountpoint        — Mount point
+        ├── smart/ *                  — SMART devices, one channel per drive
+        │   └── <device>/
+        │       ├── state            — SMART verdict (PASSED / FAILED)
+        │       ├── model            — Model
+        │       ├── serial           — Serial number
+        │       ├── firmware         — Firmware
+        │       ├── interface        — Interface (sat, nvme, …)
+        │       ├── temperature      — Temperature (°C)
+        │       ├── capacity         — Capacity (GB)
+        │       ├── power_on_hours   — Power-on hours
+        │       └── power_cycles     — Power cycles
+        ├── services/ *               — systemd units, one channel per unit
+        │   └── <unit>/
+        │       ├── state            — State (active, inactive, failed, …)
+        │       ├── sub_state        — Sub-state (running, exited, dead, …)
+        │       ├── cpu              — CPU (%)
+        │       ├── cpu_peak         — CPU peak (%)
+        │       ├── memory           — Memory (MB)
+        │       └── memory_peak      — Memory peak (MB)
         └── containers/ *             — Docker/Podman containers
             └── {container_name}/
                 ├── status           — Container status
