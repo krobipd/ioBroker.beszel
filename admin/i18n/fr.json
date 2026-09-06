@@ -203,5 +203,22 @@
   "diskTotalWrite": "Total écrit",
   "descDiskTotalIo": "Volume lu ou écrit depuis le démarrage (compteur du périphérique), pas un débit.",
   "rootDiskName": "Nom du disque racine",
-  "descRootDiskName": "Nom du disque racine défini sur l'agent (FILESYSTEM=device__name)."
+  "descRootDiskName": "Nom du disque racine défini sur l'agent (FILESYSTEM=device__name).",
+  "stateUp": "En ligne",
+  "stateDown": "Hors ligne",
+  "statePaused": "En pause",
+  "statePending": "En attente",
+  "stateUnknown": "Inconnu",
+  "zfsOnline": "En ligne",
+  "zfsDegraded": "Dégradé",
+  "zfsFaulted": "En panne",
+  "zfsOffline": "Hors ligne",
+  "zfsRemoved": "Retiré",
+  "zfsUnavailable": "Indisponible",
+  "zfsSuspended": "Suspendu",
+  "healthNone": "Aucune",
+  "healthStarting": "Démarrage",
+  "healthHealthy": "Sain",
+  "healthUnhealthy": "Défaillant",
+  "healthUnknown": "Inconnu"
 }

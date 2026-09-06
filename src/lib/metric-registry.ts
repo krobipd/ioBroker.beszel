@@ -1,4 +1,5 @@
-import { tDesc, tName } from "./i18n";
+import { tDesc, tName, tState } from "./i18n";
+import type { I18nKey } from "./i18n";
 import type { AdapterConfig, BeszelSystem, SystemStats } from "./types";
 
 /**
@@ -25,17 +26,17 @@ export interface MetricDef {
   /** Config toggle that enables this metric. */
   toggle: keyof AdapterConfig;
   /** Channel segment the state lives under (e.g. "cpu"). */
-  channel: string;
+  channel: ChannelKey;
   /** State id relative to the system (e.g. "cpu.usage"). */
   id: string;
   /** i18n key for the state's display name. */
-  nameKey: string;
+  nameKey: I18nKey;
   /**
    * i18n key for the state's `common.desc` — one plain sentence explaining what the
    * value means. Omitted where the name and unit already say everything: the fleet
    * standard wants an empty desc rather than an invented one.
    */
-  descKey?: string;
+  descKey?: I18nKey;
   /** Which common shape to build. */
   kind: "percent" | "num" | "text" | "bool";
   /** Unit for numeric kinds. */
@@ -60,35 +61,91 @@ export const SYSTEM_STATUS_UNKNOWN = "unknown";
  * `common.states` of `info.status`: the Hub's four values plus {@link SYSTEM_STATUS_UNKNOWN}.
  * One definition — the update path and the offline reset both write it, so the enum
  * can never drift between them.
+ *
+ * A FUNCTION, not a constant: the KEYS are the technical values written into the state,
+ * the VALUES are labels the admin shows. Those follow the system language via
+ * {@link tState} — and they must stay plain strings, because the admin renders a
+ * `common.states` value directly as a React child (a translation object there takes the
+ * whole GUI down with React error #31; `@iobroker/types` types the field accordingly).
  */
-export const SYSTEM_STATUS_STATES: Record<string, string> = {
-  up: "Online",
-  down: "Offline",
-  paused: "Paused",
-  pending: "Pending",
-  [SYSTEM_STATUS_UNKNOWN]: "Unknown",
-};
+export function systemStatusStates(): Record<string, string> {
+  return {
+    up: tState("stateUp"),
+    down: tState("stateDown"),
+    paused: tState("statePaused"),
+    pending: tState("statePending"),
+    [SYSTEM_STATUS_UNKNOWN]: tState("stateUnknown"),
+  };
+}
 
 /**
  * `common.states` hint of `zfs.<pool>.health`: zpool's own health words as Beszel 0.19.0
  * forwards them (`ZfsPool.Health`, from `zpool list -H -o health`). A hint for the UI, not
- * a filter — a word from a newer ZFS still lands in the state unchanged.
+ * a filter — a word from a newer ZFS still lands in the state unchanged. Keys stay zpool's
+ * uppercase words, labels follow the system language (see {@link systemStatusStates}).
  */
-export const ZFS_HEALTH_STATES: Record<string, string> = {
-  ONLINE: "Online",
-  DEGRADED: "Degraded",
-  FAULTED: "Faulted",
-  OFFLINE: "Offline",
-  REMOVED: "Removed",
-  UNAVAIL: "Unavailable",
-  SUSPENDED: "Suspended",
-};
+export function zfsHealthStates(): Record<string, string> {
+  return {
+    ONLINE: tState("zfsOnline"),
+    DEGRADED: tState("zfsDegraded"),
+    FAULTED: tState("zfsFaulted"),
+    OFFLINE: tState("zfsOffline"),
+    REMOVED: tState("zfsRemoved"),
+    UNAVAIL: tState("zfsUnavailable"),
+    SUSPENDED: tState("zfsSuspended"),
+  };
+}
+
+/**
+ * Container health as Beszel reports it: `health` is an INDEX into this list
+ * (0=none, 1=starting, 2=healthy, 3=unhealthy). The adapter turns the index into the
+ * word, so unlike the Hub's system status or zpool's health this value set is the
+ * ADAPTER's own — which is why it also ships as a `common.states` hint.
+ */
+export const CONTAINER_HEALTH_LABELS = ["none", "starting", "healthy", "unhealthy"] as const;
+
+/** Written when the Hub sends an index outside {@link CONTAINER_HEALTH_LABELS}. */
+export const CONTAINER_HEALTH_UNKNOWN = "unknown";
+
+/**
+ * `common.states` of `containers.<name>.health` — the four Docker/Podman words plus
+ * {@link CONTAINER_HEALTH_UNKNOWN}. Labels follow the system language.
+ */
+export function containerHealthStates(): Record<string, string> {
+  return {
+    none: tState("healthNone"),
+    starting: tState("healthStarting"),
+    healthy: tState("healthHealthy"),
+    unhealthy: tState("healthUnhealthy"),
+    [CONTAINER_HEALTH_UNKNOWN]: tState("healthUnknown"),
+  };
+}
+
+/**
+ * Map a Hub health INDEX to its word. Floors the index first — API drift could send a
+ * float (e.g. 2.5), which a bare lookup resolves to `undefined`.
+ *
+ * @param index Raw `health` column of the container record.
+ */
+export function containerHealthLabel(index: number): string {
+  return CONTAINER_HEALTH_LABELS[Math.floor(index)] ?? CONTAINER_HEALTH_UNKNOWN;
+}
+
+/**
+ * StateCommon of a container's health word (string, role `info.status`, states hint).
+ */
+export function containerHealthCommon(): ioBroker.StateCommon {
+  return {
+    ...textCommon(tName("containerHealth"), "info.status", tDesc("descContainerHealth")),
+    states: containerHealthStates(),
+  };
+}
 
 /**
  * StateCommon of a ZFS pool's health word (string, role `info.status`, states hint).
  */
 export function zfsHealthCommon(): ioBroker.StateCommon {
-  return { ...textCommon(tName("zfsHealth"), "info.status", tDesc("descZfsHealth")), states: ZFS_HEALTH_STATES };
+  return { ...textCommon(tName("zfsHealth"), "info.status", tDesc("descZfsHealth")), states: zfsHealthStates() };
 }
 
 /**
@@ -104,7 +161,7 @@ export const BATTERY_STATE_CHARGING = 3;
  * sub-channels ensured in updateDynamicStats. Single source so a channel's
  * display name is never spelled inline in two places.
  */
-export const CHANNEL_NAME_KEY: Record<string, string> = {
+export const CHANNEL_NAME_KEY = {
   info: "channelInfo",
   cpu: "channelCpu",
   memory: "channelMemory",
@@ -123,7 +180,21 @@ export const CHANNEL_NAME_KEY: Record<string, string> = {
   engines: "channelEngines",
   filesystems: "channelFilesystems",
   containers: "channelContainers",
-};
+} as const satisfies Record<string, I18nKey>;
+
+/** Last path segment of a channel the ADAPTER names (i.e. a key of {@link CHANNEL_NAME_KEY}). */
+export type ChannelKey = keyof typeof CHANNEL_NAME_KEY;
+
+/**
+ * Narrow an arbitrary path segment to a channel the adapter names. Needed where the
+ * segment comes from the object tree rather than from a literal — a Hub-named channel
+ * (`gpu.<id>`, `containers.<name>`) is not in the catalog and keeps its own name.
+ *
+ * @param segment Last path segment of a channel id.
+ */
+export function isChannelKey(segment: string): segment is ChannelKey {
+  return Object.prototype.hasOwnProperty.call(CHANNEL_NAME_KEY, segment);
+}
 
 /**
  * v0.7.2: dynamic-group toggles that write into a scalar channel without
@@ -141,6 +212,26 @@ export const DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = 
   fans: ["metrics_fans"],
   // v0.15.0: same shape for the ZFS pools channel (only dynamic per-pool channels).
   zfs: ["metrics_zfs"],
+  // v0.16.0: gpu / filesystems / containers are the same shape again — top-level
+  // channels holding nothing but their dynamic children. They used to be three
+  // hand-written `if` branches in cleanupMetrics next to this table, i.e. two
+  // mechanisms for one job; a seventh dynamic channel would have needed a fourth.
+  gpu: ["metrics_gpu"],
+  filesystems: ["metrics_extraFs"],
+  containers: ["metrics_containers"],
+};
+
+/**
+ * v0.16.0: dynamic SUB-channels (`<channel>.<sub>` below a system) and the single toggle
+ * each one depends on. Same job as {@link DYNAMIC_CHANNEL_TOGGLES} one level down, and the
+ * replacement for the hand-written branches that used to delete them. `battery.batteries`
+ * is deliberately absent: it has no toggle of its own and disappears with the recursive
+ * delete of `battery`.
+ */
+export const DYNAMIC_SUBCHANNEL_TOGGLES: Record<string, keyof AdapterConfig> = {
+  "cpu.cores": "metrics_cpuCores",
+  "network.interfaces": "metrics_networkInterfaces",
+  "temperature.sensors": "metrics_temperatureDetails",
 };
 
 /**
@@ -340,13 +431,18 @@ export function clampPercent(v: number | null): number | null {
 }
 
 /**
- * N7: resolve a channel's translated display name from CHANNEL_NAME_KEY. The
- * `tName` key cast lives here once instead of at every ensureChannel call.
+ * N7: resolve a channel's translated display name from CHANNEL_NAME_KEY.
+ *
+ * The parameter is the CHANNEL KEY TYPE, not a bare string: an unmapped segment used to
+ * hand `undefined` to adapter-core, which answers `{ en: undefined }` without a word in
+ * the log — and the fleet's i18n gate cannot see it because the key is computed, not
+ * literal. Now that is a compile error. Callers holding a runtime segment narrow it with
+ * {@link isChannelKey} first.
  *
  * @param ch Channel key (e.g. "cpu", "cores", "containers").
  */
-export function channelName(ch: string): ReturnType<typeof tName> {
-  return tName(CHANNEL_NAME_KEY[ch] as Parameters<typeof tName>[0]);
+export function channelName(ch: ChannelKey): ReturnType<typeof tName> {
+  return tName(CHANNEL_NAME_KEY[ch]);
 }
 
 /**
@@ -425,8 +521,8 @@ export function formatUptime(seconds: number): string {
  * @param def Metric definition (kind/unit/role/nameKey) to build the common from.
  */
 export function commonFor(def: MetricDef): ioBroker.StateCommon {
-  const name = tName(def.nameKey as Parameters<typeof tName>[0]);
-  const desc = def.descKey ? tDesc(def.descKey as Parameters<typeof tDesc>[0]) : undefined;
+  const name = tName(def.nameKey);
+  const desc = def.descKey ? tDesc(def.descKey) : undefined;
   switch (def.kind) {
     case "percent":
       return percentCommon(name, def.role, desc);
@@ -437,6 +533,114 @@ export function commonFor(def: MetricDef): ioBroker.StateCommon {
     default:
       return numCommon(name, def.unit, def.role ?? "value", desc);
   }
+}
+
+// -------------------------------------------------------------------------
+// Dynamic-group leaves (v0.16.0)
+//
+// The counterpart of the scalar registry (K1) for the datapoints inside the
+// dynamic groups whose name and description the ADAPTER owns. Both paths read
+// THIS table: `updateDynamicStats` when it creates a leaf with a value, and
+// `refreshDynamicObjects` when it brings a system without a reading up to date.
+//
+// Before v0.16.0 the refresh path carried its own copy of all 29 `common`
+// expressions, kept in step with the creation code by nothing but an invariant
+// test that checked COVERAGE (does every leaf have an entry) and not EQUALITY
+// (does the entry build the same common). A changed unit or role on one side
+// alone would have passed every gate, and the effect — a wrong common on
+// exactly the systems that are offline right now — is visible only on the live
+// tree. Hub-named leaves (sensor / fan / battery / GPU-engine) are deliberately
+// absent: their name is the device's own and cannot be rebuilt without data.
+// -------------------------------------------------------------------------
+
+/**
+ * The `common` of every adapter-named leaf inside a dynamic group, by id.
+ *
+ * Exported so a test can replace one entry and prove that BOTH paths go through
+ * {@link leafCommon} — the fleet lesson being that a table can be complete while a
+ * caller quietly stopped reading it, with gate, linter and type check all green.
+ */
+export const LEAF_COMMONS = {
+  /** @param arg Core index, from the id (`core7`) or the creation loop. */
+  cpuCore: (arg?: string) => percentCommon(tName("cpuCore", Number(arg ?? 0))),
+  ifaceUp: () => numCommon(tName("ifaceUp"), "MB/s"),
+  ifaceDown: () => numCommon(tName("ifaceDown"), "MB/s"),
+  ifaceTotalUp: () => numCommon(tName("ifaceTotalUp"), "GB", "value", tDesc("descIfaceTotal")),
+  ifaceTotalDown: () => numCommon(tName("ifaceTotalDown"), "GB", "value", tDesc("descIfaceTotal")),
+  gpuUsage: () => percentCommon(tName("gpuUsage")),
+  gpuMemoryUsed: () => numCommon(tName("gpuMemoryUsed"), "MB"),
+  gpuMemoryTotal: () => numCommon(tName("gpuMemoryTotal"), "MB"),
+  gpuPower: () => numCommon(tName("gpuPower"), "W", "value.power"),
+  gpuPowerPackage: () => numCommon(tName("gpuPowerPackage"), "W", "value.power", tDesc("descGpuPowerPackage")),
+  fsDiskPercent: () => percentCommon(tName("diskPercent")),
+  fsDiskUsed: () => numCommon(tName("diskUsed"), "GB"),
+  fsDiskTotal: () => numCommon(tName("diskTotal"), "GB"),
+  fsReadSpeed: () => numCommon(tName("readSpeed"), "MB/s"),
+  fsWriteSpeed: () => numCommon(tName("writeSpeed"), "MB/s"),
+  fsTotalRead: () => numCommon(tName("diskTotalRead"), "GB", "value", tDesc("descDiskTotalIo")),
+  fsTotalWrite: () => numCommon(tName("diskTotalWrite"), "GB", "value", tDesc("descDiskTotalIo")),
+  zfsDiskPercent: () => percentCommon(tName("diskPercent")),
+  zfsDiskUsed: () => numCommon(tName("diskUsed"), "GB"),
+  zfsDiskTotal: () => numCommon(tName("diskTotal"), "GB"),
+  zfsReadSpeed: () => numCommon(tName("readSpeed"), "MB/s"),
+  zfsWriteSpeed: () => numCommon(tName("writeSpeed"), "MB/s"),
+  zfsHealth: () => zfsHealthCommon(),
+  containerStatus: () => textCommon(tName("status")),
+  containerHealth: () => containerHealthCommon(),
+  containerCpu: () => percentCommon(tName("cpuUsage")),
+  containerMemory: () => numCommon(tName("containerMemory"), "MB"),
+  containerImage: () => textCommon(tName("containerImage")),
+  containerNetwork: () => numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
+} satisfies Record<string, (arg?: string) => ioBroker.StateCommon>;
+
+/** Id of a leaf in {@link LEAF_COMMONS} — a typo is a compile error at both call sites. */
+export type DynamicLeafId = keyof typeof LEAF_COMMONS;
+
+/**
+ * Which id a state id below the system belongs to. Only the refresh walk needs this
+ * direction: it starts from the object tree and has to find the leaf's definition.
+ * The single capture group (per-core index) is passed on to {@link leafCommon}.
+ */
+export const DYNAMIC_LEAF_PATTERNS: { id: DynamicLeafId; match: RegExp }[] = [
+  { id: "cpuCore", match: /^cpu\.cores\.core(\d+)$/ },
+  { id: "ifaceUp", match: /^network\.interfaces\.[^.]+\.up$/ },
+  { id: "ifaceDown", match: /^network\.interfaces\.[^.]+\.down$/ },
+  { id: "ifaceTotalUp", match: /^network\.interfaces\.[^.]+\.total_up$/ },
+  { id: "ifaceTotalDown", match: /^network\.interfaces\.[^.]+\.total_down$/ },
+  { id: "gpuUsage", match: /^gpu\.[^.]+\.usage$/ },
+  { id: "gpuMemoryUsed", match: /^gpu\.[^.]+\.memory_used$/ },
+  { id: "gpuMemoryTotal", match: /^gpu\.[^.]+\.memory_total$/ },
+  { id: "gpuPower", match: /^gpu\.[^.]+\.power$/ },
+  { id: "gpuPowerPackage", match: /^gpu\.[^.]+\.power_package$/ },
+  { id: "fsDiskPercent", match: /^filesystems\.[^.]+\.disk_percent$/ },
+  { id: "fsDiskUsed", match: /^filesystems\.[^.]+\.disk_used$/ },
+  { id: "fsDiskTotal", match: /^filesystems\.[^.]+\.disk_total$/ },
+  { id: "fsReadSpeed", match: /^filesystems\.[^.]+\.read_speed$/ },
+  { id: "fsWriteSpeed", match: /^filesystems\.[^.]+\.write_speed$/ },
+  { id: "fsTotalRead", match: /^filesystems\.[^.]+\.total_read$/ },
+  { id: "fsTotalWrite", match: /^filesystems\.[^.]+\.total_write$/ },
+  { id: "zfsDiskPercent", match: /^zfs\.[^.]+\.disk_percent$/ },
+  { id: "zfsDiskUsed", match: /^zfs\.[^.]+\.disk_used$/ },
+  { id: "zfsDiskTotal", match: /^zfs\.[^.]+\.disk_total$/ },
+  { id: "zfsReadSpeed", match: /^zfs\.[^.]+\.read_speed$/ },
+  { id: "zfsWriteSpeed", match: /^zfs\.[^.]+\.write_speed$/ },
+  { id: "zfsHealth", match: /^zfs\.[^.]+\.health$/ },
+  { id: "containerStatus", match: /^containers\.[^.]+\.status$/ },
+  { id: "containerHealth", match: /^containers\.[^.]+\.health$/ },
+  { id: "containerCpu", match: /^containers\.[^.]+\.cpu$/ },
+  { id: "containerMemory", match: /^containers\.[^.]+\.memory$/ },
+  { id: "containerImage", match: /^containers\.[^.]+\.image$/ },
+  { id: "containerNetwork", match: /^containers\.[^.]+\.network$/ },
+];
+
+/**
+ * The one place either path resolves a dynamic leaf's `common`.
+ *
+ * @param id Leaf id.
+ * @param arg Optional argument for the factory (the per-core index).
+ */
+export function leafCommon(id: DynamicLeafId, arg?: string): ioBroker.StateCommon {
+  return LEAF_COMMONS[id](arg);
 }
 
 /**

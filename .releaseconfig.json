@@ -1,6 +1,9 @@
 {
   "plugins": ["iobroker", "license"],
   "exec": {
-    "before_commit": ["npm run build"]
+    "before_commit": [
+      "npm run build",
+      "node -e 'const fs=require(\"fs\");for(const[f,r]of[[\"README.md\",/^(-->[ \\t]*)\\r?\\n(#{1,6} )/m],[\"CHANGELOG_OLD.md\",/^(#{1,6} .*)\\r?\\n(#{1,6} )/]])if(fs.existsSync(f)){const t=fs.readFileSync(f,\"utf8\"),n=t.replace(r,\"$1\\n\\n$2\");if(n!==t)fs.writeFileSync(f,n)}'"
+    ]
   }
 }

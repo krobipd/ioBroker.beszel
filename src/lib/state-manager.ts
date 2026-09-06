@@ -4,20 +4,23 @@ import { tDesc, tName } from "./i18n";
 import {
   buildMetricDefs,
   commonFor,
+  containerHealthLabel,
   percentCommon,
   numCommon,
   textCommon,
   boolCommon,
   clampPercent,
   channelName,
+  isChannelKey,
+  leafCommon,
   bytesToMib,
   bytesToGib,
   usedPercent,
-  zfsHealthCommon,
-  CHANNEL_NAME_KEY,
   DYNAMIC_CHANNEL_TOGGLES,
+  DYNAMIC_LEAF_PATTERNS,
+  DYNAMIC_SUBCHANNEL_TOGGLES,
   METRIC_DEPENDENCIES,
-  SYSTEM_STATUS_STATES,
+  systemStatusStates,
   SYSTEM_STATUS_UNKNOWN,
 } from "./metric-registry";
 import type { LocalizedName, MetricDef } from "./metric-registry";
@@ -132,10 +135,23 @@ export class StateManager {
    */
   private readonly knownStateIds = new Set<string>();
   /**
-   * v0.14.0: the channels the startup snapshot found. Only the legacy sweep reads
-   * them — it lets the one pre-0.3.0 channel be recognised without an object read.
+   * The channels that exist, starting from the startup snapshot.
+   *
+   * v0.16.0: kept in sync from then on, exactly like {@link knownStateIds} —
+   * {@link ensureChannel} adds, {@link dropCacheUnder} removes. Until then the set was
+   * only ever filled and never pruned, and {@link refreshDynamicObjects} re-created every
+   * channel it still found in there: a group the cleanup had just deleted came back as an
+   * empty channel on the first poll of any system without a reading, and did so again
+   * after every restart. It is now also what answers "does this channel exist" instead of
+   * an object read (see {@link snapshotExistingStates}).
    */
   private readonly knownChannelIds = new Set<string>();
+  /**
+   * v0.16.0: the system DEVICE objects that exist, same bookkeeping as the two sets above.
+   * `getExistingSystemNames` used to run an object view for this — once at startup and
+   * once per poll from `cleanupSystems`.
+   */
+  private readonly knownDeviceIds = new Set<string>();
   /** Whether {@link snapshotExistingStates} has run — the legacy sweep depends on it. */
   private snapshotTaken = false;
   private createdStatesCount = 0;
@@ -149,13 +165,26 @@ export class StateManager {
   }
 
   /**
-   * v0.11.0: snapshot every existing state id of this instance once at startup
-   * (one object view). Must run before the first cleanup/poll — anything created
+   * v0.11.0: snapshot every existing object of this instance once at startup
+   * (one object list). Must run before the first cleanup/poll — anything created
    * or deleted before it would be miscounted.
+   *
+   * v0.16.0: this is the adapter's ONLY object read in normal operation. States,
+   * channels and devices arrive in the same round-trip and are kept in sync from here
+   * on (create adds, delete removes), so every later "does this object exist" question
+   * — the startup cleanup, the channel deletes, the recursive-delete count, the
+   * dynamic-group reconcile, the system enumeration — is answered from memory. Before
+   * that the adapter asked the objects DB again for what it had just read: 43 reads per
+   * system on every start, plus one view per dynamic group and one per poll for the
+   * device list.
+   *
+   * The one thing the snapshot cannot see is somebody deleting an object in the admin
+   * while the adapter runs; the `createdIds` cache had exactly the same blind spot
+   * before, and the next start reconciles it.
    */
   public async snapshotExistingStates(): Promise<void> {
-    // One object LIST instead of a per-type view: it carries states and channels in
-    // the same round-trip, which is what lets the pre-0.3.0 sweep run without probing
+    // One object LIST instead of a per-type view: it carries every type in the
+    // same round-trip, which is what lets the pre-0.3.0 sweep run without probing
     // ids one by one (and made the `info.legacyMigrated` marker obsolete).
     const list = await this.adapter.getObjectListAsync({
       startkey: `${this.adapter.namespace}.`,
@@ -167,6 +196,8 @@ export class StateManager {
         this.knownStateIds.add(id);
       } else if (row.value?.type === "channel") {
         this.knownChannelIds.add(id);
+      } else if (row.value?.type === "device") {
+        this.knownDeviceIds.add(id);
       }
     }
     this.snapshotTaken = true;
@@ -208,25 +239,38 @@ export class StateManager {
 
   /**
    * v0.11.0: record the states removed by a RECURSIVE delete (channel, device,
-   * dynamic-group child). Counts from the object view — the honest number of
-   * datapoints the user loses — and drops them from `knownStateIds` so a later
-   * re-appearance counts as a creation. Must be called BEFORE the delete.
+   * dynamic-group child) — the honest number of datapoints the user loses — and drop
+   * them from `knownStateIds` so a later re-appearance counts as a creation. Must be
+   * called BEFORE the delete.
+   *
+   * v0.16.0: counted from `knownStateIds` instead of an object view. The set is the
+   * startup snapshot kept in sync ever since, so it answers exactly what the view did,
+   * without the round-trip.
    *
    * @param id Object id whose subtree is about to be removed.
    */
-  private async noteStatesRemovedUnder(id: string): Promise<void> {
-    const view = await this.adapter.getObjectViewAsync("system", "state", {
-      startkey: `${this.adapter.namespace}.${id}`,
-      endkey: `${this.adapter.namespace}.${id}.\uFFFF`,
-    });
-    for (const row of view?.rows ?? []) {
-      const local = this.stripNamespace(row.id);
-      // The view range can only over-reach into siblings sharing the prefix
-      // (`foo` → `foo_bar`), so filter to the subtree explicitly.
-      if (local === id || local.startsWith(`${id}.`)) {
-        this.noteStateRemoved(local);
+  private noteStatesRemovedUnder(id: string): void {
+    for (const local of StateManager.idsUnder(this.knownStateIds, id)) {
+      this.noteStateRemoved(local);
+    }
+  }
+
+  /**
+   * Ids of `set` that are `prefix` itself or live below it. Materialised into an array
+   * so the caller may delete from the set while iterating.
+   *
+   * @param set One of the bookkeeping sets (states / channels / devices).
+   * @param prefix Object id prefix, namespace-relative.
+   */
+  private static idsUnder(set: ReadonlySet<string>, prefix: string): string[] {
+    const dot = `${prefix}.`;
+    const out: string[] = [];
+    for (const id of set) {
+      if (id === prefix || id.startsWith(dot)) {
+        out.push(id);
       }
     }
+    return out;
   }
 
   /**
@@ -237,7 +281,7 @@ export class StateManager {
    *
    * @param name Raw name to sanitize
    */
-  public sanitize(name: unknown): string {
+  private sanitize(name: unknown): string {
     if (typeof name !== "string") {
       return "";
     }
@@ -256,7 +300,7 @@ export class StateManager {
    * @param uniqueKey Stable identifier (e.g. PocketBase record id) used to
    *   derive the suffix.
    */
-  public sanitizeWithSuffix(name: unknown, uniqueKey: string): string {
+  private sanitizeWithSuffix(name: unknown, uniqueKey: string): string {
     const base = this.sanitize(name);
     if (!base) {
       return "";
@@ -397,7 +441,7 @@ export class StateManager {
       } else if (id.endsWith(".info.status")) {
         await this.adapter.extendObject(id, {
           type: "state",
-          common: { states: SYSTEM_STATUS_STATES },
+          common: { states: systemStatusStates() },
           native: {},
         });
         await this.adapter.setStateChangedAsync(id, { val: SYSTEM_STATUS_UNKNOWN, ack: true });
@@ -415,19 +459,15 @@ export class StateManager {
   }
 
   /**
-   * Return sanitized names of all existing system devices.
+   * Sanitized names of all existing system devices.
+   *
+   * v0.16.0: read from `knownDeviceIds` (startup snapshot, kept in sync) instead of an
+   * object view. `cleanupSystems` calls this on every successful poll, so the view was
+   * a per-poll round-trip for a list the adapter already had.
    */
-  public async getExistingSystemNames(): Promise<string[]> {
-    const objects = await this.adapter.getObjectViewAsync("system", "device", {
-      startkey: `${this.adapter.namespace}.systems.`,
-      endkey: `${this.adapter.namespace}.systems.\uFFFF`,
-    });
-    if (!objects?.rows) {
-      return [];
-    }
+  public getExistingSystemNames(): string[] {
     const names: string[] = [];
-    for (const row of objects.rows) {
-      const id = row.id.startsWith(`${this.adapter.namespace}.`) ? this.stripNamespace(row.id) : row.id;
+    for (const id of this.knownDeviceIds) {
       const parts = id.split(".");
       if (parts.length === 2 && parts[0] === "systems") {
         names.push(parts[1]);
@@ -617,6 +657,9 @@ export class StateManager {
         { preserve: { common: ["name"] } },
       );
       this.deviceWritten.set(sysId, deviceSig);
+      // v0.16.0: the device bookkeeping mirrors the tree, so a system the Hub just
+      // added has to join it — `getExistingSystemNames` reads this set now.
+      this.knownDeviceIds.add(sysId);
     }
 
     // Info channel (always created)
@@ -632,7 +675,7 @@ export class StateManager {
       `${sysId}.info.status`,
       {
         ...textCommon(tName("status"), "info.status", tDesc("descStatus")),
-        states: SYSTEM_STATUS_STATES,
+        states: systemStatusStates(),
       },
       system.status,
     );
@@ -678,13 +721,13 @@ export class StateManager {
         activeSet.add(safe);
       }
     }
-    const existing = await this.getExistingSystemNames();
+    const existing = this.getExistingSystemNames();
     const stale = existing.filter(name => !activeSet.has(name));
     // v0.4.3 (SM1): stale-system removals in parallel.
     await Promise.all(
       stale.map(async name => {
         this.adapter.log.debug(`Removing stale system: systems.${name}`);
-        await this.noteStatesRemovedUnder(`systems.${name}`);
+        this.noteStatesRemovedUnder(`systems.${name}`);
         await this.adapter.delObjectAsync(`systems.${name}`, { recursive: true });
         this.dropCacheUnder(`systems.${name}`);
       }),
@@ -692,8 +735,15 @@ export class StateManager {
   }
 
   /**
-   * Drop every cached ID at or under the given prefix. Call after recursive
+   * Drop every cached ID at or under the given prefix. Call after a recursive
    * delObject so subsequent polls re-create the object instead of skipping it.
+   *
+   * v0.16.0: `knownChannelIds` and `knownDeviceIds` are cleared here too. They were
+   * filled by the startup snapshot and never pruned, so `refreshDynamicObjects` kept
+   * finding — and `extendObject`-recreating — group channels the cleanup or the
+   * drop-to-zero prune had just deleted: an empty `containers` / `gpu` / `cpu.cores` …
+   * channel reappeared on the first poll of every system without a reading, and again
+   * after each restart (v0.16.0).
    *
    * @param prefix State ID prefix (e.g. `systems.my_server`)
    */
@@ -706,6 +756,12 @@ export class StateManager {
       if (id === exact || id.startsWith(dot)) {
         this.createdIds.delete(id);
       }
+    }
+    for (const id of StateManager.idsUnder(this.knownChannelIds, prefix)) {
+      this.knownChannelIds.delete(id);
+    }
+    for (const id of StateManager.idsUnder(this.knownDeviceIds, prefix)) {
+      this.knownDeviceIds.delete(id);
     }
     // v0.7.2: the dynamic-group and device-signature caches must follow the
     // same lifecycle — a removed system that is re-added later must go
@@ -731,6 +787,12 @@ export class StateManager {
    * Delete states for metrics that have been disabled in the config.
    * Called on startup to clean up previously-enabled states.
    *
+   * v0.16.0: decided entirely from the startup snapshot — `knownStateIds` and
+   * `knownChannelIds` answer "does this object exist" for free, where the method used to
+   * fire one `getObjectAsync` per disabled metric per system (34 of 53 registry entries
+   * on the default configuration), one per channel candidate and an extra view plus one
+   * read per GPU. Measured before the change: 43 object reads per system on every start.
+   *
    * @param systemId Sanitized system name (the part after "systems.")
    * @param rawConfig Adapter configuration (detail toggles are gated on their category base via effectiveConfig)
    */
@@ -739,28 +801,17 @@ export class StateManager {
     // detail toggles off, so their states (and empty channels) get pruned.
     const config = this.effectiveConfig(rawConfig);
     const sysId = `systems.${systemId}`;
-    const toDelete: string[] = [];
 
     // Scalar metrics: delete the state of every disabled toggle. Driven by the
     // SAME registry as `applyMetrics` (K1) — create- and cleanup-path share one
     // source of truth, so a metric's toggle → state-id mapping can never drift.
-    for (const def of this.metricDefs()) {
-      if (!config[def.toggle]) {
-        toDelete.push(`${sysId}.${def.id}`);
-      }
-    }
+    const toDelete = this.metricDefs()
+      .filter(def => !config[def.toggle])
+      .map(def => `${sysId}.${def.id}`)
+      .filter(id => this.knownStateIds.has(id));
 
-    // v0.4.3 (SM2): toDelete check + delete in parallel.
-    await Promise.all(
-      toDelete.map(async id => {
-        const obj = await this.adapter.getObjectAsync(id);
-        if (obj) {
-          await this.adapter.delObjectAsync(id);
-          this.createdIds.delete(id);
-          this.noteStateRemoved(id);
-        }
-      }),
-    );
+    // v0.4.3 (SM2): the deletes run in parallel.
+    await Promise.all(toDelete.map(id => this.deleteStateIfKnown(id)));
 
     // Delete empty channels when all metrics in a group are disabled.
     // v0.7.2: the per-channel toggle lists are DERIVED from the registry
@@ -789,51 +840,46 @@ export class StateManager {
       }
     }
 
-    // Sub-channels
-    if (!config.metrics_cpuCores) {
-      await this.deleteChannelIfExists(`${sysId}.cpu.cores`);
+    // Dynamic SUB-channels. v0.16.0: a table like the one above, not a hand-written
+    // `if` per channel — the two ways of expressing the same rule were what let a
+    // dynamic group be added without a cleanup branch.
+    for (const [sub, toggle] of Object.entries(DYNAMIC_SUBCHANNEL_TOGGLES)) {
+      if (!config[toggle]) {
+        await this.deleteChannelIfExists(`${sysId}.${sub}`);
+      }
     }
-    if (!config.metrics_networkInterfaces) {
-      await this.deleteChannelIfExists(`${sysId}.network.interfaces`);
-    }
-    if (!config.metrics_temperatureDetails) {
-      await this.deleteChannelIfExists(`${sysId}.temperature.sensors`);
-    }
-    if (!config.metrics_gpu) {
-      await this.deleteChannelIfExists(`${sysId}.gpu`);
-    }
+
     // v0.7.2: gpuDetails off (GPU category still on) used to leave the
     // power_package state + engines channel of every GPU behind forever —
     // the only detail toggle without a cleanup branch. The per-GPU ids are
-    // dynamic, so enumerate the existing GPU channels first.
+    // dynamic, so enumerate the existing GPU channels from the snapshot.
     if (config.metrics_gpu && !config.metrics_gpuDetails) {
-      const view = await this.adapter.getObjectViewAsync("system", "channel", {
-        startkey: `${this.adapter.namespace}.${sysId}.gpu.`,
-        endkey: `${this.adapter.namespace}.${sysId}.gpu.\uFFFF`,
-      });
-      for (const row of view?.rows ?? []) {
-        const id = this.stripNamespace(row.id);
-        const child = id.slice(`${sysId}.gpu.`.length);
+      const gpuBase = `${sysId}.gpu`;
+      for (const id of StateManager.idsUnder(this.knownChannelIds, gpuBase)) {
+        const child = id.slice(`${gpuBase}.`.length);
         // Direct GPU channels only (`gpu.<id>`), not the engines channels.
         if (!child || child.includes(".")) {
           continue;
         }
-        const ppId = `${sysId}.gpu.${child}.power_package`;
-        const ppObj = await this.adapter.getObjectAsync(ppId);
-        if (ppObj) {
-          await this.adapter.delObjectAsync(ppId);
-          this.createdIds.delete(ppId);
-          this.noteStateRemoved(ppId);
-        }
-        await this.deleteChannelIfExists(`${sysId}.gpu.${child}.engines`);
+        await this.deleteStateIfKnown(`${gpuBase}.${child}.power_package`);
+        await this.deleteChannelIfExists(`${gpuBase}.${child}.engines`);
       }
     }
-    if (!config.metrics_extraFs) {
-      await this.deleteChannelIfExists(`${sysId}.filesystems`);
+  }
+
+  /**
+   * Delete one state object if the bookkeeping says it exists, and keep the counters
+   * and caches in step. No-op otherwise.
+   *
+   * @param id State id, namespace-relative.
+   */
+  private async deleteStateIfKnown(id: string): Promise<void> {
+    if (!this.knownStateIds.has(id)) {
+      return;
     }
-    if (!config.metrics_containers) {
-      await this.deleteChannelIfExists(`${sysId}.containers`);
-    }
+    await this.adapter.delObjectAsync(id);
+    this.createdIds.delete(id);
+    this.noteStateRemoved(id);
   }
 
   /**
@@ -862,7 +908,7 @@ export class StateManager {
     }
     await this.removeLegacyMigrationMarker();
 
-    const names = existingNames ?? (await this.getExistingSystemNames());
+    const names = existingNames ?? this.getExistingSystemNames();
     if (names.length === 0) {
       return;
     }
@@ -931,87 +977,18 @@ export class StateManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Datapoints inside the dynamic groups whose `common` the ADAPTER owns — name and
-   * description come from `admin/i18n`, not from the Hub. Keyed by the id suffix below
-   * the system, so {@link refreshDynamicObjects} can rebuild them from the object tree
-   * alone, with no live data.
-   *
-   * Deliberately NOT listed: everything named by the Hub (sensor, fan, battery, GPU,
-   * filesystem, interface and container names). Those cannot be rebuilt without the
-   * data, and they never change through an adapter update either.
-   *
-   * A test walks a fully populated system and fails if any adapter-named datapoint is
-   * missing here — that is what keeps this table from drifting away from the creation
-   * paths below.
-   */
-  private static readonly DYNAMIC_LEAF_COMMONS: {
-    match: RegExp;
-    common: (m: RegExpMatchArray) => ioBroker.StateCommon;
-  }[] = [
-    {
-      match: /^cpu\.cores\.core(\d+)$/,
-      common: m => percentCommon(tName("cpuCore", Number(m[1]))),
-    },
-    { match: /^network\.interfaces\.[^.]+\.up$/, common: () => numCommon(tName("ifaceUp"), "MB/s") },
-    { match: /^network\.interfaces\.[^.]+\.down$/, common: () => numCommon(tName("ifaceDown"), "MB/s") },
-    {
-      match: /^network\.interfaces\.[^.]+\.total_up$/,
-      common: () => numCommon(tName("ifaceTotalUp"), "GB", "value", tDesc("descIfaceTotal")),
-    },
-    {
-      match: /^network\.interfaces\.[^.]+\.total_down$/,
-      common: () => numCommon(tName("ifaceTotalDown"), "GB", "value", tDesc("descIfaceTotal")),
-    },
-    { match: /^gpu\.[^.]+\.usage$/, common: () => percentCommon(tName("gpuUsage")) },
-    { match: /^gpu\.[^.]+\.memory_used$/, common: () => numCommon(tName("gpuMemoryUsed"), "MB") },
-    { match: /^gpu\.[^.]+\.memory_total$/, common: () => numCommon(tName("gpuMemoryTotal"), "MB") },
-    { match: /^gpu\.[^.]+\.power$/, common: () => numCommon(tName("gpuPower"), "W", "value.power") },
-    {
-      match: /^gpu\.[^.]+\.power_package$/,
-      common: () => numCommon(tName("gpuPowerPackage"), "W", "value.power", tDesc("descGpuPowerPackage")),
-    },
-    { match: /^filesystems\.[^.]+\.disk_percent$/, common: () => percentCommon(tName("diskPercent")) },
-    { match: /^filesystems\.[^.]+\.disk_used$/, common: () => numCommon(tName("diskUsed"), "GB") },
-    { match: /^filesystems\.[^.]+\.disk_total$/, common: () => numCommon(tName("diskTotal"), "GB") },
-    { match: /^filesystems\.[^.]+\.read_speed$/, common: () => numCommon(tName("readSpeed"), "MB/s") },
-    { match: /^filesystems\.[^.]+\.write_speed$/, common: () => numCommon(tName("writeSpeed"), "MB/s") },
-    {
-      match: /^filesystems\.[^.]+\.total_read$/,
-      common: () => numCommon(tName("diskTotalRead"), "GB", "value", tDesc("descDiskTotalIo")),
-    },
-    {
-      match: /^filesystems\.[^.]+\.total_write$/,
-      common: () => numCommon(tName("diskTotalWrite"), "GB", "value", tDesc("descDiskTotalIo")),
-    },
-    { match: /^zfs\.[^.]+\.disk_percent$/, common: () => percentCommon(tName("diskPercent")) },
-    { match: /^zfs\.[^.]+\.disk_used$/, common: () => numCommon(tName("diskUsed"), "GB") },
-    { match: /^zfs\.[^.]+\.disk_total$/, common: () => numCommon(tName("diskTotal"), "GB") },
-    { match: /^zfs\.[^.]+\.read_speed$/, common: () => numCommon(tName("readSpeed"), "MB/s") },
-    { match: /^zfs\.[^.]+\.write_speed$/, common: () => numCommon(tName("writeSpeed"), "MB/s") },
-    { match: /^zfs\.[^.]+\.health$/, common: () => zfsHealthCommon() },
-    { match: /^containers\.[^.]+\.status$/, common: () => textCommon(tName("status")) },
-    {
-      match: /^containers\.[^.]+\.health$/,
-      common: () => textCommon(tName("containerHealth"), "text", tDesc("descContainerHealth")),
-    },
-    { match: /^containers\.[^.]+\.cpu$/, common: () => percentCommon(tName("cpuUsage")) },
-    { match: /^containers\.[^.]+\.memory$/, common: () => numCommon(tName("containerMemory"), "MB") },
-    { match: /^containers\.[^.]+\.image$/, common: () => textCommon(tName("containerImage")) },
-    {
-      match: /^containers\.[^.]+\.network$/,
-      common: () => numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
-    },
-  ];
-
-  /**
    * Bring the dynamic groups' names and descriptions up to date WITHOUT live data.
    *
    * `updateDynamicStats` only runs when the Hub delivered a reading, so a system that is
    * currently down never had its container / GPU / interface / filesystem datapoints
    * refreshed — they kept the wording they were created with, and no gate can see that
-   * (found on the live tree, v0.14.1). This walks what the startup snapshot already
-   * knows: the group channels the adapter names itself, and the leaves in
-   * {@link DYNAMIC_LEAF_COMMONS}. It creates nothing, deletes nothing, writes no value.
+   * (found on the live tree, v0.14.1). This walks what the bookkeeping already knows:
+   * the group channels the adapter names itself, and the leaves of
+   * `DYNAMIC_LEAF_PATTERNS`. It creates nothing, deletes nothing, writes no value.
+   *
+   * v0.16.0: the `common` comes from `leafCommon()` — the SAME table the creation paths
+   * below use. Until then this method carried its own copy of all 29 definitions, kept
+   * in step by an invariant test that only checked coverage, never equality.
    *
    * @param sysId State prefix (`systems.<safeName>`).
    */
@@ -1025,7 +1002,7 @@ export class StateManager {
         continue;
       }
       const last = id.slice(id.lastIndexOf(".") + 1);
-      if (CHANNEL_NAME_KEY[last]) {
+      if (isChannelKey(last)) {
         await this.ensureChannel(id, channelName(last));
       }
     }
@@ -1034,10 +1011,10 @@ export class StateManager {
         continue;
       }
       const rel = id.slice(prefix.length);
-      for (const entry of StateManager.DYNAMIC_LEAF_COMMONS) {
+      for (const entry of DYNAMIC_LEAF_PATTERNS) {
         const m = rel.match(entry.match);
         if (m) {
-          await this.ensureStateObject(id, entry.common(m));
+          await this.ensureStateObject(id, leafCommon(entry.id, m[1]));
           break;
         }
       }
@@ -1135,7 +1112,7 @@ export class StateManager {
             `${sysId}.cpu.cores.core${i}`,
             // Positional label, but still a translation object: the fleet standard
             // wants one for every object, and `%s` carries the index into each language.
-            percentCommon(tName("cpuCore", i)),
+            leafCommon("cpuCore", String(i)),
             clampPercent(cores[i]),
           );
         }
@@ -1162,22 +1139,22 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.network.interfaces.${safeId}`, sanitizeDisplayName(iface), API_NAMED);
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.up`,
-            numCommon(tName("ifaceUp"), "MB/s"),
+            leafCommon("ifaceUp"),
             bytesToMib(vals[0]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.down`,
-            numCommon(tName("ifaceDown"), "MB/s"),
+            leafCommon("ifaceDown"),
             bytesToMib(vals[1]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_up`,
-            numCommon(tName("ifaceTotalUp"), "GB", "value", tDesc("descIfaceTotal")),
+            leafCommon("ifaceTotalUp"),
             bytesToGib(vals[2]),
           );
           await this.createAndSetState(
             `${sysId}.network.interfaces.${safeId}.total_down`,
-            numCommon(tName("ifaceTotalDown"), "GB", "value", tDesc("descIfaceTotal")),
+            leafCommon("ifaceTotalDown"),
             bytesToGib(vals[3]),
           );
         },
@@ -1199,30 +1176,26 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.gpu.${safeId}`, sanitizeDisplayName(gpuData.n ?? gpuId), API_NAMED);
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.usage`,
-            percentCommon(tName("gpuUsage")),
+            leafCommon("gpuUsage"),
             clampPercent(gpuData.u ?? null),
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.memory_used`,
-            numCommon(tName("gpuMemoryUsed"), "MB"),
+            leafCommon("gpuMemoryUsed"),
             gpuData.mu ?? null,
           );
           await this.createAndSetState(
             `${sysId}.gpu.${safeId}.memory_total`,
-            numCommon(tName("gpuMemoryTotal"), "MB"),
+            leafCommon("gpuMemoryTotal"),
             gpuData.mt ?? null,
           );
-          await this.createAndSetState(
-            `${sysId}.gpu.${safeId}.power`,
-            numCommon(tName("gpuPower"), "W", "value.power"),
-            gpuData.p ?? null,
-          );
+          await this.createAndSetState(`${sysId}.gpu.${safeId}.power`, leafCommon("gpuPower"), gpuData.p ?? null);
           // GPU details (v0.6.0): package power + per-engine usage. Engines the
           // driver stopped reporting get pruned (debounced) — nested group.
           if (config.metrics_gpuDetails) {
             await this.createAndSetState(
               `${sysId}.gpu.${safeId}.power_package`,
-              numCommon(tName("gpuPowerPackage"), "W", "value.power", tDesc("descGpuPowerPackage")),
+              leafCommon("gpuPowerPackage"),
               gpuData.pp ?? null,
             );
             await this.syncDynamicGroup(
@@ -1268,27 +1241,19 @@ export class StateManager {
 
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.disk_percent`,
-            percentCommon(tName("diskPercent")),
+            leafCommon("fsDiskPercent"),
             percent,
           );
-          await this.createAndSetState(
-            `${sysId}.filesystems.${safeId}.disk_used`,
-            numCommon(tName("diskUsed"), "GB"),
-            used,
-          );
-          await this.createAndSetState(
-            `${sysId}.filesystems.${safeId}.disk_total`,
-            numCommon(tName("diskTotal"), "GB"),
-            total,
-          );
+          await this.createAndSetState(`${sysId}.filesystems.${safeId}.disk_used`, leafCommon("fsDiskUsed"), used);
+          await this.createAndSetState(`${sysId}.filesystems.${safeId}.disk_total`, leafCommon("fsDiskTotal"), total);
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.read_speed`,
-            numCommon(tName("readSpeed"), "MB/s"),
+            leafCommon("fsReadSpeed"),
             fsData.r ?? null,
           );
           await this.createAndSetState(
             `${sysId}.filesystems.${safeId}.write_speed`,
-            numCommon(tName("writeSpeed"), "MB/s"),
+            leafCommon("fsWriteSpeed"),
             fsData.w ?? null,
           );
           // Beszel 0.19.0: cumulative device counters per filesystem — a volume in GB,
@@ -1296,14 +1261,14 @@ export class StateManager {
           if (fsData.tr !== undefined) {
             await this.createAndSetState(
               `${sysId}.filesystems.${safeId}.total_read`,
-              numCommon(tName("diskTotalRead"), "GB", "value", tDesc("descDiskTotalIo")),
+              leafCommon("fsTotalRead"),
               bytesToGib(fsData.tr),
             );
           }
           if (fsData.tw !== undefined) {
             await this.createAndSetState(
               `${sysId}.filesystems.${safeId}.total_write`,
-              numCommon(tName("diskTotalWrite"), "GB", "value", tDesc("descDiskTotalIo")),
+              leafCommon("fsTotalWrite"),
               bytesToGib(fsData.tw),
             );
           }
@@ -1331,22 +1296,22 @@ export class StateManager {
           const used = pool.du ?? null;
           await this.createAndSetState(
             `${sysId}.zfs.${safeId}.disk_percent`,
-            percentCommon(tName("diskPercent")),
+            leafCommon("zfsDiskPercent"),
             usedPercent(total, used),
           );
-          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_used`, numCommon(tName("diskUsed"), "GB"), used);
-          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_total`, numCommon(tName("diskTotal"), "GB"), total);
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_used`, leafCommon("zfsDiskUsed"), used);
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_total`, leafCommon("zfsDiskTotal"), total);
           await this.createAndSetState(
             `${sysId}.zfs.${safeId}.read_speed`,
-            numCommon(tName("readSpeed"), "MB/s"),
+            leafCommon("zfsReadSpeed"),
             bytesToMib(pool.rb ?? 0),
           );
           await this.createAndSetState(
             `${sysId}.zfs.${safeId}.write_speed`,
-            numCommon(tName("writeSpeed"), "MB/s"),
+            leafCommon("zfsWriteSpeed"),
             bytesToMib(pool.wb ?? 0),
           );
-          await this.createAndSetState(`${sysId}.zfs.${safeId}.health`, zfsHealthCommon(), pool.h ?? null);
+          await this.createAndSetState(`${sysId}.zfs.${safeId}.health`, leafCommon("zfsHealth"), pool.h ?? null);
         },
       );
     }
@@ -1391,8 +1356,6 @@ export class StateManager {
 
     await this.ensureChannel(`${sysId}.containers`, channelName("containers"));
 
-    const healthLabels = ["none", "starting", "healthy", "unhealthy"];
-
     for (const container of sysContainers) {
       const cId = resolvedIds.get(container.id) ?? "";
       if (cId.length === 0) {
@@ -1400,32 +1363,32 @@ export class StateManager {
       }
       // container.name is user-defined (Docker container name) → keep as-is.
       await this.ensureChannel(`${sysId}.containers.${cId}`, sanitizeDisplayName(container.name), API_NAMED);
-      await this.createAndSetState(`${sysId}.containers.${cId}.status`, textCommon(tName("status")), container.status);
-      // v0.4.3 (SM7): floor the health index — API drift could send a
-      // float (e.g. 2.5) which `healthLabels[2.5]` resolves to undefined.
-      const healthIdx = Math.floor(container.health);
+      await this.createAndSetState(
+        `${sysId}.containers.${cId}.status`,
+        leafCommon("containerStatus"),
+        container.status,
+      );
+      // v0.4.3 (SM7): `containerHealthLabel` floors the index — API drift could send a
+      // float (e.g. 2.5), which a bare lookup resolves to undefined. The word list and
+      // the matching `common.states` hint live together in the registry (v0.16.0).
       await this.createAndSetState(
         `${sysId}.containers.${cId}.health`,
-        textCommon(tName("containerHealth"), "text", tDesc("descContainerHealth")),
-        healthLabels[healthIdx] ?? "unknown",
+        leafCommon("containerHealth"),
+        containerHealthLabel(container.health),
       );
-      await this.createAndSetState(`${sysId}.containers.${cId}.cpu`, percentCommon(tName("cpuUsage")), container.cpu);
+      await this.createAndSetState(`${sysId}.containers.${cId}.cpu`, leafCommon("containerCpu"), container.cpu);
       await this.createAndSetState(
         `${sysId}.containers.${cId}.memory`,
-        numCommon(tName("containerMemory"), "MB"),
+        leafCommon("containerMemory"),
         container.memory,
       );
-      await this.createAndSetState(
-        `${sysId}.containers.${cId}.image`,
-        textCommon(tName("containerImage")),
-        container.image,
-      );
+      await this.createAndSetState(`${sysId}.containers.${cId}.image`, leafCommon("containerImage"), container.image);
       // v0.6.0: combined network throughput (sent + recv, bytes/s). Only when
       // the Hub provides it — older Hubs omit the `net` column.
       if (container.net != null) {
         await this.createAndSetState(
           `${sysId}.containers.${cId}.network`,
-          numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
+          leafCommon("containerNetwork"),
           container.net,
         );
       }
@@ -1518,16 +1481,14 @@ export class StateManager {
   ): Promise<void> {
     let known = this.dynamicChildren.get(base);
     if (!known) {
-      // First poll for this group since adapter start: reconcile against the
-      // DB once so zombies from previous runs (or older versions) get pruned.
+      // First poll for this group since adapter start: reconcile against what the
+      // startup snapshot found, so zombies from previous runs (or older versions) get
+      // pruned. v0.16.0: from `knownChannelIds`/`knownStateIds` instead of an object
+      // view — the snapshot IS that view, taken once for the whole namespace.
       known = new Set<string>();
-      const view = await this.adapter.getObjectViewAsync("system", childType, {
-        startkey: `${this.adapter.namespace}.${base}.`,
-        endkey: `${this.adapter.namespace}.${base}.\uFFFF`,
-      });
-      for (const row of view?.rows ?? []) {
-        const id = row.id.startsWith(`${this.adapter.namespace}.`) ? this.stripNamespace(row.id) : row.id;
-        if (!id.startsWith(`${base}.`)) {
+      const source = childType === "channel" ? this.knownChannelIds : this.knownStateIds;
+      for (const id of StateManager.idsUnder(source, base)) {
+        if (id === base) {
           continue;
         }
         // Only the direct child segment (`<base>.<cId>`), not deeper ids.
@@ -1541,7 +1502,7 @@ export class StateManager {
     await Promise.all(
       stale.map(async cId => {
         this.adapter.log.debug(`Removing stale ${childType} ${base}.${cId} (no longer reported)`);
-        await this.noteStatesRemovedUnder(`${base}.${cId}`);
+        this.noteStatesRemovedUnder(`${base}.${cId}`);
         await this.adapter.delObjectAsync(`${base}.${cId}`, { recursive: true });
         this.dropCacheUnder(`${base}.${cId}`);
       }),
@@ -1549,14 +1510,10 @@ export class StateManager {
     // H2d: if that removed the LAST child (the group emptied to zero), delete the
     // now-empty parent group channel too — otherwise an empty `<sysId>.gpu` /
     // `.containers` / `.filesystems` … object lingers. Gated on the emptying
-    // transition (something was removed AND nothing is left active), so it costs
-    // one extra object read only on that single poll, never per-poll.
-    if (stale.length > 0 && activeIds.size === 0) {
-      const parent = await this.adapter.getObjectAsync(base);
-      if (parent) {
-        await this.adapter.delObjectAsync(base);
-        this.createdIds.delete(base);
-      }
+    // transition (something was removed AND nothing is left active).
+    if (stale.length > 0 && activeIds.size === 0 && this.knownChannelIds.has(base)) {
+      await this.adapter.delObjectAsync(base);
+      this.dropCacheUnder(base);
     }
     this.dynamicChildren.set(base, new Set(activeIds));
   }
@@ -1583,6 +1540,10 @@ export class StateManager {
       native,
     });
     this.createdIds.add(id);
+    // v0.16.0: the channel bookkeeping is only a truthful mirror of the tree if a
+    // freshly created channel joins it — everything that asks "does this channel
+    // exist" now reads this set instead of the objects DB.
+    this.knownChannelIds.add(id);
   }
 
   /**
@@ -1591,19 +1552,18 @@ export class StateManager {
    *   `false` only for the legacy migration, which reports its own total.
    */
   private async deleteChannelIfExists(id: string, countRemoval = true): Promise<void> {
+    if (!this.knownChannelIds.has(id)) {
+      return;
+    }
     try {
-      const obj = await this.adapter.getObjectAsync(id);
-      if (obj) {
-        if (countRemoval) {
-          await this.noteStatesRemovedUnder(id);
-        }
-        await this.adapter.delObjectAsync(id, { recursive: true });
-        this.dropCacheUnder(id);
+      if (countRemoval) {
+        this.noteStatesRemovedUnder(id);
       }
+      await this.adapter.delObjectAsync(id, { recursive: true });
+      this.dropCacheUnder(id);
     } catch (err) {
-      // v0.5.0 (S2): a silent catch replaced by a debug trace. Broker-already-down
-      // or "object does not exist" are expected here — keep them out of the
-      // user log but leave a breadcrumb for diagnostics.
+      // v0.5.0 (S2): a silent catch replaced by a debug trace. A broker that is already
+      // down is expected here — keep it out of the user log but leave a breadcrumb.
       this.adapter.log.debug(`deleteChannelIfExists(${id}) ignored: ${errText(err)}`);
     }
   }

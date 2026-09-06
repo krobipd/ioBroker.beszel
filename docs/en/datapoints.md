@@ -50,18 +50,23 @@ can look "full" and still be perfectly healthy.
 
 ## Disk
 
-| Switch                  | Datapoints                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------- |
-| Disk Usage _(on)_       | `disk.percent`, `disk.used`, `disk.total`                                                      |
-| Read/Write Speed _(on)_ | `disk.read`, `disk.write`                                                                      |
-| Additional Filesystems  | `filesystems.<mount>.disk_percent`, `.disk_used`, `.disk_total`, `.read_speed`, `.write_speed` |
-| I/O load                | `disk.io_util`, `disk.io_await_read`, `disk.io_await_write`                                    |
-| Peak values             | `disk.read_peak`, `disk.write_peak`                                                            |
+| Switch                  | Datapoints                                                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Disk Usage _(on)_       | `disk.percent`, `disk.used`, `disk.total`, `disk.name`                                                                        |
+| Read/Write Speed _(on)_ | `disk.read`, `disk.write`                                                                                                     |
+| Additional Filesystems  | `filesystems.<mount>.disk_percent`, `.disk_used`, `.disk_total`, `.read_speed`, `.write_speed`, `.total_read`, `.total_write` |
+| I/O load                | `disk.io_util`, `disk.io_await_read`, `disk.io_await_write`, `disk.total_read`, `disk.total_write`                            |
+| Peak values             | `disk.read_peak`, `disk.write_peak`                                                                                           |
 
 The `disk.*` values describe the filesystem the agent tracks as root. Anything else you configured
 in Beszel appears under `filesystems.`. `io_util` is the share of time the disk had at least one
 request in flight; the two `io_await` values are the average duration of a single read or write
 operation, the same figures `iostat` prints as `r_await` and `w_await`.
+
+`disk.name` is the custom name you can give the root disk on the agent (`FILESYSTEM=device__name`)
+and only appears when one is set. The `total_read` / `total_write` values are volumes, not rates:
+how much the device has read or written since it was started. They need Beszel 0.19.0 or newer and
+are gone again after a reboot, because the counter starts at zero.
 
 ## Network
 
@@ -89,6 +94,21 @@ hottest reading, which is usually the one worth alarming on.
 Fans need Beszel 0.18.8 or newer and are Linux-only, because the agent reads them from hwmon.
 They live in their own `fans` channel rather than under temperature: different source, different
 meaning. A fan reading 0 rpm is kept — a stopped fan is a measurement, not a missing value.
+
+## ZFS
+
+| Switch    | Datapoints                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| ZFS Pools | `zfs.<pool>.disk_percent`, `.disk_used`, `.disk_total`, `.read_speed`, `.write_speed`, `.health` |
+
+One channel per pool, named as `zpool list` names it. Capacity is what ZFS reports as allocated
+against the pool size, so it is not the same number a `df` inside a dataset shows. Throughput is
+what the pool moved in the last collection interval — an idle pool reads 0, not "unknown".
+`health` carries zpool's own word (`ONLINE`, `DEGRADED`, `FAULTED`, …); the adapter passes it on
+unchanged, so a word from a newer ZFS arrives intact even if it is not in the list the admin offers.
+
+Needs Beszel 0.19.0 or newer. The pool's detail data (scrub state, vdevs, datasets) lives in a
+separate collection on the Hub and is not read.
 
 ## GPU
 

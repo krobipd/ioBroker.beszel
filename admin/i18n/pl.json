@@ -203,5 +203,22 @@
   "diskTotalWrite": "Łącznie zapisano",
   "descDiskTotalIo": "Ilość danych odczytanych lub zapisanych od uruchomienia (licznik urządzenia), nie szybkość.",
   "rootDiskName": "Nazwa dysku głównego",
-  "descRootDiskName": "Nazwa dysku głównego ustawiona w agencie (FILESYSTEM=device__name)."
+  "descRootDiskName": "Nazwa dysku głównego ustawiona w agencie (FILESYSTEM=device__name).",
+  "stateUp": "Online",
+  "stateDown": "Offline",
+  "statePaused": "Wstrzymane",
+  "statePending": "Oczekuje",
+  "stateUnknown": "Nieznany",
+  "zfsOnline": "Online",
+  "zfsDegraded": "Obniżona sprawność",
+  "zfsFaulted": "Uszkodzony",
+  "zfsOffline": "Offline",
+  "zfsRemoved": "Usunięty",
+  "zfsUnavailable": "Niedostępny",
+  "zfsSuspended": "Zawieszony",
+  "healthNone": "Brak",
+  "healthStarting": "Uruchamianie",
+  "healthHealthy": "Sprawny",
+  "healthUnhealthy": "Niesprawny",
+  "healthUnknown": "Nieznany"
 }

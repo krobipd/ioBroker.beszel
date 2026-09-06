@@ -889,9 +889,16 @@
         "zh-cn": "镜像健康检查的结果；镜像未定义时为 “none”。"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.status",
       "read": true,
-      "write": false
+      "write": false,
+      "states": {
+        "none": "None",
+        "starting": "Starting",
+        "healthy": "Healthy",
+        "unhealthy": "Unhealthy",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.containers.backup_job.health"
@@ -1036,9 +1043,16 @@
         "zh-cn": "镜像健康检查的结果；镜像未定义时为 “none”。"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.status",
       "read": true,
-      "write": false
+      "write": false,
+      "states": {
+        "none": "None",
+        "starting": "Starting",
+        "healthy": "Healthy",
+        "unhealthy": "Unhealthy",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.containers.nginx.health"
@@ -1221,9 +1235,16 @@
         "zh-cn": "镜像健康检查的结果；镜像未定义时为 “none”。"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.status",
       "read": true,
-      "write": false
+      "write": false,
+      "states": {
+        "none": "None",
+        "starting": "Starting",
+        "healthy": "Healthy",
+        "unhealthy": "Unhealthy",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.containers.postgres.health"

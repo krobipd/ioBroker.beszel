@@ -1618,6 +1618,87 @@ describe("BeszelClient", () => {
   });
 
   // -----------------------------------------------------------------------
+  // v0.16.0 — URL shapes without an explicit port
+  // -----------------------------------------------------------------------
+
+  describe("delay fallback", () => {
+    it("a client built without an injected delay still retries a 429, just without backing off", async () => {
+      // Production always injects the adapter-managed delay (cancels on unload). The
+      // fallback exists so a bare client outside the adapter does not pull in a plain
+      // setTimeout — it must retry immediately rather than not at all.
+      let attempts = 0;
+      mock = createMockServer({
+        systemsHandler: () => {
+          attempts++;
+          return attempts === 1
+            ? { status: 429, body: "slow down", headers: { "retry-after": "1" } }
+            : { status: 200, body: JSON.stringify({ page: 1, perPage: 200, totalItems: 0, totalPages: 1, items: [] }) };
+        },
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret"); // no delay injected
+      const systems = await client.getSystems();
+      expect(attempts, "the 429 must be retried").to.equal(2);
+      expect(systems).to.deep.equal([]);
+    }, 10000);
+  });
+
+  describe("default ports", () => {
+    it("a Hub URL without a port falls back to the scheme's default", async () => {
+      // `parsedUrl.port` is "" for `http://host/` — without the fallback the request
+      // would go to port 0. Nothing on port 80 here, so the measurable proof is that the
+      // connection is attempted against 80 and refused, not that it silently succeeds.
+      const client = new BeszelClient("http://127.0.0.1", "admin", "secret", 2000);
+      const result = await client.checkConnection();
+      expect(result.success).to.equal(false);
+      expect(result.message, "must have tried the default port, not port 0").to.match(
+        /ECONNREFUSED|ETIMEDOUT|EACCES|timed out/i,
+      );
+    }, 10000);
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.16.0 — a broken response tears the request down
+  // -----------------------------------------------------------------------
+
+  describe("response error", () => {
+    it("a response cut off mid-body rejects and leaves nothing in flight", async () => {
+      // Announce more bytes than we send, then kill the socket. Measured on Node 22:
+      // this reaches `req.on("error")` with ECONNRESET (NOT `res.on("error")`), and the
+      // request is already destroyed — so what is worth pinning here is that the call
+      // rejects and the in-flight registry is clean, which is what `cancelAll()` walks
+      // at shutdown.
+      const server = http.createServer((_req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json", "Content-Length": "1000" });
+        res.write('{"items":[');
+        res.socket?.destroy();
+      });
+      await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+      const port = (server.address() as { port: number }).port;
+      try {
+        const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+        let threw = false;
+        try {
+          await client.checkConnection().then(r => {
+            if (!r.success) {
+              throw new Error(r.message);
+            }
+          });
+        } catch {
+          threw = true;
+        }
+        expect(threw, "a truncated response must not resolve").to.equal(true);
+        // Nothing may still be registered as in flight — cancelAll() would otherwise
+        // have work to do at shutdown for a request that is long dead.
+        const inflight = (client as unknown as { inflight: Set<unknown> }).inflight;
+        expect(inflight.size, "the aborted request must be off the in-flight list").to.equal(0);
+      } finally {
+        await new Promise<void>(resolve => server.close(() => resolve()));
+      }
+    }, 10000);
+  });
+
+  // -----------------------------------------------------------------------
   // Pagination — a page of only-unusable records must not end the walk
   // -----------------------------------------------------------------------
 

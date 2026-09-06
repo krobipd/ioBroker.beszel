@@ -203,5 +203,22 @@
   "diskTotalWrite": "累计写入",
   "descDiskTotalIo": "自启动以来读取或写入的数据量（设备计数器），不是速率。",
   "rootDiskName": "根磁盘名称",
-  "descRootDiskName": "在代理上设置的根磁盘名称（FILESYSTEM=device__name）。"
+  "descRootDiskName": "在代理上设置的根磁盘名称（FILESYSTEM=device__name）。",
+  "stateUp": "在线",
+  "stateDown": "离线",
+  "statePaused": "已暂停",
+  "statePending": "等待中",
+  "stateUnknown": "未知",
+  "zfsOnline": "在线",
+  "zfsDegraded": "降级",
+  "zfsFaulted": "故障",
+  "zfsOffline": "离线",
+  "zfsRemoved": "已移除",
+  "zfsUnavailable": "不可用",
+  "zfsSuspended": "已挂起",
+  "healthNone": "无",
+  "healthStarting": "启动中",
+  "healthHealthy": "健康",
+  "healthUnhealthy": "不健康",
+  "healthUnknown": "未知"
 }

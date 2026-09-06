@@ -38,6 +38,8 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 - **ioBroker Admin >= 8.0.11**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
 
+> The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
+
 ---
 
 ## Documentation
@@ -245,6 +247,16 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- Fixed: switching a metric group off now really empties it — a system that was offline at the time kept the empty channel and got it back after every restart
+- Fixed: an object-database hiccup during startup no longer leaves the instance running without ever polling again
+- Changed: the status words of a system, of a ZFS pool and of a container are shown in your ioBroker language instead of English
+- Changed: a container's health is now a proper status datapoint with its list of possible values, like the system status next to it
+- Changed: the adapter reads the object tree once at startup and answers from that, instead of asking the database again for every disabled metric of every system
+- Changed: user documentation now covers the ZFS pools, the root disk name and the read/write totals
+
 ### 0.15.0 (2026-09-05)
 
 - New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.

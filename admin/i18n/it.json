@@ -203,5 +203,22 @@
   "diskTotalWrite": "Totale scritto",
   "descDiskTotalIo": "Volume letto o scritto dall'avvio (contatore del dispositivo), non una velocità.",
   "rootDiskName": "Nome del disco radice",
-  "descRootDiskName": "Nome del disco radice impostato sull'agente (FILESYSTEM=device__name)."
+  "descRootDiskName": "Nome del disco radice impostato sull'agente (FILESYSTEM=device__name).",
+  "stateUp": "Online",
+  "stateDown": "Offline",
+  "statePaused": "In pausa",
+  "statePending": "In attesa",
+  "stateUnknown": "Sconosciuto",
+  "zfsOnline": "Online",
+  "zfsDegraded": "Degradato",
+  "zfsFaulted": "Guasto",
+  "zfsOffline": "Offline",
+  "zfsRemoved": "Rimosso",
+  "zfsUnavailable": "Non disponibile",
+  "zfsSuspended": "Sospeso",
+  "healthNone": "Nessuno",
+  "healthStarting": "In avvio",
+  "healthHealthy": "Integro",
+  "healthUnhealthy": "Non integro",
+  "healthUnknown": "Sconosciuto"
 }

@@ -203,5 +203,22 @@
   "diskTotalWrite": "Geschrieben gesamt",
   "descDiskTotalIo": "Seit dem Systemstart gelesene bzw. geschriebene Datenmenge (Gerätezähler), keine Rate.",
   "rootDiskName": "Name der Systemfestplatte",
-  "descRootDiskName": "Auf dem Agenten vergebener Name der Systemfestplatte (FILESYSTEM=device__name)."
+  "descRootDiskName": "Auf dem Agenten vergebener Name der Systemfestplatte (FILESYSTEM=device__name).",
+  "stateUp": "Online",
+  "stateDown": "Offline",
+  "statePaused": "Pausiert",
+  "statePending": "Ausstehend",
+  "stateUnknown": "Unbekannt",
+  "zfsOnline": "Online",
+  "zfsDegraded": "Beeinträchtigt",
+  "zfsFaulted": "Fehlerhaft",
+  "zfsOffline": "Offline",
+  "zfsRemoved": "Entfernt",
+  "zfsUnavailable": "Nicht verfügbar",
+  "zfsSuspended": "Angehalten",
+  "healthNone": "Keine",
+  "healthStarting": "Startet",
+  "healthHealthy": "Gesund",
+  "healthUnhealthy": "Fehlerhaft",
+  "healthUnknown": "Unbekannt"
 }

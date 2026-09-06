@@ -4,6 +4,8 @@ import { join } from "node:path";
 vi.mock("@iobroker/adapter-core", () => ({
   I18n: {
     getTranslatedObject: vi.fn((key: string) => ({ en: key, de: `${key}_de` })),
+    // `common.states` labels go through the plain-string path, not the object one.
+    translate: vi.fn((key: string) => key),
   },
 }));
 

@@ -203,5 +203,22 @@
   "diskTotalWrite": "Записано всього",
   "descDiskTotalIo": "Обсяг прочитаних або записаних даних від завантаження (лічильник пристрою), не швидкість.",
   "rootDiskName": "Назва системного диска",
-  "descRootDiskName": "Назва системного диска, задана на агенті (FILESYSTEM=device__name)."
+  "descRootDiskName": "Назва системного диска, задана на агенті (FILESYSTEM=device__name).",
+  "stateUp": "В мережі",
+  "stateDown": "Не в мережі",
+  "statePaused": "Призупинено",
+  "statePending": "Очікує",
+  "stateUnknown": "Невідомо",
+  "zfsOnline": "В мережі",
+  "zfsDegraded": "Погіршено",
+  "zfsFaulted": "Несправно",
+  "zfsOffline": "Вимкнено",
+  "zfsRemoved": "Вилучено",
+  "zfsUnavailable": "Недоступно",
+  "zfsSuspended": "Призупинено",
+  "healthNone": "Немає",
+  "healthStarting": "Запускається",
+  "healthHealthy": "Справний",
+  "healthUnhealthy": "Несправний",
+  "healthUnknown": "Невідомо"
 }

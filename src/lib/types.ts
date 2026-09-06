@@ -64,28 +64,32 @@ export interface AdapterConfig {
   metrics_battery: boolean;
 
   // --- v0.6.0 additions (all default off — opt-in detail/peaks) ---
+  // v0.16.0: required like every other toggle. They were optional only because they
+  // arrived later; the manifest ships all of them with a default, `effectiveConfig`
+  // writes to them, and one interface with two rules for the same kind of field was a
+  // trap waiting for the next addition.
   /** Per-core CPU usage states */
-  metrics_cpuCores?: boolean;
+  metrics_cpuCores: boolean;
   /** Peak CPU usage state */
-  metrics_cpuPeak?: boolean;
+  metrics_cpuPeak: boolean;
   /** Peak memory state */
-  metrics_memoryPeak?: boolean;
+  metrics_memoryPeak: boolean;
   /** Disk I/O detail (bytes + utilization + wait times) */
-  metrics_diskIo?: boolean;
+  metrics_diskIo: boolean;
   /** Peak disk read/write speed states */
-  metrics_diskPeak?: boolean;
+  metrics_diskPeak: boolean;
   /** Per-network-interface states */
-  metrics_networkInterfaces?: boolean;
+  metrics_networkInterfaces: boolean;
   /** Peak network sent/received states */
-  metrics_networkPeak?: boolean;
+  metrics_networkPeak: boolean;
   /** GPU detail states (package power + per-engine usage) */
-  metrics_gpuDetails?: boolean;
+  metrics_gpuDetails: boolean;
   // --- v0.11.0 additions (Beszel 0.18.8) ---
   /** Per-fan RPM states (Beszel 0.18.8+, Linux hwmon) */
-  metrics_fans?: boolean;
+  metrics_fans: boolean;
   // --- v0.15.0 additions (Beszel 0.19.0) ---
   /** Per-pool ZFS states: usage, throughput, health (Beszel 0.19.0+) */
-  metrics_zfs?: boolean;
+  metrics_zfs: boolean;
 }
 
 /**

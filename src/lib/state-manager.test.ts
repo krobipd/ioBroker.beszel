@@ -4,10 +4,28 @@ import { join } from "node:path";
 vi.mock("@iobroker/adapter-core", () => ({
   I18n: {
     getTranslatedObject: vi.fn((key: string) => ({ en: key, de: `${key}_de` })),
+    // `common.states` labels go through the plain-string path, not the object one.
+    translate: vi.fn((key: string) => key),
   },
 }));
 
-import { METRIC_DEPENDENCIES } from "./metric-registry";
+import {
+  buildMetricDefs,
+  bytesToGib,
+  bytesToMib,
+  containerHealthLabel,
+  containerHealthStates,
+  systemStatusStates,
+  zfsHealthStates,
+  CONTAINER_HEALTH_LABELS,
+  CONTAINER_HEALTH_UNKNOWN,
+  DYNAMIC_CHANNEL_TOGGLES,
+  DYNAMIC_LEAF_PATTERNS,
+  DYNAMIC_SUBCHANNEL_TOGGLES,
+  LEAF_COMMONS,
+  leafCommon,
+  METRIC_DEPENDENCIES,
+} from "./metric-registry";
 import { StateManager } from "./state-manager";
 import type { AdapterConfig, BeszelSystem, BeszelContainer, SystemStats } from "./types";
 
@@ -152,63 +170,66 @@ function createMockAdapter(): MockAdapter {
 // Test data
 // ---------------------------------------------------------------------------
 
-function allMetricsConfig(overrides: Partial<AdapterConfig> = {}): AdapterConfig {
-  return {
-    url: "http://localhost:8090",
-    username: "test",
-    password: "test",
-    pollInterval: 60,
-    metrics_uptime: true,
-    metrics_agentVersion: true,
-    metrics_services: true,
-    metrics_cpu: true,
-    metrics_loadAvg: true,
-    metrics_cpuBreakdown: true,
-    metrics_memory: true,
-    metrics_memoryDetails: true,
-    metrics_swap: true,
-    metrics_disk: true,
-    metrics_diskSpeed: true,
-    metrics_extraFs: true,
-    metrics_network: true,
-    metrics_temperature: true,
-    metrics_temperatureDetails: true,
-    metrics_gpu: true,
-    metrics_containers: true,
-    metrics_battery: true,
-    metrics_fans: true,
-    metrics_zfs: true,
-    ...overrides,
+/**
+ * `sanitize` / `sanitizeWithSuffix` are internals of the manager (nothing outside the
+ * class calls them). The tests still pin their behaviour, and reach them through this
+ * single shim instead of widening the class's public surface for the test's sake.
+ *
+ * @param m The manager under test.
+ */
+function internals(m: StateManager): {
+  sanitize(name: unknown): string;
+  sanitizeWithSuffix(name: unknown, uniqueKey: string): string;
+} {
+  return m as unknown as {
+    sanitize(name: unknown): string;
+    sanitizeWithSuffix(name: unknown, uniqueKey: string): string;
   };
 }
 
-function noMetricsConfig(): AdapterConfig {
-  return {
+/**
+ * Every metric toggle the adapter acts on, DERIVED from the registry and the two cleanup
+ * tables instead of listed by hand. The hand-written list is what let `metrics_diskIo`
+ * slip past the fixtures when it was added (2026-09-05): the helper simply did not know
+ * the switch, so "all metrics on" quietly meant "all but that one".
+ */
+const ALL_TOGGLES: (keyof AdapterConfig)[] = [
+  ...new Set<keyof AdapterConfig>([
+    ...buildMetricDefs().map(d => d.toggle),
+    ...(Object.keys(METRIC_DEPENDENCIES) as (keyof AdapterConfig)[]),
+    ...Object.values(DYNAMIC_CHANNEL_TOGGLES).flat(),
+    ...Object.values(DYNAMIC_SUBCHANNEL_TOGGLES),
+  ]),
+];
+
+/**
+ * Config with every metric toggle set to the same value.
+ *
+ * @param value What all toggles get.
+ * @param overrides Individual toggles (or connection fields) to differ.
+ */
+function metricsConfig(value: boolean, overrides: Partial<AdapterConfig> = {}): AdapterConfig {
+  const cfg: Record<string, unknown> = {
     url: "http://localhost:8090",
     username: "test",
     password: "test",
     pollInterval: 60,
-    metrics_uptime: false,
-    metrics_agentVersion: false,
-    metrics_services: false,
-    metrics_cpu: false,
-    metrics_loadAvg: false,
-    metrics_cpuBreakdown: false,
-    metrics_memory: false,
-    metrics_memoryDetails: false,
-    metrics_swap: false,
-    metrics_disk: false,
-    metrics_diskSpeed: false,
-    metrics_extraFs: false,
-    metrics_network: false,
-    metrics_temperature: false,
-    metrics_temperatureDetails: false,
-    metrics_gpu: false,
-    metrics_containers: false,
-    metrics_battery: false,
-    metrics_fans: false,
-    metrics_zfs: false,
   };
+  for (const toggle of ALL_TOGGLES) {
+    cfg[toggle] = value;
+  }
+  return { ...(cfg as unknown as AdapterConfig), ...overrides };
+}
+
+/**
+ * @param overrides Toggles to differ from "everything on".
+ */
+function allMetricsConfig(overrides: Partial<AdapterConfig> = {}): AdapterConfig {
+  return metricsConfig(true, overrides);
+}
+
+function noMetricsConfig(): AdapterConfig {
+  return metricsConfig(false);
 }
 
 const testSystem: BeszelSystem = {
@@ -297,59 +318,59 @@ describe("StateManager", () => {
 
   describe("sanitize", () => {
     it("should lowercase the input", () => {
-      expect(manager.sanitize("MyServer")).to.equal("myserver");
+      expect(internals(manager).sanitize("MyServer")).to.equal("myserver");
     });
 
     it("should replace non-alphanumeric characters with underscore", () => {
-      expect(manager.sanitize("my server!")).to.equal("my_server");
+      expect(internals(manager).sanitize("my server!")).to.equal("my_server");
     });
 
     it("should collapse multiple non-alphanumeric to single underscore", () => {
-      expect(manager.sanitize("my---server")).to.equal("my_server");
+      expect(internals(manager).sanitize("my---server")).to.equal("my_server");
     });
 
     it("should trim leading and trailing underscores", () => {
-      expect(manager.sanitize("---server---")).to.equal("server");
+      expect(internals(manager).sanitize("---server---")).to.equal("server");
     });
 
     it("should truncate to 50 characters", () => {
       const longName = "a".repeat(60);
-      expect(manager.sanitize(longName)).to.have.lengthOf(50);
+      expect(internals(manager).sanitize(longName)).to.have.lengthOf(50);
     });
 
     it("should handle empty string", () => {
-      expect(manager.sanitize("")).to.equal("");
+      expect(internals(manager).sanitize("")).to.equal("");
     });
 
     it("should handle special characters", () => {
-      expect(manager.sanitize("Server (Rack #2)")).to.equal("server_rack_2");
+      expect(internals(manager).sanitize("Server (Rack #2)")).to.equal("server_rack_2");
     });
 
     it("should handle already clean names", () => {
-      expect(manager.sanitize("myserver01")).to.equal("myserver01");
+      expect(internals(manager).sanitize("myserver01")).to.equal("myserver01");
     });
 
     it("should handle dots and slashes", () => {
-      expect(manager.sanitize("host.example.com/vm1")).to.equal("host_example_com_vm1");
+      expect(internals(manager).sanitize("host.example.com/vm1")).to.equal("host_example_com_vm1");
     });
 
     it("should handle unicode characters", () => {
-      expect(manager.sanitize("Mein-Server-Ü")).to.equal("mein_server");
+      expect(internals(manager).sanitize("Mein-Server-Ü")).to.equal("mein_server");
     });
   });
 
   // SM5 v0.4.3 — name-collision disambiguation
   describe("sanitizeWithSuffix + prepareForPoll (SM5 v0.4.3)", () => {
     it("sanitizeWithSuffix appends a stable hash suffix", () => {
-      const a = manager.sanitizeWithSuffix("Server A", "id001");
-      const b = manager.sanitizeWithSuffix("Server A", "id002");
+      const a = internals(manager).sanitizeWithSuffix("Server A", "id001");
+      const b = internals(manager).sanitizeWithSuffix("Server A", "id002");
       // Both start with the same base name…
       expect(a.startsWith("server_a__")).to.equal(true);
       expect(b.startsWith("server_a__")).to.equal(true);
       // …but their suffix differs
       expect(a).to.not.equal(b);
       // …and the same input always yields the same suffix (stable across runs)
-      expect(manager.sanitizeWithSuffix("Server A", "id001")).to.equal(a);
+      expect(internals(manager).sanitizeWithSuffix("Server A", "id001")).to.equal(a);
     });
 
     it("prepareForPoll keeps bare name for unique systems (back-compat)", () => {
@@ -371,8 +392,8 @@ describe("StateManager", () => {
     });
 
     it("sanitizeWithSuffix returns empty when the base name is unusable", () => {
-      expect(manager.sanitizeWithSuffix("!!!", "id001")).to.equal("");
-      expect(manager.sanitizeWithSuffix(42, "id001")).to.equal("");
+      expect(internals(manager).sanitizeWithSuffix("!!!", "id001")).to.equal("");
+      expect(internals(manager).sanitizeWithSuffix(42, "id001")).to.equal("");
     });
 
     it("prepareForPoll records an empty safeName for an unusable system name", () => {
@@ -969,7 +990,9 @@ describe("StateManager", () => {
       const common = adapter.objects.get("systems.my_server.zfs.tank.health")?.common;
       expect(common?.role).to.equal("info.status");
       expect(common?.type).to.equal("string");
-      expect((common as { states?: Record<string, string> } | undefined)?.states?.DEGRADED).to.equal("Degraded");
+      // v0.16.0: the LABEL is translated (the mock answers with the key); the KEY stays
+      // zpool's own word, which is what the state carries.
+      expect((common as { states?: Record<string, string> } | undefined)?.states?.DEGRADED).to.equal("zfsDegraded");
     });
 
     it("does not create the group when the toggle is off", async () => {
@@ -1227,7 +1250,21 @@ describe("StateManager", () => {
     });
 
     it("does NOT create peak/io states when the toggles are off", async () => {
-      await manager.updateSystem(testSystem, statsV2, [], allMetricsConfig());
+      // v0.16.0: the toggles are named explicitly. They used to be MISSING from the
+      // fixture helper, so this asserted nothing but "a switch the helper forgot creates
+      // nothing" — three tests were passing on that accident.
+      await manager.updateSystem(
+        testSystem,
+        statsV2,
+        [],
+        allMetricsConfig({
+          metrics_cpuPeak: false,
+          metrics_memoryPeak: false,
+          metrics_diskPeak: false,
+          metrics_networkPeak: false,
+          metrics_diskIo: false,
+        }),
+      );
       expect(adapter.states.has("systems.my_server.cpu.peak")).to.be.false;
       expect(adapter.states.has("systems.my_server.disk.io_util")).to.be.false;
     });
@@ -1331,7 +1368,7 @@ describe("StateManager", () => {
 
     it("does NOT create per-core states when disabled", async () => {
       const stats = { ...testStats, cpus: [12, 34] };
-      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_cpuCores: false }));
       expect(adapter.objects.has("systems.my_server.cpu.cores")).to.be.false;
     });
   });
@@ -1357,7 +1394,7 @@ describe("StateManager", () => {
 
     it("does NOT create interface states when disabled", async () => {
       const stats = { ...testStats, ni: { eth0: [10, 20, 1000, 2000] as [number, number, number, number] } };
-      await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_networkInterfaces: false }));
       expect(adapter.objects.has("systems.my_server.network.interfaces")).to.be.false;
     });
   });
@@ -1910,11 +1947,11 @@ describe("StateManager", () => {
       });
     });
 
-    it("every adapter-named dynamic datapoint is covered by the refresh table", async () => {
-      // The table is a second description of what the creation paths build, so it can
-      // drift. This walks a fully populated system and demands that each datapoint the
-      // ADAPTER names (the mock marks those with a `_de` suffix) is matched by it —
-      // a new metric that is forgotten in the table fails here, not on a user's tree.
+    it("every adapter-named dynamic datapoint is covered by the shared leaf table", async () => {
+      // The table drives BOTH paths, so a new metric that is forgotten in it fails here
+      // and not on a user's tree. This walks a fully populated system and demands that
+      // each datapoint the ADAPTER names (the mock marks those with a `_de` suffix) is
+      // matched by a pattern.
       const cfg = allMetricsConfig({
         metrics_containers: true,
         metrics_gpu: true,
@@ -1932,11 +1969,6 @@ describe("StateManager", () => {
         cfg,
       );
 
-      const table = (
-        StateManager as unknown as {
-          DYNAMIC_LEAF_COMMONS: { match: RegExp }[];
-        }
-      ).DYNAMIC_LEAF_COMMONS;
       const prefix = "systems.my_server.";
       const groups =
         /^(temperature\.sensors|fans|battery\.batteries|cpu\.cores|network\.interfaces|gpu|filesystems|zfs|containers)\./;
@@ -1951,11 +1983,61 @@ describe("StateManager", () => {
         }
         const name = obj.common.name as { de?: string } | undefined;
         const adapterNamed = typeof name?.de === "string" && name.de.endsWith("_de");
-        if (adapterNamed && !table.some(e => e.match.test(rel))) {
+        if (adapterNamed && !DYNAMIC_LEAF_PATTERNS.some(e => e.match.test(rel))) {
           missed.push(rel);
         }
       }
-      expect(missed, "adapter-named dynamic datapoints missing from DYNAMIC_LEAF_COMMONS").to.deep.equal([]);
+      expect(missed, "adapter-named dynamic datapoints missing from DYNAMIC_LEAF_PATTERNS").to.deep.equal([]);
+    });
+
+    it("every leaf definition is reachable through a pattern", async () => {
+      // The other direction: a `common` nobody can match is dead weight, and it hides a
+      // leaf whose refresh silently never happens.
+      const patterned = new Set(DYNAMIC_LEAF_PATTERNS.map(e => e.id));
+      const unreachable = Object.keys(LEAF_COMMONS).filter(id => !patterned.has(id as keyof typeof LEAF_COMMONS));
+      expect(unreachable, "leaf definitions without a path pattern").to.deep.equal([]);
+      const unknown = DYNAMIC_LEAF_PATTERNS.filter(e => !(e.id in LEAF_COMMONS)).map(e => e.id);
+      expect(unknown, "patterns pointing at a leaf definition that does not exist").to.deep.equal([]);
+      await Promise.resolve();
+    });
+
+    it("BOTH the creation path and the refresh path read the shared leaf table", async () => {
+      // A table can be complete while a caller quietly stopped reading it — dropping a
+      // single call line left gate, linter and type check green on fakeroku. So this
+      // does not compare the two commons with each other (they could both be wrong in
+      // the same way); it REPLACES one entry of the table and demands that each path
+      // hands out the replacement.
+      const cfg = allMetricsConfig({ metrics_networkInterfaces: true });
+      const original = LEAF_COMMONS.ifaceUp;
+      const sentinel = (): ioBroker.StateCommon => ({
+        name: { en: "SENTINEL", de: "SENTINEL_de" },
+        type: "number",
+        role: "value",
+        unit: "sentinel/s",
+        read: true,
+        write: false,
+      });
+      try {
+        LEAF_COMMONS.ifaceUp = sentinel;
+
+        // (a) creation path — updateDynamicStats builds the leaf with a value
+        await manager.snapshotExistingStates();
+        await manager.updateSystem(testSystem, richStats(), [], cfg);
+        const id = "systems.my_server.network.interfaces.eth0.up";
+        expect(adapter.objects.get(id)?.common.unit, "creation path ignores the table").to.equal("sentinel/s");
+
+        // (b) refresh path — a fresh manager, a system without stats, object only
+        adapter.objects.set(id, {
+          ...adapter.objects.get(id)!,
+          common: { ...adapter.objects.get(id)!.common, unit: "stale" },
+        });
+        const fresh = new StateManager(adapter as never);
+        await fresh.snapshotExistingStates();
+        await fresh.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+        expect(adapter.objects.get(id)?.common.unit, "refresh path ignores the table").to.equal("sentinel/s");
+      } finally {
+        LEAF_COMMONS.ifaceUp = original;
+      }
     });
 
     it("a system without stats STILL gets corrected names and descriptions on its datapoints", async () => {
@@ -2345,7 +2427,7 @@ describe("StateManager", () => {
   describe("defensive boundaries", () => {
     it("sanitize returns empty string for non-string input", () => {
       // Using unknown cast to simulate runtime drift
-      const mgr = manager as unknown as { sanitize(n: unknown): string };
+      const mgr = internals(manager);
       expect(mgr.sanitize(null)).to.equal("");
       expect(mgr.sanitize(undefined)).to.equal("");
       expect(mgr.sanitize(42)).to.equal("");
@@ -2354,8 +2436,8 @@ describe("StateManager", () => {
     });
 
     it("sanitize collapses all-non-alphanumeric names to empty", () => {
-      expect(manager.sanitize("!!!")).to.equal("");
-      expect(manager.sanitize("---")).to.equal("");
+      expect(internals(manager).sanitize("!!!")).to.equal("");
+      expect(internals(manager).sanitize("---")).to.equal("");
     });
 
     it("skips system with unusable sanitized name", async () => {
@@ -2811,8 +2893,11 @@ describe("StateManager", () => {
       expect(adapter.states.has("systems.my_server.cpu.cores.core1")).to.be.true;
     });
 
-    it("reconciles zombies from a previous run on the first poll (view fallback)", async () => {
-      // Simulate a leftover container channel from before this adapter start.
+    it("reconciles zombies from a previous run on the first poll (startup snapshot)", async () => {
+      // Simulate a leftover container channel from before this adapter start. v0.16.0:
+      // the reconcile reads the startup snapshot instead of a per-group object view, so
+      // the leftover has to be in the tree when the snapshot is taken — which is exactly
+      // the situation it describes (onReady snapshots before the first poll).
       adapter.objects.set("systems.my_server.containers.ghost", {
         type: "channel",
         common: { name: "ghost" },
@@ -2823,6 +2908,7 @@ describe("StateManager", () => {
         common: { name: "cpu" },
         native: {},
       });
+      await manager.snapshotExistingStates();
       const live: BeszelContainer[] = [
         { id: "c1", system: testSystem.id, name: "nginx", status: "running", health: 2, cpu: 1, memory: 1, image: "n" },
       ];
@@ -2841,40 +2927,41 @@ describe("StateManager", () => {
 
     it("a removed-and-re-added system reconciles against the DB again (group cache follows the lifecycle)", async () => {
       // dropCacheUnder must clear dynamicChildren too — otherwise the re-added
-      // system trusts a stale in-memory set and never re-reads the object view,
-      // so leftovers from the previous life are never reconciled (audit
-      // 2026-08-22: that cache-drop was unguarded).
-      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
-      await manager.cleanupSystems([]); // system disappears from the Hub
-
-      // A zombie sensor survives in the DB (e.g. written by an older version).
+      // system trusts a stale in-memory set and never reconciles, so leftovers from the
+      // previous life stay forever (audit 2026-08-22: that cache-drop was unguarded).
+      // A zombie sensor from an older version is in the tree when the adapter starts.
       adapter.objects.set("systems.my_server.temperature.sensors.zombie", {
         type: "state",
         common: { name: "zombie" },
         native: {},
       });
+      await manager.snapshotExistingStates();
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.temperature.sensors.zombie")).to.be.false;
-      expect(adapter.states.has("systems.my_server.temperature.sensors.core_0")).to.be.true;
-    });
+      await manager.cleanupSystems([]); // system disappears from the Hub
+      expect(adapter.objects.has("systems.my_server")).to.be.false;
 
-    it("getExistingSystemNames survives an object view that returns nothing", async () => {
-      adapter.getObjectViewAsync = (): Promise<null> => Promise.resolve(null);
-      expect(await manager.getExistingSystemNames()).to.deep.equal([]);
-    });
-
-    it("ignores foreign rows the object view happens to return", async () => {
-      // The view is queried with a start/end key, but a broker that answers
-      // sloppily must not make us treat an unrelated id as a group member.
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
-      const origView = adapter.getObjectViewAsync;
-      adapter.getObjectViewAsync = async (design, search, params) => {
-        const res = await origView(design, search, params);
-        return { rows: [...(res?.rows ?? []), { id: "beszel.0.somewhere.else", value: res!.rows[0].value }] };
-      };
-      // A second manager starts with an empty group cache → it reconciles via the view.
-      const fresh = new StateManager(adapter as never);
-      await fresh.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.states.has("systems.my_server.temperature.sensors.core_0")).to.be.true;
+      expect(adapter.objects.has("systems.my_server.temperature.sensors.zombie")).to.be.false;
+    });
+
+    it("getExistingSystemNames is empty when the snapshot found no device", async () => {
+      await manager.snapshotExistingStates();
+      expect(manager.getExistingSystemNames()).to.deep.equal([]);
+    });
+
+    it("does not treat a prefix-sharing sibling as a group member", async () => {
+      // The reconcile filters `<base>.` — an id that merely SHARES the prefix
+      // (`temperature.sensors_backup`) is a different object and must survive.
+      adapter.objects.set("systems.my_server.temperature.sensors_backup", {
+        type: "channel",
+        common: { name: "not a member" },
+        native: {},
+      });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.temperature.sensors_backup")).to.be.true;
       expect(adapter.objects.has("systems.my_server.temperature.sensors.core_0")).to.be.true;
     });
 
@@ -2884,8 +2971,8 @@ describe("StateManager", () => {
       // then delete the wrong path.
       adapter.objects.set("systems.my_server", { type: "device", common: {}, native: {} });
       adapter.objects.set("systems.my_server.sub.device", { type: "device", common: {}, native: {} });
-      const names = await manager.getExistingSystemNames();
-      expect(names).to.deep.equal(["my_server"]);
+      await manager.snapshotExistingStates();
+      expect(manager.getExistingSystemNames()).to.deep.equal(["my_server"]);
     });
   });
 
@@ -2957,6 +3044,27 @@ describe("StateManager", () => {
       }
       expect(checked).to.be.greaterThan(0);
     });
+
+    it("manifest, admin UI and code know exactly the same metric switches", () => {
+      // v0.16.0: the third side of the triangle. `ALL_TOGGLES` is derived from the code,
+      // so this closes the gap that let a new switch (`metrics_diskIo`, 2026-09-05) exist
+      // in the manifest and the UI while the test fixtures had never heard of it — three
+      // "does NOT create when off" tests were asserting nothing because of it.
+      const manifest = JSON.parse(readFileSync(join(__dirname, "../../io-package.json"), "utf8")) as {
+        native: Record<string, unknown>;
+      };
+      const inManifest = Object.keys(manifest.native)
+        .filter(k => k.startsWith("metrics_"))
+        .sort();
+      const inCode = [...ALL_TOGGLES].sort();
+      const inAdmin = [...fields.keys()].sort();
+      expect(inCode, "code toggles vs. io-package.json native").to.deep.equal(inManifest);
+      expect(inAdmin, "admin UI fields vs. io-package.json native").to.deep.equal(inManifest);
+      // …and every one of them is a real boolean default, not an accident.
+      for (const key of inManifest) {
+        expect(typeof manifest.native[key], `${key} must default to a boolean`).to.equal("boolean");
+      }
+    });
   });
 
   describe("device object", () => {
@@ -2971,9 +3079,405 @@ describe("StateManager", () => {
     });
   });
 
+  // -----------------------------------------------------------------------
+  // v0.16.0 — a deleted channel stays deleted
+  // -----------------------------------------------------------------------
+
+  describe("channel bookkeeping (v0.16.0)", () => {
+    it("a channel cleanupMetrics deleted does NOT come back on a system without stats", async () => {
+      // The bug: `knownChannelIds` was filled by the startup snapshot and never pruned,
+      // so refreshDynamicObjects found every deleted group channel again and
+      // `extendObject` re-created it — empty. Every start deleted them, every first poll
+      // brought them back, and only on the systems that are offline right now.
+      adapter.objects.set("systems.my_server", { type: "device", common: {}, native: {} });
+      for (const ch of [
+        "systems.my_server.containers",
+        "systems.my_server.containers.nginx",
+        "systems.my_server.cpu",
+        "systems.my_server.cpu.cores",
+        "systems.my_server.temperature",
+        "systems.my_server.temperature.sensors",
+        "systems.my_server.gpu",
+        "systems.my_server.fans",
+        "systems.my_server.zfs",
+        "systems.my_server.filesystems",
+        "systems.my_server.network",
+        "systems.my_server.network.interfaces",
+      ]) {
+        adapter.objects.set(ch, { type: "channel", common: { name: { en: "old" } }, native: {} });
+      }
+      adapter.objects.set("systems.my_server.containers.nginx.status", {
+        type: "state",
+        common: {},
+        native: {},
+      });
+      await manager.snapshotExistingStates();
+
+      // Every dynamic group switched off.
+      const cfg = allMetricsConfig({
+        metrics_containers: false,
+        metrics_cpuCores: false,
+        metrics_temperatureDetails: false,
+        metrics_gpu: false,
+        metrics_gpuDetails: false,
+        metrics_fans: false,
+        metrics_zfs: false,
+        metrics_extraFs: false,
+        metrics_networkInterfaces: false,
+      });
+      await manager.cleanupMetrics("my_server", cfg);
+      const gone = [
+        "systems.my_server.containers",
+        "systems.my_server.cpu.cores",
+        "systems.my_server.temperature.sensors",
+        "systems.my_server.gpu",
+        "systems.my_server.fans",
+        "systems.my_server.zfs",
+        "systems.my_server.filesystems",
+        "systems.my_server.network.interfaces",
+      ];
+      for (const id of gone) {
+        expect(adapter.objects.has(id), `${id} should be gone after cleanup`).to.be.false;
+      }
+
+      // First poll, system has no reading → the refresh path walks the tree.
+      await manager.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+      const resurrected = gone.filter(id => adapter.objects.has(id));
+      expect(resurrected, "empty channels resurrected on a system without stats").to.deep.equal([]);
+    });
+
+    it("a group channel pruned at runtime stays gone when the system later goes down", async () => {
+      // Same defect, reachable without touching a single switch: containers stop, the
+      // drop-to-zero prune removes the now-empty parent channel, the system goes
+      // offline — and the channel used to reappear.
+      adapter.objects.set("systems.my_server", { type: "device", common: {}, native: {} });
+      adapter.objects.set("systems.my_server.containers", {
+        type: "channel",
+        common: { name: { en: "Containers" } },
+        native: {},
+      });
+      adapter.objects.set("systems.my_server.containers.nginx", {
+        type: "channel",
+        common: { name: { en: "nginx" } },
+        native: {},
+      });
+      adapter.objects.set("systems.my_server.containers.nginx.status", {
+        type: "state",
+        common: {},
+        native: {},
+      });
+      await manager.snapshotExistingStates();
+
+      const cfg = allMetricsConfig({ metrics_containers: true });
+      // Two empty polls: the second confirms the drop-to-zero and prunes the parent.
+      await manager.updateSystem(testSystem, testStats, [], cfg);
+      await manager.updateSystem(testSystem, testStats, [], cfg);
+      expect(adapter.objects.has("systems.my_server.containers"), "prune must remove the empty parent").to.be.false;
+
+      await manager.updateSystem({ ...testSystem, status: "down" }, undefined, [], cfg);
+      expect(adapter.objects.has("systems.my_server.containers"), "channel came back on the offline system").to.be
+        .false;
+    });
+
+    it("removing a system forgets its channels and device, so nothing is refreshed into existence", async () => {
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(manager.getExistingSystemNames()).to.deep.equal(["my_server"]);
+
+      await manager.cleanupSystems([]);
+      expect(manager.getExistingSystemNames()).to.deep.equal([]);
+      // The refresh walk of ANOTHER system must not resurrect anything of the removed one.
+      await manager.updateSystem({ ...testSystem, id: "other", name: "Other" }, undefined, [], allMetricsConfig());
+      const leftovers = [...adapter.objects.keys()].filter(id => id.startsWith("systems.my_server"));
+      expect(leftovers, "objects of a removed system reappeared").to.deep.equal([]);
+    });
+
+    it("deleting a state the bookkeeping never saw is a no-op, not a delete", async () => {
+      // The gpuDetails branch asks for every GPU's power_package; a GPU that never had
+      // one (details were off all along) must not produce a delete for a missing object.
+      const stats = { ...testStats, g: { gpu0: { n: "Intel", u: 30 } } };
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_gpuDetails: false }));
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.power_package")).to.be.false;
+      const deleted: string[] = [];
+      adapter.delObjectAsync = (id: string): Promise<void> => {
+        deleted.push(id);
+        return Promise.resolve();
+      };
+      await manager.cleanupMetrics("my_server", allMetricsConfig({ metrics_gpu: true, metrics_gpuDetails: false }));
+      expect(deleted, "deleted an object that was never there").to.not.include(
+        "systems.my_server.gpu.gpu0.power_package",
+      );
+    });
+
+    it("cleanupMetrics asks the objects DB nothing — the startup snapshot answers", async () => {
+      // Measured before the change: 43 `getObjectAsync` per system per start on the
+      // default configuration, for information the snapshot had just read in one call.
+      // The tree must actually CONTAIN what gets deleted, otherwise the counter has
+      // nothing to count and the test would pass on an empty run.
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(
+        testSystem,
+        richStats(),
+        testContainers,
+        allMetricsConfig({ metrics_gpu: true, metrics_gpuDetails: true, metrics_containers: true }),
+      );
+      expect(adapter.states.has("systems.my_server.gpu.gpu0.power_package"), "fixture must create removable states").to
+        .be.true;
+      expect(adapter.objects.has("systems.my_server.containers"), "fixture must create removable channels").to.be.true;
+      let reads = 0;
+      adapter.getObjectAsync = (id: string): Promise<ObjectDef | null> => {
+        reads++;
+        return Promise.resolve(adapter.objects.get(id) ?? null);
+      };
+      adapter.getObjectViewAsync = (): Promise<{ rows: Array<{ id: string; value: ObjectDef }> }> => {
+        reads++;
+        return Promise.resolve({ rows: [] });
+      };
+      await manager.cleanupMetrics(
+        "my_server",
+        allMetricsConfig({
+          metrics_gpu: true,
+          metrics_gpuDetails: false,
+          metrics_cpuPeak: false,
+          metrics_containers: false,
+          metrics_battery: false,
+        }),
+      );
+      // …and it really did delete, so the zero above is "asked nobody", not "did nothing".
+      expect(adapter.objects.has("systems.my_server.containers")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.battery")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.gpu.gpu0.power_package")).to.be.false;
+      expect(reads, "cleanupMetrics still reads objects from the DB").to.equal(0);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.16.0 — common.states: plain strings, translated, complete
+  // -----------------------------------------------------------------------
+
+  describe("defensive fallbacks (v0.16.0)", () => {
+    it("a snapshot the broker answers with nothing leaves the bookkeeping empty", async () => {
+      adapter.getObjectListAsync = (): Promise<null> => Promise.resolve(null);
+      await manager.snapshotExistingStates();
+      expect(manager.getExistingSystemNames()).to.deep.equal([]);
+    });
+
+    it("the snapshot ignores object types it does not track", async () => {
+      adapter.objects.set("systems", { type: "folder", common: {}, native: {} });
+      adapter.objects.set("systems.my_server", { type: "device", common: {}, native: {} });
+      adapter.objects.set("systems.my_server.cpu", { type: "channel", common: {}, native: {} });
+      adapter.objects.set("systems.my_server.cpu.usage", { type: "state", common: {}, native: {} });
+      await manager.snapshotExistingStates();
+      expect(manager.getExistingSystemNames()).to.deep.equal(["my_server"]);
+    });
+
+    it("a system whose name is not even a string is skipped with a readable warning", async () => {
+      const warns: string[] = [];
+      adapter.log.warn = (m: string): void => {
+        warns.push(m);
+      };
+      const broken = { ...testSystem, name: { oops: true } } as unknown as BeszelSystem;
+      await manager.updateSystem(broken, testStats, [], allMetricsConfig());
+      expect(warns.some(w => w.includes("unusable name") && w.includes("oops"))).to.equal(true);
+      expect([...adapter.objects.keys()].some(k => k.startsWith("systems."))).to.equal(false);
+    });
+
+    it("a system with an unusable name contributes nothing to the offline id list", () => {
+      manager.prepareForPoll([
+        { ...testSystem, id: "a", name: "Good One" },
+        { ...testSystem, id: "b", name: "!!!" },
+      ]);
+      expect(manager.knownSystemIds()).to.deep.equal(["systems.good_one"]);
+    });
+
+    it("a container whose name sanitizes to nothing is skipped, the others are not", async () => {
+      const containers: BeszelContainer[] = [
+        { id: "c1", system: "sys001", name: "***", status: "running", health: 2, cpu: 1, memory: 8, image: "i" },
+        { id: "c2", system: "sys001", name: "nginx", status: "running", health: 2, cpu: 1, memory: 8, image: "i" },
+      ];
+      await manager.updateSystem(testSystem, testStats, containers, allMetricsConfig({ metrics_containers: true }));
+      const built = [...adapter.objects.keys()].filter(
+        k => /^systems\.my_server\.containers\.[^.]+$/.test(k) && adapter.objects.get(k)!.type === "channel",
+      );
+      expect(built).to.deep.equal(["systems.my_server.containers.nginx"]);
+    });
+
+    it("a system with an unusable name is not mistaken for a stale device during cleanup", async () => {
+      adapter.objects.set("systems.good_one", { type: "device", common: {}, native: {} });
+      await manager.snapshotExistingStates();
+      manager.prepareForPoll([
+        { ...testSystem, id: "a", name: "Good One" },
+        { ...testSystem, id: "b", name: "!!!" },
+      ]);
+      await manager.cleanupSystems(["Good One"]);
+      expect(adapter.objects.has("systems.good_one"), "the healthy system must survive").to.be.true;
+    });
+
+    it("a dynamic-group member whose name sanitizes to nothing is skipped, not crashed on", async () => {
+      const stats = { ...testStats, t: { "!!!": 40, cpu: 50 } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_temperatureDetails: true }));
+      const sensors = [...adapter.objects.keys()].filter(k => k.startsWith("systems.my_server.temperature.sensors."));
+      expect(sensors).to.deep.equal(["systems.my_server.temperature.sensors.cpu"]);
+    });
+
+    it("the byte conversions answer null rather than NaN when the Hub omits the field", () => {
+      expect(bytesToMib(undefined)).to.equal(null);
+      expect(bytesToGib(undefined)).to.equal(null);
+      expect(bytesToMib(1024 * 1024)).to.equal(1);
+      expect(bytesToGib(1024 * 1024 * 1024)).to.equal(1);
+    });
+
+    it("the per-core leaf still builds a common when no index is handed in", () => {
+      // The refresh path passes the index from the id; a caller without one must get a
+      // usable common instead of `Core NaN`.
+      expect(leafCommon("cpuCore")).to.have.property("type", "number");
+    });
+
+    it("a GPU without a vendor name falls back to its own id", async () => {
+      const stats = { ...testStats, g: { gpu7: { u: 30 } } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_gpu: true }));
+      expect(adapter.objects.get("systems.my_server.gpu.gpu7")?.common.name).to.equal("gpu7");
+    });
+
+    it("a ZFS pool that reports nothing readable still gets its channel and null values", async () => {
+      const stats = { ...testStats, z: { tank: {} } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_zfs: true }));
+      expect(adapter.objects.has("systems.my_server.zfs.tank")).to.be.true;
+      expect(adapter.states.get("systems.my_server.zfs.tank.disk_total")?.val).to.equal(null);
+      expect(adapter.states.get("systems.my_server.zfs.tank.disk_percent")?.val).to.equal(null);
+      expect(adapter.states.get("systems.my_server.zfs.tank.health")?.val).to.equal(null);
+      // omitzero on the wire means idle, not unknown — the speeds stay 0.
+      expect(adapter.states.get("systems.my_server.zfs.tank.read_speed")?.val).to.equal(0);
+    });
+
+    it("a filesystem that reports no size yields null, not a computed percentage", async () => {
+      const stats = { ...testStats, efs: { "/mnt/x": {} } };
+      await manager.updateSystem(testSystem, stats, [], allMetricsConfig({ metrics_extraFs: true }));
+      expect(adapter.states.get("systems.my_server.filesystems.mnt_x.disk_percent")?.val).to.equal(null);
+      expect(adapter.states.get("systems.my_server.filesystems.mnt_x.disk_total")?.val).to.equal(null);
+    });
+  });
+
+  describe("registry robustness (v0.16.0)", () => {
+    it("every metric's extract survives a system with no data at all", () => {
+      // The `?? null` tails are the defence against a Hub that sends a record without
+      // the field. `available` normally keeps them out of reach, which is exactly why
+      // nothing had ever exercised them — one changed guard and a thrown TypeError
+      // would take a whole poll down.
+      const bare: BeszelSystem = { id: "x", name: "X", status: "up", host: "h", info: {} };
+      for (const def of buildMetricDefs()) {
+        const withoutStats = (): unknown => def.extract(bare, undefined);
+        const withEmptyStats = (): unknown => def.extract(bare, {});
+        expect(withoutStats, `${def.id} threw without stats`).to.not.throw();
+        expect(withEmptyStats, `${def.id} threw on an empty stats record`).to.not.throw();
+        expect([null, undefined], `${def.id} invented a value out of nothing`).to.include(def.extract(bare, {}));
+      }
+    });
+
+    it("every metric's availability gate says no when there is nothing to read", () => {
+      const bare: BeszelSystem = { id: "x", name: "X", status: "up", host: "h", info: {} };
+      for (const def of buildMetricDefs()) {
+        if (!def.available) {
+          continue; // always-available metrics fall back inside extract (loadAvg, uptime)
+        }
+        expect(def.available(undefined, bare), `${def.id} claims to be available without stats`).to.equal(false);
+      }
+    });
+  });
+
+  describe("common.states invariants (v0.16.0)", () => {
+    it("every states VALUE is a plain string (React #31 invariant)", () => {
+      // A translation object in a `common.states` value takes the whole admin down with
+      // React error #31 — the admin renders the value directly as a React child. The
+      // fleet standard demands this test next to every states map.
+      for (const [label, map] of [
+        ["systemStatusStates", systemStatusStates()],
+        ["zfsHealthStates", zfsHealthStates()],
+        ["containerHealthStates", containerHealthStates()],
+      ] as const) {
+        for (const [k, v] of Object.entries(map)) {
+          expect(typeof v, `${label}[${k}] must be a plain string`).to.equal("string");
+        }
+      }
+    });
+
+    it("every states LABEL comes from the translation, not from a hardcoded word", () => {
+      // The mock answers a translation with its key, so a label that never went through
+      // `tState` would show up here as the English word it was frozen as.
+      expect(systemStatusStates()).to.deep.equal({
+        up: "stateUp",
+        down: "stateDown",
+        paused: "statePaused",
+        pending: "statePending",
+        unknown: "stateUnknown",
+      });
+      expect(zfsHealthStates().UNAVAIL).to.equal("zfsUnavailable");
+      expect(containerHealthStates().unhealthy).to.equal("healthUnhealthy");
+    });
+
+    it("the container health enum covers every label the adapter can write", () => {
+      const written = new Set([...CONTAINER_HEALTH_LABELS, CONTAINER_HEALTH_UNKNOWN]);
+      expect(new Set(Object.keys(containerHealthStates()))).to.deep.equal(written);
+      // …and the mapping itself: index → word, out-of-range → unknown.
+      expect(containerHealthLabel(0)).to.equal("none");
+      expect(containerHealthLabel(2)).to.equal("healthy");
+      expect(containerHealthLabel(2.5)).to.equal("healthy");
+      expect(containerHealthLabel(9)).to.equal(CONTAINER_HEALTH_UNKNOWN);
+      expect(containerHealthLabel(-1)).to.equal(CONTAINER_HEALTH_UNKNOWN);
+    });
+
+    it("container health is a status datapoint like the other two, not plain text", async () => {
+      await manager.updateSystem(testSystem, testStats, testContainers, allMetricsConfig());
+      const id = [...adapter.objects.keys()].find(k => /\.containers\.[^.]+\.health$/.test(k))!;
+      const common = adapter.objects.get(id)!.common as { role?: string; states?: Record<string, string> };
+      expect(common.role, "the adapter knows this value set — it belongs on info.status").to.equal("info.status");
+      expect(common.states?.healthy).to.equal("healthHealthy");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.16.0 — every dynamic channel has a cleanup rule
+  // -----------------------------------------------------------------------
+
+  describe("channel cleanup completeness (v0.16.0)", () => {
+    it("switching every metric off leaves no channel behind but info", async () => {
+      // The end-to-end form of the rule the two toggle tables express. A new dynamic
+      // group that nobody wired into a cleanup table fails here — which is what used to
+      // need a seventh hand-written `if`.
+      const all = allMetricsConfig({
+        metrics_containers: true,
+        metrics_gpu: true,
+        metrics_gpuDetails: true,
+        metrics_extraFs: true,
+        metrics_networkInterfaces: true,
+        metrics_cpuCores: true,
+        metrics_zfs: true,
+      });
+      await manager.snapshotExistingStates();
+      await manager.updateSystem(
+        testSystem,
+        { ...richStats(), z: { tank: { d: 100, du: 50, rb: 1, wb: 1, h: "ONLINE" } } },
+        testContainers,
+        all,
+      );
+      const before = [...adapter.objects.keys()].filter(
+        id => id.startsWith("systems.my_server.") && adapter.objects.get(id)!.type === "channel",
+      );
+      expect(before.length, "the fixture must build a fully populated tree").to.be.greaterThan(8);
+
+      await manager.cleanupMetrics("my_server", noMetricsConfig());
+      const left = [...adapter.objects.keys()].filter(
+        id => id.startsWith("systems.my_server.") && adapter.objects.get(id)!.type === "channel",
+      );
+      expect(left, "channels without a cleanup rule").to.deep.equal(["systems.my_server.info"]);
+    });
+  });
+
   describe("deleteChannelIfExists", () => {
     it("leaves a debug breadcrumb instead of throwing when the broker refuses", async () => {
       adapter.objects.set("systems.my_server.gpu", { type: "channel", common: {}, native: {} });
+      await manager.snapshotExistingStates();
       const debugs: string[] = [];
       adapter.log.debug = (msg: string): void => {
         debugs.push(msg);
@@ -3038,7 +3542,7 @@ describe("StateManager", () => {
       const longName = `/${"a".repeat(5000)}`;
       const stats = { ...testStats, efs: { [longName]: { d: 100, du: 10 } } };
       await manager.updateSystem(testSystem, stats, [], allMetricsConfig());
-      const safeId = manager.sanitize(longName);
+      const safeId = internals(manager).sanitize(longName);
       const obj = adapter.objects.get(`systems.my_server.filesystems.${safeId}`);
       const name = obj?.common.name as string;
       expect(name.length).to.be.lessThanOrEqual(201); // 200 + ellipsis, not 5001
@@ -3131,14 +3635,16 @@ describe("StateManager", () => {
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       const status = adapter.objects.get("systems.my_server.info.status");
       expect(status?.common.role).to.equal("info.status");
+      // v0.16.0: KEYS are the technical values the state carries, LABELS are translated
+      // plain strings (the mock answers a translation with its key).
       expect(status?.common.states).to.deep.equal({
-        up: "Online",
-        down: "Offline",
-        paused: "Paused",
-        pending: "Pending",
+        up: "stateUp",
+        down: "stateDown",
+        paused: "statePaused",
+        pending: "statePending",
         // The adapter's own fifth value — the Hub never sends it; it is what the
         // datapoint says while nobody is reading (adapter stopped / Hub unreachable).
-        unknown: "Unknown",
+        unknown: "stateUnknown",
       });
     });
   });

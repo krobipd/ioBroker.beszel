@@ -52,19 +52,25 @@ deshalb kann eine Maschine „voll" aussehen und trotzdem völlig gesund sein.
 
 ## Festplatte
 
-| Schalter                | Datenpunkte                                                                                    |
-| ----------------------- | ---------------------------------------------------------------------------------------------- |
-| Disk Usage _(an)_       | `disk.percent`, `disk.used`, `disk.total`                                                      |
-| Read/Write Speed _(an)_ | `disk.read`, `disk.write`                                                                      |
-| Additional Filesystems  | `filesystems.<mount>.disk_percent`, `.disk_used`, `.disk_total`, `.read_speed`, `.write_speed` |
-| I/O load                | `disk.io_util`, `disk.io_await_read`, `disk.io_await_write`                                    |
-| Peak values             | `disk.read_peak`, `disk.write_peak`                                                            |
+| Schalter                | Datenpunkte                                                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Disk Usage _(an)_       | `disk.percent`, `disk.used`, `disk.total`, `disk.name`                                                                        |
+| Read/Write Speed _(an)_ | `disk.read`, `disk.write`                                                                                                     |
+| Additional Filesystems  | `filesystems.<mount>.disk_percent`, `.disk_used`, `.disk_total`, `.read_speed`, `.write_speed`, `.total_read`, `.total_write` |
+| I/O load                | `disk.io_util`, `disk.io_await_read`, `disk.io_await_write`, `disk.total_read`, `disk.total_write`                            |
+| Peak values             | `disk.read_peak`, `disk.write_peak`                                                                                           |
 
 Die `disk.*`-Werte beschreiben das Dateisystem, das der Agent als Wurzel führt. Alles weitere, was
 Sie in Beszel eingerichtet haben, steht unter `filesystems.`. `io_util` ist der Zeitanteil, in dem
 mindestens eine Anfrage an der Platte offen war; die beiden `io_await`-Werte sind die
 Durchschnittsdauer eines einzelnen Lese- bzw. Schreibvorgangs — dieselben Größen, die `iostat` als
 `r_await` und `w_await` ausgibt.
+
+`disk.name` ist der Name, den Sie der Systemfestplatte am Agenten geben können
+(`FILESYSTEM=device__name`); der Datenpunkt entsteht nur, wenn dort einer gesetzt ist. Die
+`total_read`/`total_write`-Werte sind Mengen, keine Raten: wie viel das Gerät seit seinem Start
+gelesen bzw. geschrieben hat. Sie brauchen Beszel 0.19.0 oder neuer und beginnen nach einem Neustart
+wieder bei null, weil auch der Zähler dort beginnt.
 
 ## Netzwerk
 
@@ -93,6 +99,22 @@ Lüfter brauchen Beszel 0.18.8 oder neuer und gibt es nur unter Linux, weil der 
 liest. Sie stehen in einem eigenen Kanal `fans` statt unter Temperatur: andere Quelle, andere
 Bedeutung. Ein Lüfter mit 0 rpm bleibt stehen — ein stehender Lüfter ist ein Messwert, kein
 fehlender Wert.
+
+## ZFS
+
+| Schalter  | Datenpunkte                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| ZFS Pools | `zfs.<pool>.disk_percent`, `.disk_used`, `.disk_total`, `.read_speed`, `.write_speed`, `.health` |
+
+Ein Kanal je Pool, benannt wie ihn `zpool list` nennt. Die Belegung ist das, was ZFS als belegt
+gegen die Poolgröße meldet — also nicht dieselbe Zahl, die ein `df` in einem Dataset zeigt. Der
+Durchsatz ist das, was der Pool im letzten Erfassungsintervall bewegt hat; ein ruhender Pool zeigt
+0, nicht „unbekannt". `health` trägt zpools eigenes Wort (`ONLINE`, `DEGRADED`, `FAULTED`, …); der
+Adapter reicht es unverändert weiter, ein Wort aus einem neueren ZFS kommt also auch dann an, wenn
+es nicht in der Auswahlliste der Admin steht.
+
+Braucht Beszel 0.19.0 oder neuer. Die Detaildaten eines Pools (Scrub-Zustand, vdevs, Datasets)
+liegen in einer eigenen Sammlung auf dem Hub und werden nicht gelesen.
 
 ## GPU
 

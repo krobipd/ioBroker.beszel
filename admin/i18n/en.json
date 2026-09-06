@@ -203,5 +203,22 @@
   "diskTotalWrite": "Total Write",
   "descDiskTotalIo": "Volume read or written since boot (device counter), not a rate.",
   "rootDiskName": "Root Disk Name",
-  "descRootDiskName": "Custom name of the root disk set on the agent (FILESYSTEM=device__name)."
+  "descRootDiskName": "Custom name of the root disk set on the agent (FILESYSTEM=device__name).",
+  "stateUp": "Online",
+  "stateDown": "Offline",
+  "statePaused": "Paused",
+  "statePending": "Pending",
+  "stateUnknown": "Unknown",
+  "zfsOnline": "Online",
+  "zfsDegraded": "Degraded",
+  "zfsFaulted": "Faulted",
+  "zfsOffline": "Offline",
+  "zfsRemoved": "Removed",
+  "zfsUnavailable": "Unavailable",
+  "zfsSuspended": "Suspended",
+  "healthNone": "None",
+  "healthStarting": "Starting",
+  "healthHealthy": "Healthy",
+  "healthUnhealthy": "Unhealthy",
+  "healthUnknown": "Unknown"
 }

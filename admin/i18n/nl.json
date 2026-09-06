@@ -203,5 +203,22 @@
   "diskTotalWrite": "Totaal geschreven",
   "descDiskTotalIo": "Hoeveelheid gelezen of geschreven sinds het opstarten (apparaatteller), geen snelheid.",
   "rootDiskName": "Naam van de rootschijf",
-  "descRootDiskName": "Op de agent ingestelde naam van de rootschijf (FILESYSTEM=device__name)."
+  "descRootDiskName": "Op de agent ingestelde naam van de rootschijf (FILESYSTEM=device__name).",
+  "stateUp": "Online",
+  "stateDown": "Offline",
+  "statePaused": "Gepauzeerd",
+  "statePending": "In afwachting",
+  "stateUnknown": "Onbekend",
+  "zfsOnline": "Online",
+  "zfsDegraded": "Verslechterd",
+  "zfsFaulted": "Defect",
+  "zfsOffline": "Offline",
+  "zfsRemoved": "Verwijderd",
+  "zfsUnavailable": "Niet beschikbaar",
+  "zfsSuspended": "Opgeschort",
+  "healthNone": "Geen",
+  "healthStarting": "Wordt gestart",
+  "healthHealthy": "Gezond",
+  "healthUnhealthy": "Ongezond",
+  "healthUnknown": "Onbekend"
 }

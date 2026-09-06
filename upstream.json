@@ -1,10 +1,6 @@
 {
   "source": "github:henrygd/beszel",
   "verified": "v0.19.0",
-  "watch": [
-    "internal/entities/",
-    "internal/hub/",
-    "agent/"
-  ],
+  "watch": ["internal/entities/", "internal/hub/", "agent/"],
   "snapshot": "Ressourcen/beszel/beszel-<version>/"
 }

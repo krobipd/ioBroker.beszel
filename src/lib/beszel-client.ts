@@ -162,8 +162,7 @@ export class BeszelClient {
   /** Fetch all systems (paginated, B2 v0.4.3) */
   public async getSystems(): Promise<BeszelSystem[]> {
     await this.ensureToken();
-    const items = await this.fetchAllPages("/api/collections/systems/records?sort=name", coerceSystem);
-    return items.filter((s): s is BeszelSystem => s !== null);
+    return this.fetchAllPages("/api/collections/systems/records?sort=name", coerceSystem);
   }
 
   /**
@@ -195,7 +194,7 @@ export class BeszelClient {
         // Deduplicate: keep the newest record per system.
         let addedNew = false;
         for (const record of pageItems) {
-          if (record && !result.has(record.system)) {
+          if (!result.has(record.system)) {
             result.set(record.system, record.stats);
             addedNew = true;
           }
@@ -221,7 +220,7 @@ export class BeszelClient {
     const items = await this.fetchAllPages("/api/collections/system_details/records", coerceSystemDetailsRecord);
     const result = new Map<string, SystemDetails>();
     for (const rec of items) {
-      if (rec && !result.has(rec.system)) {
+      if (!result.has(rec.system)) {
         result.set(rec.system, rec.details);
       }
     }
@@ -231,8 +230,7 @@ export class BeszelClient {
   /** Fetch all containers (paginated, B2 v0.4.3) */
   public async getContainers(): Promise<BeszelContainer[]> {
     await this.ensureToken();
-    const items = await this.fetchAllPages("/api/collections/containers/records?sort=system%2Cname", coerceContainer);
-    return items.filter((c): c is BeszelContainer => c !== null);
+    return this.fetchAllPages("/api/collections/containers/records?sort=system%2Cname", coerceContainer);
   }
 
   // -------------------------------------------------------------------------
@@ -304,7 +302,10 @@ export class BeszelClient {
    * always append our own `page=` and `perPage=`.
    *
    * @param path The collection-records path (with or without query string).
-   * @param itemCoercer Per-item coercer; `null` items are dropped by the caller.
+   * @param itemCoercer Per-item coercer; a record it rejects is dropped by
+   *   `coercePocketBaseList`, so neither this method nor its callers ever see a
+   *   `null` item (v0.16.0 — the nullable type and the callers' re-filtering were
+   *   left over from before that).
    * @param consumePage Optional per-page consumer (v0.7.2). Receives each
    *   page's coerced items; returning `false` stops the walk early — used by
    *   `getLatestStats` to stop once a page contributes nothing new instead
@@ -313,10 +314,10 @@ export class BeszelClient {
   private async fetchAllPages<T>(
     path: string,
     itemCoercer: (raw: unknown) => T | null,
-    consumePage?: (pageItems: (T | null)[]) => boolean,
-  ): Promise<(T | null)[]> {
+    consumePage?: (pageItems: T[]) => boolean,
+  ): Promise<T[]> {
     const sep = path.includes("?") ? "&" : "?";
-    const out: (T | null)[] = [];
+    const out: T[] = [];
     let totalPages = 1;
     for (let page = 1; page <= Math.min(totalPages, MAX_PAGES); page++) {
       const pagedPath = `${path}${sep}page=${page}&perPage=${PAGE_SIZE}`;
@@ -441,6 +442,9 @@ export class BeszelClient {
         const chunks: Buffer[] = [];
         let received = 0;
         res.on("error", err => {
+          // Tear the request down like the timeout path does — without this the socket
+          // can linger on the agent until its own keep-alive expires.
+          req.destroy();
           cleanup();
           reject(err);
         });

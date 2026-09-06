@@ -568,6 +568,23 @@ describe("coerce", () => {
   // coerceSystemStatsRecord
   // -----------------------------------------------------------------------
 
+  describe("ZFS pool entries that are not objects", () => {
+    it("keeps the pool with empty metrics instead of dropping it", () => {
+      // Total coercion, like the filesystem map: the pool exists on the Hub either way,
+      // so a garbage entry yields "nothing readable", never a vanished channel.
+      const s = coerceSystemStats({ z: { tank: "not an object", pool2: null, pool3: 42 } });
+      expect(Object.keys(s.z ?? {})).to.deep.equal(["tank", "pool2", "pool3"]);
+      expect(s.z!.tank).to.deep.equal({});
+      expect(s.z!.pool2).to.deep.equal({});
+      expect(s.z!.pool3).to.deep.equal({});
+    });
+
+    it("drops only the unreadable fields of an otherwise good pool", () => {
+      const s = coerceSystemStats({ z: { tank: { d: 100, du: "nope", rb: NaN, h: 7 } } });
+      expect(s.z!.tank).to.deep.equal({ d: 100 });
+    });
+  });
+
   describe("coerceSystemStatsRecord", () => {
     it("returns the record with coerced stats", () => {
       const rec = coerceSystemStatsRecord({

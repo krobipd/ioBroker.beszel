@@ -145,7 +145,7 @@ function setup(configOverrides: Record<string, unknown> = {}): {
   };
   const stateMgr: FakeStateMgr = {
     migrateLegacyStates: vi.fn(async () => {}),
-    getExistingSystemNames: vi.fn(() => Promise.resolve([])),
+    getExistingSystemNames: vi.fn(() => []),
     cleanupMetrics: vi.fn(async () => {}),
     prepareForPoll: vi.fn(),
     updateSystem: vi.fn(async () => {}),
@@ -235,7 +235,7 @@ describe("BeszelAdapter onReady", () => {
   it("happy path: migrates, cleans existing systems' metrics, polls once, schedules the interval", async () => {
     const { adapter, client, stateMgr } = setup();
     const i = internalOf(adapter);
-    stateMgr.getExistingSystemNames.mockResolvedValue(["server_a", "old_box"]);
+    stateMgr.getExistingSystemNames.mockReturnValue(["server_a", "old_box"]);
     await i.onReady();
 
     expect(stateMgr.migrateLegacyStates).toHaveBeenCalledTimes(1);
@@ -261,7 +261,7 @@ describe("BeszelAdapter onReady", () => {
       order.push("poll");
       return Promise.resolve();
     });
-    stateMgr.getExistingSystemNames.mockResolvedValue(["server_a"]);
+    stateMgr.getExistingSystemNames.mockReturnValue(["server_a"]);
     await i.onReady();
     // Anything created or removed before the snapshot would be miscounted.
     expect(order).toEqual(["snapshot", "cleanup", "poll"]);
@@ -270,7 +270,7 @@ describe("BeszelAdapter onReady", () => {
   it("F3: fetches existing system names once and hands them to migrateLegacyStates", async () => {
     const { adapter, stateMgr } = setup();
     const i = internalOf(adapter);
-    stateMgr.getExistingSystemNames.mockResolvedValue(["server_a", "old_box"]);
+    stateMgr.getExistingSystemNames.mockReturnValue(["server_a", "old_box"]);
     await i.onReady();
     // The names are fetched once in onReady and threaded into the migration, so the
     // real StateManager needn't re-run the object view a second time on startup.
@@ -284,12 +284,70 @@ describe("BeszelAdapter onReady", () => {
     expect(i.setStateChangedAsync.mock.calls[0]).toEqual(["info.connection", { val: false, ack: true }]);
   });
 
-  it("catches a failing boot step instead of crashing (boundary try/catch)", async () => {
-    const { adapter, stateMgr } = setup();
+  it("a failing setup step is logged and the adapter STILL polls (v0.16.0)", async () => {
+    // The defect: any rejected object call between I18n.init and setInterval logged one
+    // line and returned before the timer was armed. The process stayed alive, polled
+    // never again, and js-controller does not restart a daemon that is still running —
+    // only a manual restart brought the instance back.
+    const { adapter, stateMgr, client } = setup();
     const i = internalOf(adapter);
     stateMgr.migrateLegacyStates.mockRejectedValue(new Error("db down"));
     await i.onReady();
-    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("onReady failed: db down"));
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("'legacy migration' failed"));
+    expect(client.getSystems, "the first poll must still happen").toHaveBeenCalledTimes(1);
+    expect(i.setInterval, "the poll timer must still be armed").toHaveBeenCalledTimes(1);
+  });
+
+  it("every guarded setup step survives its own failure", async () => {
+    const { adapter, stateMgr } = setup();
+    const i = internalOf(adapter);
+    stateMgr.snapshotExistingStates.mockRejectedValue(new Error("snapshot boom"));
+    stateMgr.markAllOffline.mockRejectedValue(new Error("offline boom"));
+    stateMgr.cleanupMetrics.mockRejectedValue(new Error("cleanup boom"));
+    stateMgr.getExistingSystemNames.mockReturnValue(["server_a"]);
+    await i.onReady();
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("'object snapshot' failed"));
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("'offline markers' failed"));
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Metric cleanup for system 'server_a' failed"));
+    expect(i.setInterval, "the poll timer must still be armed").toHaveBeenCalledTimes(1);
+  });
+
+  it("one system's failed cleanup does not stop the others", async () => {
+    const { adapter, stateMgr } = setup();
+    const i = internalOf(adapter);
+    stateMgr.getExistingSystemNames.mockReturnValue(["server_a", "server_b", "server_c"]);
+    stateMgr.cleanupMetrics.mockImplementation((name: string) =>
+      name === "server_b" ? Promise.reject(new Error("bad row")) : Promise.resolve(),
+    );
+    await i.onReady();
+    expect(stateMgr.cleanupMetrics).toHaveBeenCalledTimes(3);
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("server_b"));
+    expect(i.setInterval).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failing I18n.init is the one hard stop — it ends onReady", async () => {
+    // Without the translations every object name would reach the tree as a raw key, so
+    // this one IS worth ending the start for. It is also the only remaining path into
+    // the outer catch.
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    const core = (await import("@iobroker/adapter-core")) as unknown as {
+      I18n: { init: ReturnType<typeof vi.fn> };
+    };
+    core.I18n.init.mockRejectedValueOnce(new Error("i18n gone"));
+    await i.onReady();
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("onReady failed: i18n gone"));
+    expect(i.setInterval).not.toHaveBeenCalled();
+  });
+
+  it("a configuration stop still ends WITHOUT a poll timer", async () => {
+    // The other half of the rule: with no credentials there is nothing to poll, so
+    // ending right there is the correct answer and must not be "recovered" from.
+    const { adapter } = setup({ password: "" });
+    const i = internalOf(adapter);
+    await i.onReady();
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("are required"));
+    expect(i.setInterval).not.toHaveBeenCalled();
   });
 
   it("SEC-3b: warns when the Hub URL is plain http to a remote host", async () => {

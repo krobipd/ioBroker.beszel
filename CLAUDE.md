@@ -149,9 +149,72 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     ging raus, während 0.19.0 zwei Tage alt war. Mutationstabelle `mutations_beszel_2026-09-05.py`
     (13, alle gefangen; Z4/Z5 überlebten zuerst → Aufräum-Test + Invarianten-Abdeckung für `zfs`).
 
-## Tests (616 unit + 57 package + 1 integration + 1 inventory = 675)
+34. **Der Start-Schnappschuss ist der EINZIGE Objekt-Lesevorgang (v0.16.0)** — `knownStateIds`,
+    `knownChannelIds` und (neu) `knownDeviceIds` kommen aus dem einen `getObjectListAsync` in
+    `snapshotExistingStates()` und werden ab da mitgeführt: `ensureChannel` und `updateSystem`
+    tragen ein, `dropCacheUnder` trägt aus. Jede spätere Frage „gibt es dieses Objekt" wird daraus
+    beantwortet — `cleanupMetrics`, `deleteChannelIfExists`, `noteStatesRemovedUnder`, der
+    Gruppen-Abgleich in `pruneDynamicChildren` und `getExistingSystemNames`. Vorher fragte der
+    Adapter die Objektdatenbank erneut nach dem, was er gerade gelesen hatte: **43
+    `getObjectAsync` je System und Start** bei Standardkonfiguration, dazu eine View je dynamischer
+    Gruppe und eine je Poll für die Geräteliste. Der einzige blinde Fleck ist eine Löschung von
+    Hand in der Admin während der Laufzeit — den hatte der `createdIds`-Cache vorher genauso, und
+    der nächste Start gleicht ihn ab.
+35. **Eine gelöschte Gruppe bleibt gelöscht (v0.16.0, FEHLER)** — `knownChannelIds` wurde vom
+    Schnappschuss gefüllt und nie wieder gepflegt. `refreshDynamicObjects` fand dort jeden
+    Gruppenkanal wieder, den `cleanupMetrics` oder die Drop-auf-null-Prune gerade gelöscht hatte,
+    und legte ihn per `extendObject` **leer wieder an** — auf jedem System ohne Messwert, nach
+    jedem Neustart erneut, und nur dort: erreichbare Systeme liefen über `updateDynamicStats` und
+    hatten den Kanal nicht. Zwei Wege dorthin: Schalter aus, und ohne jede Konfigurationsänderung
+    eine Gruppe, die im Betrieb auf null fällt. Behoben, indem `dropCacheUnder` die Kanal- und
+    Gerätebuchhaltung mitführt; Regressionstests decken beide Wege ab.
+36. **Ein gescheiterter Aufbauschritt kostet nicht den Poll-Timer (v0.16.0, FEHLER)** — die acht
+    Schritte zwischen `I18n.init` und `setInterval` lagen in EINEM `try` um ganz `onReady`: ein
+    abgelehnter Objektaufruf loggte eine Zeile und kehrte **vor** dem Timer zurück. Der Prozess
+    lief weiter, pollte nie wieder, und js-controller startet einen lebenden Daemon nicht neu.
+    Jetzt läuft jeder Schritt über `setupStep()` (fängt, loggt, macht weiter), und die
+    Systemschleife der Aufräumung hat Einzelschutz wie die des Polls. **`I18n.init` bleibt hart**
+    (ohne Übersetzungen erreicht jeder Name als roher Schlüssel den Baum), und die beiden
+    Konfigurationsabbrüche — fehlende Zugangsdaten, ungültige URL — enden weiterhin ohne Timer.
+37. **Eine Tabelle für die dynamischen Blätter, aus der BEIDE Wege lesen (v0.16.0)** —
+    `LEAF_COMMONS` + `DYNAMIC_LEAF_PATTERNS` + `leafCommon()` in der Registry lösen
+    `DYNAMIC_LEAF_COMMONS` im Manager ab. Das war eine zweite Beschreibung der 29 Erzeugungspfade,
+    zusammengehalten von einem Invariantentest, der nur die ABDECKUNG prüfte (hat jedes Blatt einen
+    Eintrag) und nie die GLEICHHEIT (baut der Eintrag denselben common). Der Ersatztest ersetzt einen
+    Tabelleneintrag durch einen Sentinel und verlangt, dass Erzeugung **und** Auffrischung ihn
+    ausliefern — nach der fakeroku-Lehre, dass eine gestrichene Aufrufzeile Gate, Linter und
+    Typprüfung grün lässt.
+38. **`common.states` folgen der Systemsprache (v0.16.0)** — der Flottenstandard hat zwei Hälften:
+    plain-string (sonst React #31) UND auf die Systemsprache aufgelöst. beszel hielt nur die erste.
+    `systemStatusStates()`, `zfsHealthStates()` und `containerHealthStates()` sind jetzt Funktionen
+    über `tState()` (= `I18n.translate`, liefert den plain string der Systemsprache); 17 Schlüssel in
+    elf Sprachen. Die KEYS bleiben die technischen Werte, die im State stehen. Dazu der vom Standard
+    geforderte Regressionstest über alle drei Werteliste-Fabriken.
+39. **Container-Zustand ist ein Statusdatenpunkt (v0.16.0)** — `containers.<name>.health` trug Rolle
+    `text` und keine Werteliste, während `info.status` und `zfs.<pool>.health` beides haben —
+    ausgerechnet der Datenpunkt, dessen Werteliste der ADAPTER selbst erzeugt. Jetzt Rolle
+    `info.status` + `common.states`; `CONTAINER_HEALTH_LABELS` und `containerHealthLabel()` liegen
+    neben ihren zwei Geschwistern in der Registry statt inline in einer I/O-Methode.
+40. **Kanal-Aufräumung komplett tabellengetrieben (v0.16.0)** — `gpu`, `filesystems` und `containers`
+    sind in `DYNAMIC_CHANNEL_TOGGLES` gewandert, die drei Unterkanäle in das neue
+    `DYNAMIC_SUBCHANNEL_TOGGLES`; die sechs handgeschriebenen `if`-Zweige in `cleanupMetrics` sind
+    weg. Ein Ende-zu-Ende-Test schaltet alles ab und verlangt, dass unter dem System nur noch der
+    `info`-Kanal steht — ein neuer dynamischer Kanal ohne Aufräumregel fällt dort auf, statt einen
+    siebten Zweig zu brauchen.
+41. **Typen statt Casts an der i18n-Grenze (v0.16.0)** — `i18n.ts` exportiert `I18nKey`;
+    `MetricDef.nameKey`/`descKey` und `CHANNEL_NAME_KEY` tragen ihn, `channelName()` nimmt
+    `ChannelKey` statt `string`. Ein unbekannter Kanal reichte vorher `undefined` an adapter-core,
+    das still `{ en: undefined }` antwortet — und das Flotten-Gate sieht es nicht, weil der
+    Schlüssel berechnet ist. Jetzt ist es ein Compilefehler. Die drei Casts sind weg.
+42. **Die Test-Vorrichtungen leiten die Schalterliste ab (v0.16.0)** — `ALL_TOGGLES` kommt aus der
+    Registry plus den beiden Toggle-Tabellen, nicht mehr aus einer Handliste. Die Handliste hatte
+    `metrics_diskIo` nie gelernt, weshalb DREI Tests „legt nichts an, wenn der Schalter aus ist"
+    gegen einen `undefined`-Schalter liefen und nichts prüften. Dazu die Invariante
+    **Manifest ↔ Admin-UI ↔ Code**: die drei Schalterlisten müssen deckungsgleich sein.
 
-Zusammensetzung (gemessen 2026-09-05): state-manager 271 · coerce 144 · main 94 · beszel-client 66 · message-router 16 · i18n 7 · inventory 6 · repo-standards 12 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · i18n 7.
+## Tests (652 unit + 58 package + 1 integration + 1 inventory = 712)
+
+Zusammensetzung (gemessen 2026-09-06 nach dem Vollaudit): state-manager 298 · coerce 146 · main 98 · beszel-client 69 · message-router 16 · repo-standards 12 · i18n 7 · inventory 6 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version). Deckung **99,2 % Stmts · 98,6 % Branch · 97,1 % Funcs**; `src/lib` 100 % Funktionen, `state-manager.ts` 100 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server, `?? ""` auf einer garantiert gesetzten Map-Id) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 
@@ -166,3 +229,34 @@ npm run lint          # ESLint
 npm run format:check  # Prettier --check
 npm run check         # tsc --noEmit (Type-Check)
 ```
+
+## Prettier-Ausschlüsse (v0.16.0)
+
+`npm run format:check` ist seit dem Vollaudit 0 — nach dem Flotten-Rezept in drei Klassen aufgeräumt
+(`reference_prettier_vs_consistency_master`). Drei Dateien tragen ein Ausschlussmuster im
+`format`/`format:check`-Skript, **keine `.prettierignore`** (die meldet der Repochecker als veraltete
+Konfigurationsdatei, W0084 + W5048) — genau die Liste, die das Rezept nennt:
+
+| Datei                    | Grund                                                                                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build/**`               | esbuild-Ausgabe, unversioniert                                                                                                                           |
+| `io-package.json`        | Release-Skript, `sync-iopackage-from-i18n.py` und der Konsistenz-Autofix schreiben aufgeklapptes JSON; Prettier will kurze Arrays einzeilig — nie stabil |
+| `.github/dependabot.yml` | Bot-Format mit einfachen Anführungszeichen, Flottenentscheid 2026-07-01                                                                                  |
+
+`README.md` und `CHANGELOG_OLD.md` sind **nicht** ausgeschlossen, obwohl sie das Release-Skript
+schreibt: `executeCleanupStage` setzt den Platzhalter als `changelogBefore.trimEnd() + "\n" +
+"### **WORK IN PROGRESS**"`, also ohne die Leerzeile, die Prettier zwischen HTML-Kommentar und
+Überschrift verlangt (`@alcalzone/release-script-plugin-changelog`, `build/index.js:248`; dieselbe
+Form für CHANGELOG_OLD in Zeile 230). Nach jedem Release meldet `format:check` diese eine Zeile
+darum erneut. Das ist ein Fund am Flotten-Werkzeug, kein Grund, die Datei im Adapter aus dem
+eigenen Gate zu nehmen — nachformatieren, nicht ausschließen.
+
+`.remember/` steht seit v0.16.0 in der `.gitignore` (Kratzverzeichnis des Notiz-Hooks, nie
+Repo-Inhalt) — damit überspringt Prettier es von selbst; es war nur sichtbar, weil Prettier die
+verschachtelte `.gitignore` darin nicht liest.
+
+`tsconfig.json`, `tsconfig.build.json` und `.vscode/settings.json` kamen aus dem Konsistenz-Master
+und standen noch im alten Vorlagen-Format (Tabs, aufgeklappte Arrays). Der Master ist längst
+prettier-sauber — der Adapter ist nachgezogen (`tsc --showConfig` vorher/nachher identisch). Das
+Konsistenz-Gate sah die Drift nicht, weil es JSON **semantisch** vergleicht; das ist Absicht, kein
+Loch.

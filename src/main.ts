@@ -199,6 +199,28 @@ export class BeszelAdapter extends utils.Adapter {
     });
   }
 
+  /**
+   * Run one startup step whose failure must not cost the adapter its poll timer.
+   *
+   * Everything between `I18n.init` and the first poll used to sit in one `try` around
+   * the whole of `onReady`: a single rejected object call — a hiccup of the objects DB
+   * while the adapter starts — logged one line and returned BEFORE `setInterval`. The
+   * process then stayed alive, polled never again and js-controller does not restart a
+   * daemon that is still running, so only a manual restart brought the instance back.
+   * `clearStopInstanceFlag` already argued the right way about this ("not worth failing
+   * the start over; the next start retries") — there just was no next start.
+   *
+   * @param label What was being set up, for the log line.
+   * @param fn The step.
+   */
+  private async setupStep(label: string, fn: () => Promise<void>): Promise<void> {
+    try {
+      await fn();
+    } catch (err: unknown) {
+      this.log.error(`Startup step '${label}' failed — the adapter keeps going: ${errText(err)}`);
+    }
+  }
+
   private async onReady(): Promise<void> {
     try {
       // First: without this the whole shutdown path stays dead on an updated install.
@@ -206,22 +228,29 @@ export class BeszelAdapter extends utils.Adapter {
       if (await this.clearStopInstanceFlag()) {
         return;
       }
+      // The one hard precondition of the whole adapter: without the translations every
+      // object name would reach the tree as a raw key. A failure here is worth ending
+      // the start for — every step after it is guarded instead.
       await I18n.init(join(this.adapterDir, "admin"), this);
-      // Straight after the translations are loaded: an existing installation must pick
-      // up corrected names/descriptions too, not just a fresh one.
-      await this.ensureInstanceObjects();
       const config = this.config as unknown as AdapterConfig;
 
       this.log.debug(
         `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`,
       );
 
-      // L1: setStateChanged (not the deprecated setStateAsync) — no needless event.
-      await this.setStateChangedAsync("info.connection", { val: false, ack: true });
+      // Straight after the translations are loaded: an existing installation must pick
+      // up corrected names/descriptions too, not just a fresh one.
+      await this.setupStep("instance objects", () => this.ensureInstanceObjects());
 
-      // v0.11.0: snapshot the existing states BEFORE any cleanup or poll — it is
+      // L1: setStateChanged (not the deprecated setStateAsync) — no needless event.
+      await this.setupStep("connection state", async () => {
+        await this.setStateChangedAsync("info.connection", { val: false, ack: true });
+      });
+
+      // v0.11.0: snapshot the existing objects BEFORE any cleanup or poll — it is
       // the baseline for the "created / removed N datapoint(s)" line, so every
-      // change from here on is attributable.
+      // change from here on is attributable, and since v0.16.0 it is also what
+      // answers every later "does this object exist" question.
       //
       // Nothing has been read yet, so no system may still claim to be online from
       // the previous run — least of all when the adapter cannot even start: the
@@ -230,9 +259,12 @@ export class BeszelAdapter extends utils.Adapter {
       // already saying "disconnected" next to it. Runs off the snapshot, no extra
       // object view.
       this.stateManager = this.makeStateManager();
-      await this.stateManager.snapshotExistingStates();
-      await this.stateManager.markAllOffline();
+      await this.setupStep("object snapshot", () => this.stateManager!.snapshotExistingStates());
+      await this.setupStep("offline markers", () => this.stateManager!.markAllOffline());
 
+      // The two configuration stops below are NOT startup steps: with no credentials or
+      // an unusable URL there is nothing to poll, so ending without a timer is the
+      // correct answer, not a failure to recover from.
       if (!config.url || !config.username || !config.password) {
         this.log.error(
           "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once.",
@@ -257,11 +289,23 @@ export class BeszelAdapter extends utils.Adapter {
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
 
-      // F3: enumerate the existing system devices once and reuse the list for both
-      // the legacy migration and the metric cleanup, instead of two object views.
-      const existingNames = await this.stateManager.getExistingSystemNames();
-      await this.stateManager.migrateLegacyStates(existingNames);
-      await Promise.all(existingNames.map(name => this.stateManager!.cleanupMetrics(name, config)));
+      // F3: the system devices come from the startup snapshot, and both the legacy
+      // migration and the metric cleanup reuse that one list.
+      const existingNames = this.stateManager.getExistingSystemNames();
+      await this.setupStep("legacy migration", () => this.stateManager!.migrateLegacyStates(existingNames));
+      await this.setupStep("metric cleanup", async () => {
+        // Per system, like the poll's fan-out: one system whose cleanup fails must not
+        // take the other systems — or the start — with it.
+        await Promise.all(
+          existingNames.map(async name => {
+            try {
+              await this.stateManager!.cleanupMetrics(name, config);
+            } catch (err: unknown) {
+              this.log.warn(`Metric cleanup for system '${name}' failed: ${errText(err)}`);
+            }
+          }),
+        );
+      });
       this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
 
       await this.poll();
@@ -447,6 +491,39 @@ export class BeszelAdapter extends utils.Adapter {
   }
 
   /**
+   * Drop every entry whose system id is no longer on the Hub. Shared by the three
+   * per-system bookkeeping structures — they used to carry the same loop three times,
+   * and a fourth structure would have added a fourth copy.
+   *
+   * @param book Set or Map keyed by system id.
+   * @param activeIds System ids present in the current poll.
+   */
+  private static pruneByActiveIds(book: Set<string> | Map<string, unknown>, activeIds: ReadonlySet<string>): void {
+    for (const id of [...book.keys()]) {
+      if (!activeIds.has(id)) {
+        book.delete(id);
+      }
+    }
+  }
+
+  /**
+   * Write a state without letting a rejection escape.
+   *
+   * The error paths run inside the `catch` of an un-awaited interval poll, or while the
+   * broker is going down: an unguarded `await` there would surface as an unhandled
+   * rejection (crash-loop, no stack). Five call sites carried the identical
+   * `void …catch(() => {})` before.
+   *
+   * @param id State id, namespace-relative.
+   * @param val Value to write.
+   */
+  private setStateSafe(id: string, val: ioBroker.StateValue): void {
+    void this.setStateChangedAsync(id, { val, ack: true }).catch(() => {
+      /* broker shutting down / states unreachable */
+    });
+  }
+
+  /**
    * DP4: write the fleet-level rollup states (total / online / all-up) so a
    * dashboard can show "N of M up" without enumerating every system. The three
    * states are static instance objects (io-package.json), so they exist from the
@@ -536,8 +613,15 @@ export class BeszelAdapter extends utils.Adapter {
       }
 
       // v0.6.0 (F2): attach static hardware/OS details when "System info" is on
-      // (F3/N5: extracted to keep the poll body readable).
-      await this.fetchAndAttachDetails(systems, config);
+      // (F3/N5: the fetch is extracted to keep the poll body readable; the attach stays
+      // here so the data flow is visible rather than a side effect of the fetch).
+      const details = await this.fetchSystemDetails(systems, config);
+      for (const system of systems) {
+        const d = details.get(system.id);
+        if (d) {
+          system.details = d;
+        }
+      }
 
       // v0.4.3 (SM5): pre-resolve safeNames deterministically so collisions
       // between two systems with the same sanitized name get suffixed
@@ -590,21 +674,9 @@ export class BeszelAdapter extends utils.Adapter {
         // L5: bookkeeping keyed by the STABLE system id — two systems that share
         // a sanitized name would otherwise clobber each other's failure-dedup marker.
         const activeIds = new Set(systems.map(s => s.id));
-        for (const id of [...this.failedSystems]) {
-          if (!activeIds.has(id)) {
-            this.failedSystems.delete(id);
-          }
-        }
-        for (const id of [...this.detailsAttempted]) {
-          if (!activeIds.has(id)) {
-            this.detailsAttempted.delete(id);
-          }
-        }
-        for (const id of [...this.systemDetails.keys()]) {
-          if (!activeIds.has(id)) {
-            this.systemDetails.delete(id);
-          }
-        }
+        BeszelAdapter.pruneByActiveIds(this.failedSystems, activeIds);
+        BeszelAdapter.pruneByActiveIds(this.detailsAttempted, activeIds);
+        BeszelAdapter.pruneByActiveIds(this.systemDetails, activeIds);
 
         // DP4: fleet rollup for dashboards (non-empty poll only, like the cleanup).
         await this.writeRollup(systems.length, systems.filter(s => s.status === "up").length);
@@ -632,19 +704,27 @@ export class BeszelAdapter extends utils.Adapter {
   }
 
   /**
-   * F2/F3: fetch the static `system_details` collection (hardware/OS) and attach
-   * it to the current systems. No-op unless "System info" is enabled. Only
-   * fetched when a system id we've never attempted appears (first poll or a new
-   * system) — the data is static, so re-fetching each poll would be waste. A
-   * failed fetch is non-fatal (details stay absent → no hardware states); a
-   * transient NETWORK/TIMEOUT is retried next poll rather than marked attempted.
+   * F2/F3: fetch the static `system_details` collection (hardware/OS) for the current
+   * systems. No-op unless "System info" is enabled. Only fetched when a system id we've
+   * never attempted appears (first poll or a new system) — the data is static, so
+   * re-fetching each poll would be waste. A failed fetch is non-fatal (details stay
+   * absent → no hardware states); a transient NETWORK/TIMEOUT is retried next poll
+   * rather than marked attempted.
    *
-   * @param systems Systems from the current poll (mutated: `.details` attached).
+   * v0.16.0: returns the map instead of writing `system.details` into the caller's array
+   * behind its back. The attach still happens — the metric registry reads
+   * `system.details` — but it is now one visible line in the poll.
+   *
+   * @param systems Systems from the current poll.
    * @param config Adapter configuration.
+   * @returns Details by system id (empty when the toggle is off or nothing was fetched).
    */
-  private async fetchAndAttachDetails(systems: BeszelSystem[], config: AdapterConfig): Promise<void> {
+  private async fetchSystemDetails(
+    systems: BeszelSystem[],
+    config: AdapterConfig,
+  ): Promise<Map<string, SystemDetails>> {
     if (!config.metrics_agentVersion) {
-      return;
+      return new Map();
     }
     // Edge: a system that is `pending` right now gets marked attempted, so its
     // hardware info appears only after the next adapter restart — an accepted
@@ -674,12 +754,7 @@ export class BeszelAdapter extends utils.Adapter {
         }
       }
     }
-    for (const system of systems) {
-      const d = this.systemDetails.get(system.id);
-      if (d) {
-        system.details = d;
-      }
-    }
+    return this.systemDetails;
   }
 
   /**
@@ -732,12 +807,10 @@ export class BeszelAdapter extends utils.Adapter {
       this.log.debug(`Poll failed: ${errMsg}`);
     }
 
-    // L1: fire-and-forget with .catch — this runs in the catch of the un-awaited
+    // L1: fire-and-forget via setStateSafe — this runs in the catch of the un-awaited
     // interval poll; an unguarded await here would escape as an unhandled
     // rejection if the states DB is also down (crash-loop, no stack). Mirrors onUnload.
-    void this.setStateChangedAsync("info.connection", { val: false, ack: true }).catch(() => {
-      /* broker shutting down / states unreachable */
-    });
+    this.setStateSafe("info.connection", false);
 
     // The poll failed as a whole (Hub unreachable, auth rejected, …), so this run
     // learned nothing about any system. Leaving `info.online` on its last value
@@ -748,21 +821,13 @@ export class BeszelAdapter extends utils.Adapter {
     // `info.status` says "unknown" rather than one of the Hub's four values: the
     // adapter did not observe the system going down, it just cannot ask any more.
     for (const sysId of this.stateManager?.knownSystemIds() ?? []) {
-      void this.setStateChangedAsync(`${sysId}.info.online`, { val: false, ack: true }).catch(() => {
-        /* broker shutting down / states unreachable */
-      });
-      void this.setStateChangedAsync(`${sysId}.info.status`, { val: SYSTEM_STATUS_UNKNOWN, ack: true }).catch(() => {
-        /* broker shutting down / states unreachable */
-      });
+      this.setStateSafe(`${sysId}.info.online`, false);
+      this.setStateSafe(`${sysId}.info.status`, SYSTEM_STATUS_UNKNOWN);
     }
     // Same claim one level up — the rollup states are instance objects, so they
     // exist even before the first successful poll.
-    void this.setStateChangedAsync("info.systemsOnline", { val: 0, ack: true }).catch(() => {
-      /* broker shutting down / states unreachable */
-    });
-    void this.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true }).catch(() => {
-      /* broker shutting down / states unreachable */
-    });
+    this.setStateSafe("info.systemsOnline", 0);
+    this.setStateSafe("info.systemsAllUp", false);
   }
 }
 
