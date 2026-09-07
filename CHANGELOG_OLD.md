@@ -1,5 +1,9 @@
 # Older Changes
 
+## 0.14.1 (2026-09-04)
+
+- Fixed: a system that is offline right now kept the old datapoint names and got no descriptions — the update reached only systems the Hub had a current reading for
+
 ## 0.14.0 (2026-09-04)
 
 - New: user documentation in the repository, in English and German — setup step by step, what every metric switch creates, and the questions that keep coming up

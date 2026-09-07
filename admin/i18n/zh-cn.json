@@ -94,7 +94,7 @@
   "temperatureMax": "温度（最热传感器）",
   "hostname": "主机名",
   "os": "操作系统",
-  "osName": "系统版本",
+  "osName": "系统名称",
   "kernel": "内核",
   "cpuModel": "CPU 型号",
   "arch": "架构",

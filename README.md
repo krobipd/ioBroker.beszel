@@ -284,6 +284,11 @@ beszel.0.
     ### **WORK IN PROGRESS**
 -->
 
+### 0.17.1 (2026-09-07)
+
+- Improved: sixteen datapoints now carry an explanation in the object tree — online state, OS name, load average, container and service CPU, ZFS scrub errors and drive power cycles
+- Fixed: the datapoint carrying the distribution name was labelled "OS Version" — it now reads "OS Name" in all eleven languages, matching what it actually shows
+
 ### 0.17.0 (2026-09-06)
 
 - New: SMART data per drive as an opt-in metric — the drive's own overall verdict plus temperature, capacity, power-on hours and power cycles
@@ -307,10 +312,6 @@ beszel.0.
 ### 0.14.2 (2026-09-05)
 
 - Changed: Internal cleanup. No user-facing changes.
-
-### 0.14.1 (2026-09-04)
-
-- Fixed: a system that is offline right now kept the old datapoint names and got no descriptions — the update reached only systems the Hub had a current reading for
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

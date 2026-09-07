@@ -88,7 +88,8 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     gegen die KERNZAHL zu lesen), `info.online` (wahr nur bei „up", falsch auch sobald der Adapter
     nichts liest — `markAllOffline` schreibt nur den WERT, das `common` bleibt stehen),
     `info.os_name` (die Distribution neben der Plattform-Familie in `info.os`; der Agent füllt sie
-    aus der Docker-Info bzw. `PRETTY_NAME`), Container- **und** systemd-CPU (ein gemeinsamer
+    aus der Docker-Info bzw. `PRETTY_NAME` — die BESCHRIFTUNG hieß bis v0.17.1 in allen elf
+    Sprachen „OS Version" und log damit, sie heißt jetzt „OS-Name"), Container- **und** systemd-CPU (ein gemeinsamer
     Schlüssel: beide teilen durch `Kerne × Zeit`, alle Kerne zusammen sind 100 % — `docker stats`
     teilt durch EINEN Kern und zeigt darum mehr), `scrub_errors` (aus der `scan:`-Zeile von
     `zpool status`, bleibt bis zum nächsten Lauf stehen) und `power_cycles` (Lebensdauer-Zähler

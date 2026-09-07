@@ -94,7 +94,7 @@
   "temperatureMax": "Temperatura (sensore più caldo)",
   "hostname": "Nome host",
   "os": "Sistema operativo",
-  "osName": "Versione del SO",
+  "osName": "Nome del SO",
   "kernel": "Kernel",
   "cpuModel": "Modello CPU",
   "arch": "Architettura",

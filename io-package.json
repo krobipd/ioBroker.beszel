@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.17.0",
+    "version": "0.17.1",
     "news": {
+      "0.17.1": {
+        "en": "Sixteen datapoints now explain themselves in the object tree, and the datapoint carrying the distribution name is labelled \"OS Name\" instead of \"OS Version\".",
+        "de": "Sechzehn Datenpunkte erklären sich jetzt im Objektbaum, und der Datenpunkt mit dem Distributionsnamen heißt „OS-Name“ statt „OS-Version“.",
+        "ru": "Шестнадцать точек данных теперь имеют пояснение в дереве объектов, а точка с названием дистрибутива называется «Название ОС» вместо «Версия ОС».",
+        "pt": "Dezasseis pontos de dados passam a trazer uma explicação na árvore de objetos, e o ponto com o nome da distribuição chama-se «Nome do SO» em vez de «Versão do SO».",
+        "nl": "Zestien datapunten hebben nu een uitleg in de objectboom, en het datapunt met de distributienaam heet \"OS-naam\" in plaats van \"OS-versie\".",
+        "fr": "Seize points de données portent désormais une explication dans l'arbre d'objets, et celui qui contient le nom de la distribution s'appelle « Nom de l'OS » au lieu de « Version de l'OS ».",
+        "it": "Sedici punti dati riportano ora una spiegazione nell'albero degli oggetti e quello con il nome della distribuzione si chiama «Nome del SO» invece di «Versione del SO».",
+        "es": "Dieciséis puntos de datos ahora incluyen una explicación en el árbol de objetos, y el que lleva el nombre de la distribución se llama «Nombre del SO» en vez de «Versión del SO».",
+        "pl": "Szesnaście punktów danych ma teraz objaśnienie w drzewie obiektów, a punkt z nazwą dystrybucji nazywa się „Nazwa systemu“ zamiast „Wersja systemu“.",
+        "uk": "Шістнадцять точок даних тепер мають пояснення в дереві об'єктів, а точка з назвою дистрибутива називається «Назва ОС» замість «Версія ОС».",
+        "zh-cn": "对象树中现有十六个数据点带有说明，承载发行版名称的数据点标签由“系统版本”改为“系统名称”。"
+      },
       "0.17.0": {
         "en": "SMART data, ZFS pool details and systemd service details are available as opt-in metrics; the two slow sources are read every 15 minutes.",
         "de": "SMART-Daten, ZFS-Pool-Details und systemd-Dienst-Details sind als zuschaltbare Metriken verfügbar; die zwei langsamen Quellen werden alle 15 Minuten gelesen.",
@@ -80,19 +93,6 @@
         "pl": "Poprawione nazwy i opisy docierają teraz także do istniejących instalacji.\nMniej oczywiste punkty danych mają krótkie wyjaśnienie.\nSystem bez odczytu zachowuje ostatnie wartości.\nDokumentacja po angielsku i niemiecku.",
         "uk": "Виправлені назви та описи тепер доходять і до наявних інсталяцій.\nНеочевидні точки даних мають коротке пояснення.\nСистема без вимірювання зберігає останні значення.\nДокументація англійською та німецькою.",
         "zh-cn": "更正后的名称和说明现在也会应用到已有安装。\n含义不直观的数据点带有简短说明。\n无读数的系统保留最后的数值。\n提供英文和德文用户文档。"
-      },
-      "0.13.0": {
-        "en": "IPv6 Hub addresses work; stopping during a poll logs no false error; systems stay offline when the adapter cannot start; the fleet summary states exist from the installation on.",
-        "de": "IPv6-Hub-Adressen funktionieren; Stoppen während eines Abrufs erzeugt keine falsche Fehlerzeile; Systeme bleiben offline, wenn der Adapter nicht startet; Zusammenfassung ab Installation vorhanden.",
-        "ru": "Адреса хаба IPv6 работают; остановка во время опроса не пишет ложную ошибку; системы остаются офлайн, если адаптер не запускается; сводные состояния существуют с момента установки.",
-        "pt": "Endereços IPv6 do Hub funcionam; parar durante uma consulta não regista erro falso; os sistemas ficam offline se o adaptador não arrancar; os estados de resumo existem desde a instalação.",
-        "nl": "IPv6-Hub-adressen werken; stoppen tijdens een poll logt geen valse fout; systemen blijven offline als de adapter niet start; de samenvattingsstates bestaan vanaf de installatie.",
-        "fr": "Les adresses IPv6 du Hub fonctionnent ; l'arrêt pendant une interrogation n'écrit plus de fausse erreur ; les systèmes restent hors ligne si l'adaptateur ne démarre pas ; synthèse dès l'installation.",
-        "it": "Gli indirizzi IPv6 del Hub funzionano; l'arresto durante un polling non registra falsi errori; i sistemi restano offline se l'adapter non si avvia; gli stati di riepilogo esistono dall'installazione.",
-        "es": "Las direcciones IPv6 del Hub funcionan; detener durante una consulta no registra un error falso; los sistemas quedan fuera de línea si el adaptador no inicia; estados de resumen desde la instalación.",
-        "pl": "Adresy IPv6 Huba działają; zatrzymanie podczas odpytania nie zapisuje fałszywego błędu; systemy pozostają offline, gdy adapter nie startuje; stany podsumowania istnieją od instalacji.",
-        "uk": "IPv6-адреси хаба працюють; зупинка під час опитування не пише хибну помилку; системи залишаються офлайн, якщо адаптер не запускається; зведені стани існують від моменту встановлення.",
-        "zh-cn": "支持 IPv6 Hub 地址；轮询期间停止不再记录错误的报错；适配器无法启动时各系统保持离线；汇总状态自安装起即存在。"
       }
     },
     "plugins": {

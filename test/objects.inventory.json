@@ -565,17 +565,17 @@
     "type": "state",
     "common": {
       "name": {
-        "de": "OS-Version",
-        "en": "OS Version",
-        "es": "Versión del SO",
-        "fr": "Version de l'OS",
-        "it": "Versione del SO",
-        "nl": "OS-versie",
-        "pl": "Wersja systemu",
-        "pt": "Versão do SO",
-        "ru": "Версия ОС",
-        "uk": "Версія ОС",
-        "zh-cn": "系统版本"
+        "de": "OS-Name",
+        "en": "OS Name",
+        "es": "Nombre del SO",
+        "fr": "Nom de l'OS",
+        "it": "Nome del SO",
+        "nl": "OS-naam",
+        "pl": "Nazwa systemu",
+        "pt": "Nome do SO",
+        "ru": "Название ОС",
+        "uk": "Назва ОС",
+        "zh-cn": "系统名称"
       },
       "desc": {
         "de": "Die Distribution oder Ausgabe, die der Agent meldet, etwa „Ubuntu 24.04.1 LTS“ oder „macOS 15.1“.",
@@ -3204,17 +3204,17 @@
     "type": "state",
     "common": {
       "name": {
-        "de": "OS-Version",
-        "en": "OS Version",
-        "es": "Versión del SO",
-        "fr": "Version de l'OS",
-        "it": "Versione del SO",
-        "nl": "OS-versie",
-        "pl": "Wersja systemu",
-        "pt": "Versão do SO",
-        "ru": "Версия ОС",
-        "uk": "Версія ОС",
-        "zh-cn": "系统版本"
+        "de": "OS-Name",
+        "en": "OS Name",
+        "es": "Nombre del SO",
+        "fr": "Nom de l'OS",
+        "it": "Nome del SO",
+        "nl": "OS-naam",
+        "pl": "Nazwa systemu",
+        "pt": "Nome do SO",
+        "ru": "Название ОС",
+        "uk": "Назва ОС",
+        "zh-cn": "系统名称"
       },
       "desc": {
         "de": "Die Distribution oder Ausgabe, die der Agent meldet, etwa „Ubuntu 24.04.1 LTS“ oder „macOS 15.1“.",
