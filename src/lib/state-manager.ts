@@ -697,7 +697,7 @@ export class StateManager {
     // Always: online + status
     await this.createAndSetState(
       `${sysId}.info.online`,
-      boolCommon(tName("online"), "indicator.reachable"),
+      boolCommon(tName("online"), "indicator.reachable", tDesc("descOnline")),
       system.status === "up",
     );
     await this.createAndSetState(

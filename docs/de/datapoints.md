@@ -18,8 +18,12 @@ Basis-Schalter; ihre drei Einträge sind unabhängig.
 | System info      | `info.hostname`, `info.os`, `info.os_name`, `info.kernel`, `info.cpu_model`, `info.arch`, `info.cores`, `info.threads`, `info.podman`, `info.agent_version` | statische Daten, einmal beim Start und bei einem neuen System gelesen |
 | Systemd Services | `info.services_total`, `info.services_failed`                                                                                                               | nur Linux mit systemd                                                 |
 
+`info.os` ist die Plattform-Familie (`Linux`, `macOS`, `Windows`, `FreeBSD`); `info.os_name` ist
+die Distribution oder Ausgabe, die der Agent daneben meldet, etwa `Ubuntu 24.04.1 LTS`.
+
 Immer vorhanden, unabhängig von jedem Schalter: `info.online` und `info.status`. `info.online` ist
-der Wert, den das Gerätesymbol im Objektbaum liest. `info.status` trägt die vier Werte des Hubs
+der Wert, den das Gerätesymbol im Objektbaum liest: wahr nur, solange der Hub `up` meldet, und
+wieder falsch, sobald nichts gelesen wird. `info.status` trägt die vier Werte des Hubs
 (`up`, `down`, `paused`, `pending`) und einen fünften des Adapters, `unknown` — für die Zeit, in der
 der Adapter gestoppt ist oder den Hub nicht erreicht. Einen der vier Hub-Werte zu schreiben, würde
 dort etwas behaupten, das niemand gemessen hat.
@@ -33,6 +37,10 @@ dort etwas behaupten, das niemand gemessen hat.
 | CPU Breakdown       | `cpu.user`, `cpu.system`, `cpu.iowait`, `cpu.steal`, `cpu.idle` |
 | Per-core usage      | `cpu.cores.core0`, `core1`, …                                   |
 | Peak values         | `cpu.peak`                                                      |
+
+Die drei Load-Average-Werte haben keine Einheit: sie zählen die Prozesse, die die CPU nutzen oder
+auf sie warten — deshalb gehören sie zur Kernzahl ins Verhältnis gesetzt: 4,0 ist ein ausgelasteter
+Vierkerner und eine ruhige 32-Kern-Maschine.
 
 `cpu.steal` ist der Zeitanteil, den der Hypervisor anderen Gästen gegeben hat — auf echter Hardware
 bleibt er bei null, auf einer überbuchten VM ist er die Zahl, die erklärt, warum sich alles zäh
@@ -132,8 +140,10 @@ Der GPU-Speicher wird in MB gemeldet.
 | Container Monitoring | `containers.<name>.status`, `.health`, `.cpu`, `.memory`, `.image`, `.network` |
 
 `health` ist das Ergebnis der Health-Prüfung des Images und steht auf `none`, wenn das Image keine
-definiert. `network` ist Gesendet und Empfangen zusammen in Byte pro Sekunde und erscheint nur,
-wenn der Hub den Wert liefert.
+definiert. `cpu` ist der Anteil an der gesamten CPU des Hosts, alle Kerne zusammen sind also 100 % —
+`docker stats` teilt stattdessen durch einen einzelnen Kern und zeigt für dieselbe Last eine höhere
+Zahl. `network` ist Gesendet und Empfangen zusammen in Byte pro Sekunde und erscheint nur, wenn der
+Hub den Wert liefert.
 
 ## Akku
 
@@ -153,8 +163,9 @@ Akkus die Kinder löschen würde.
 | SMART-Geräte | `smart.<Gerät>.state`, `.model`, `.serial`, `.firmware`, `.interface`, `.temperature`, `.capacity`, `.power_on_hours`, `.power_cycles` | braucht smartctl auf dem Host; alle 15 Min gelesen |
 
 `state` ist das Gesamturteil des Laufwerks selbst (`PASSED` / `FAILED`) — ein sterbendes
-Laufwerk sagt es hier zuerst. Eine Spalte, die smartctl nicht gefüllt hat, bleibt leer,
-statt eine Null zu melden, die wie ein Messwert aussieht.
+Laufwerk sagt es hier zuerst. `power_on_hours` und `power_cycles` zählen über die gesamte
+Lebensdauer des Laufwerks, nicht seit dem letzten Start. Eine Spalte, die smartctl nicht gefüllt
+hat, bleibt leer, statt eine Null zu melden, die wie ein Messwert aussieht.
 
 ## ZFS-Pool-Details
 
@@ -163,6 +174,9 @@ statt eine Null zu melden, die wie ein Messwert aussieht.
 | ZFS-Details | `zfs.<Pool>.scrub_state`, `.scrub_progress`, `.scrub_errors`                         | braucht den ZFS-Schalter                        |
 | ZFS-Details | `zfs.<Pool>.vdevs.<Vdev>.state`, `.read_errors`, `.write_errors`, `.checksum_errors` | gezählt seit dem letzten Zurücksetzen des Pools |
 | ZFS-Details | `zfs.<Pool>.datasets.<Dataset>.used`, `.avail`, `.mountpoint`                        | GB                                              |
+
+`scrub_errors` ist das, was der letzte Scrub oder Resilver nicht beheben konnte; der Wert bleibt
+bis zum Ende des nächsten Laufs stehen — eine Null dort ist also nur so frisch wie der letzte Scrub.
 
 Der Hub frischt diese Details etwa stündlich auf, der Adapter liest sie deshalb höchstens
 alle 15 Minuten — Belegung und Zustand der Pools im Minutentakt stehen weiter oben in der
@@ -175,4 +189,5 @@ ZFS-Gruppe.
 | Dienst-Details | `services.<Unit>.state`, `.sub_state`, `.cpu`, `.cpu_peak`, `.memory`, `.memory_peak` | braucht den Schalter Systemd-Dienste |
 
 Ein Kanal je Unit — auf einem gut gefüllten Host sind das viele Datenpunkte. `state` und
-`sub_state` tragen das systemd-Wort (`active`, `running`, …), nicht die Zahl des Hubs.
+`sub_state` tragen das systemd-Wort (`active`, `running`, …), nicht die Zahl des Hubs. `cpu` wird
+wie bei den Containern gemessen: als Anteil am ganzen Host, alle Kerne zusammen sind 100 %.

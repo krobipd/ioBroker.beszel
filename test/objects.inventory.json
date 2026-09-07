@@ -241,6 +241,19 @@
         "uk": "Load Average 15хв",
         "zh-cn": "15 分钟负载"
       },
+      "desc": {
+        "de": "Prozesse, die im Mittel die CPU nutzen oder auf sie warten — mit der Kernzahl vergleichen, nicht mit 100.",
+        "en": "Processes using or waiting for the CPU on average — compare it with the core count, not with 100.",
+        "es": "Procesos que en promedio usan la CPU o esperan por ella — compárelo con el número de núcleos, no con 100.",
+        "fr": "Processus utilisant le CPU ou l'attendant en moyenne — à comparer au nombre de cœurs, pas à 100.",
+        "it": "Processi che in media usano la CPU o la attendono — da confrontare con il numero di core, non con 100.",
+        "nl": "Processen die gemiddeld de CPU gebruiken of erop wachten — vergelijk met het aantal cores, niet met 100.",
+        "pl": "Procesy średnio korzystające z CPU lub czekające na nie — porównuj z liczbą rdzeni, nie ze 100.",
+        "pt": "Processos que em média usam a CPU ou esperam por ela — compare com o número de núcleos, não com 100.",
+        "ru": "Среднее число процессов, использующих ЦП или ожидающих его — сравнивайте с числом ядер, а не со 100.",
+        "uk": "Процеси, що в середньому використовують ЦП або чекають на нього — порівнюйте з кількістю ядер, а не зі 100.",
+        "zh-cn": "平均占用或等待 CPU 的进程数——应与核心数比较，而不是与 100 比较。"
+      },
       "type": "number",
       "role": "value",
       "read": true,
@@ -265,6 +278,19 @@
         "uk": "Load Average 1хв",
         "zh-cn": "1 分钟负载"
       },
+      "desc": {
+        "de": "Prozesse, die im Mittel die CPU nutzen oder auf sie warten — mit der Kernzahl vergleichen, nicht mit 100.",
+        "en": "Processes using or waiting for the CPU on average — compare it with the core count, not with 100.",
+        "es": "Procesos que en promedio usan la CPU o esperan por ella — compárelo con el número de núcleos, no con 100.",
+        "fr": "Processus utilisant le CPU ou l'attendant en moyenne — à comparer au nombre de cœurs, pas à 100.",
+        "it": "Processi che in media usano la CPU o la attendono — da confrontare con il numero di core, non con 100.",
+        "nl": "Processen die gemiddeld de CPU gebruiken of erop wachten — vergelijk met het aantal cores, niet met 100.",
+        "pl": "Procesy średnio korzystające z CPU lub czekające na nie — porównuj z liczbą rdzeni, nie ze 100.",
+        "pt": "Processos que em média usam a CPU ou esperam por ela — compare com o número de núcleos, não com 100.",
+        "ru": "Среднее число процессов, использующих ЦП или ожидающих его — сравнивайте с числом ядер, а не со 100.",
+        "uk": "Процеси, що в середньому використовують ЦП або чекають на нього — порівнюйте з кількістю ядер, а не зі 100.",
+        "zh-cn": "平均占用或等待 CPU 的进程数——应与核心数比较，而不是与 100 比较。"
+      },
       "type": "number",
       "role": "value",
       "read": true,
@@ -288,6 +314,19 @@
         "ru": "Load Average 5м",
         "uk": "Load Average 5хв",
         "zh-cn": "5 分钟负载"
+      },
+      "desc": {
+        "de": "Prozesse, die im Mittel die CPU nutzen oder auf sie warten — mit der Kernzahl vergleichen, nicht mit 100.",
+        "en": "Processes using or waiting for the CPU on average — compare it with the core count, not with 100.",
+        "es": "Procesos que en promedio usan la CPU o esperan por ella — compárelo con el número de núcleos, no con 100.",
+        "fr": "Processus utilisant le CPU ou l'attendant en moyenne — à comparer au nombre de cœurs, pas à 100.",
+        "it": "Processi che in media usano la CPU o la attendono — da confrontare con il numero di core, non con 100.",
+        "nl": "Processen die gemiddeld de CPU gebruiken of erop wachten — vergelijk met het aantal cores, niet met 100.",
+        "pl": "Procesy średnio korzystające z CPU lub czekające na nie — porównuj z liczbą rdzeni, nie ze 100.",
+        "pt": "Processos que em média usam a CPU ou esperam por ela — compare com o número de núcleos, não com 100.",
+        "ru": "Среднее число процессов, использующих ЦП или ожидающих его — сравнивайте с числом ядер, а не со 100.",
+        "uk": "Процеси, що в середньому використовують ЦП або чекають на нього — порівнюйте з кількістю ядер, а не зі 100.",
+        "zh-cn": "平均占用或等待 CPU 的进程数——应与核心数比较，而不是与 100 比较。"
       },
       "type": "number",
       "role": "value",
@@ -477,6 +516,19 @@
         "uk": "Онлайн",
         "zh-cn": "在线"
       },
+      "desc": {
+        "de": "Nur wahr, solange der Hub „up“ meldet; beim Beenden des Adapters oder bei nicht erreichbarem Hub wird der Wert ebenfalls falsch.",
+        "en": "True only while the Hub reports \"up\"; it also turns false when the adapter stops or cannot reach the Hub.",
+        "es": "Verdadero solo mientras el Hub informa «up»; también pasa a falso cuando el adaptador se detiene o no alcanza el Hub.",
+        "fr": "Vrai uniquement tant que le Hub indique « up » ; devient également faux quand l'adaptateur s'arrête ou n'atteint pas le Hub.",
+        "it": "Vero solo finché l'hub riporta «up»; diventa falso anche quando l'adapter si ferma o non raggiunge l'hub.",
+        "nl": "Alleen waar zolang de hub \"up\" meldt; wordt ook onwaar als de adapter stopt of de hub niet bereikbaar is.",
+        "pl": "Prawda tylko wtedy, gdy hub zgłasza „up“; staje się fałszem także po zatrzymaniu adaptera lub gdy hub jest nieosiągalny.",
+        "pt": "Verdadeiro apenas enquanto o Hub reporta «up»; também fica falso quando o adaptador para ou não alcança o Hub.",
+        "ru": "Истинно только пока хаб сообщает «up»; при остановке адаптера или недоступном хабе значение тоже становится ложным.",
+        "uk": "Істинно лише поки хаб повідомляє «up»; стає хибним також після зупинки адаптера або коли хаб недоступний.",
+        "zh-cn": "仅当 Hub 报告 “up” 时为真；适配器停止或无法连接 Hub 时同样变为假。"
+      },
       "type": "boolean",
       "role": "indicator.reachable",
       "read": true,
@@ -524,6 +576,19 @@
         "ru": "Версия ОС",
         "uk": "Версія ОС",
         "zh-cn": "系统版本"
+      },
+      "desc": {
+        "de": "Die Distribution oder Ausgabe, die der Agent meldet, etwa „Ubuntu 24.04.1 LTS“ oder „macOS 15.1“.",
+        "en": "The distribution or release the agent reports, for example \"Ubuntu 24.04.1 LTS\" or \"macOS 15.1\".",
+        "es": "La distribución o versión que informa el agente, por ejemplo «Ubuntu 24.04.1 LTS» o «macOS 15.1».",
+        "fr": "La distribution ou l'édition que l'agent indique, par exemple « Ubuntu 24.04.1 LTS » ou « macOS 15.1 ».",
+        "it": "La distribuzione o release riportata dall'agent, per esempio «Ubuntu 24.04.1 LTS» o «macOS 15.1».",
+        "nl": "De distributie of uitgave die de agent meldt, bijvoorbeeld \"Ubuntu 24.04.1 LTS\" of \"macOS 15.1\".",
+        "pl": "Dystrybucja lub wydanie zgłaszane przez agenta, na przykład „Ubuntu 24.04.1 LTS“ lub „macOS 15.1“.",
+        "pt": "A distribuição ou versão que o agente reporta, por exemplo «Ubuntu 24.04.1 LTS» ou «macOS 15.1».",
+        "ru": "Дистрибутив или выпуск, о котором сообщает агент, например «Ubuntu 24.04.1 LTS» или «macOS 15.1».",
+        "uk": "Дистрибутив або випуск, який повідомляє агент, наприклад «Ubuntu 24.04.1 LTS» або «macOS 15.1».",
+        "zh-cn": "代理报告的发行版或版本，例如 “Ubuntu 24.04.1 LTS” 或 “macOS 15.1”。"
       },
       "type": "string",
       "role": "text",
@@ -848,6 +913,19 @@
         "uk": "Завантаження CPU",
         "zh-cn": "CPU 使用率"
       },
+      "desc": {
+        "de": "Anteil an der gesamten CPU des Hosts, alle Kerne zusammen sind 100 % — ein ausgelasteter Kern von acht zeigt rund 12 %.",
+        "en": "Share of the whole host's CPU, so all cores together make 100% — one busy core of eight reads about 12%.",
+        "es": "Proporción de toda la CPU del host, todos los núcleos juntos son 100 % — un núcleo ocupado de ocho muestra cerca del 12 %.",
+        "fr": "Part du CPU total de l'hôte, tous les cœurs réunis font 100 % — un cœur occupé sur huit affiche environ 12 %.",
+        "it": "Quota della CPU complessiva dell'host, tutti i core insieme sono 100 % — un core occupato su otto mostra circa 12 %.",
+        "nl": "Aandeel van de volledige CPU van de host, alle cores samen zijn 100 % — één bezette core van acht toont ongeveer 12 %.",
+        "pl": "Udział w całym CPU hosta, wszystkie rdzenie razem to 100 % — jeden obciążony rdzeń z ośmiu pokazuje około 12 %.",
+        "pt": "Percentagem da CPU total do host, todos os núcleos juntos são 100 % — um núcleo ocupado de oito mostra cerca de 12 %.",
+        "ru": "Доля всего ЦП хоста: все ядра вместе — 100 %, поэтому одно загруженное ядро из восьми даёт около 12 %.",
+        "uk": "Частка всього ЦП хоста: усі ядра разом — 100 %, тож одне завантажене ядро з восьми показує близько 12 %.",
+        "zh-cn": "占主机全部 CPU 的比例，所有核心合计为 100%——八核中有一个满载约显示 12%。"
+      },
       "type": "number",
       "role": "value",
       "unit": "%",
@@ -1001,6 +1079,19 @@
         "ru": "Загрузка CPU",
         "uk": "Завантаження CPU",
         "zh-cn": "CPU 使用率"
+      },
+      "desc": {
+        "de": "Anteil an der gesamten CPU des Hosts, alle Kerne zusammen sind 100 % — ein ausgelasteter Kern von acht zeigt rund 12 %.",
+        "en": "Share of the whole host's CPU, so all cores together make 100% — one busy core of eight reads about 12%.",
+        "es": "Proporción de toda la CPU del host, todos los núcleos juntos son 100 % — un núcleo ocupado de ocho muestra cerca del 12 %.",
+        "fr": "Part du CPU total de l'hôte, tous les cœurs réunis font 100 % — un cœur occupé sur huit affiche environ 12 %.",
+        "it": "Quota della CPU complessiva dell'host, tutti i core insieme sono 100 % — un core occupato su otto mostra circa 12 %.",
+        "nl": "Aandeel van de volledige CPU van de host, alle cores samen zijn 100 % — één bezette core van acht toont ongeveer 12 %.",
+        "pl": "Udział w całym CPU hosta, wszystkie rdzenie razem to 100 % — jeden obciążony rdzeń z ośmiu pokazuje około 12 %.",
+        "pt": "Percentagem da CPU total do host, todos os núcleos juntos são 100 % — um núcleo ocupado de oito mostra cerca de 12 %.",
+        "ru": "Доля всего ЦП хоста: все ядра вместе — 100 %, поэтому одно загруженное ядро из восьми даёт около 12 %.",
+        "uk": "Частка всього ЦП хоста: усі ядра разом — 100 %, тож одне завантажене ядро з восьми показує близько 12 %.",
+        "zh-cn": "占主机全部 CPU 的比例，所有核心合计为 100%——八核中有一个满载约显示 12%。"
       },
       "type": "number",
       "role": "value",
@@ -1193,6 +1284,19 @@
         "ru": "Загрузка CPU",
         "uk": "Завантаження CPU",
         "zh-cn": "CPU 使用率"
+      },
+      "desc": {
+        "de": "Anteil an der gesamten CPU des Hosts, alle Kerne zusammen sind 100 % — ein ausgelasteter Kern von acht zeigt rund 12 %.",
+        "en": "Share of the whole host's CPU, so all cores together make 100% — one busy core of eight reads about 12%.",
+        "es": "Proporción de toda la CPU del host, todos los núcleos juntos son 100 % — un núcleo ocupado de ocho muestra cerca del 12 %.",
+        "fr": "Part du CPU total de l'hôte, tous les cœurs réunis font 100 % — un cœur occupé sur huit affiche environ 12 %.",
+        "it": "Quota della CPU complessiva dell'host, tutti i core insieme sono 100 % — un core occupato su otto mostra circa 12 %.",
+        "nl": "Aandeel van de volledige CPU van de host, alle cores samen zijn 100 % — één bezette core van acht toont ongeveer 12 %.",
+        "pl": "Udział w całym CPU hosta, wszystkie rdzenie razem to 100 % — jeden obciążony rdzeń z ośmiu pokazuje około 12 %.",
+        "pt": "Percentagem da CPU total do host, todos os núcleos juntos são 100 % — um núcleo ocupado de oito mostra cerca de 12 %.",
+        "ru": "Доля всего ЦП хоста: все ядра вместе — 100 %, поэтому одно загруженное ядро из восьми даёт около 12 %.",
+        "uk": "Частка всього ЦП хоста: усі ядра разом — 100 %, тож одне завантажене ядро з восьми показує близько 12 %.",
+        "zh-cn": "占主机全部 CPU 的比例，所有核心合计为 100%——八核中有一个满载约显示 12%。"
       },
       "type": "number",
       "role": "value",
@@ -1591,6 +1695,19 @@
         "uk": "Load Average 15хв",
         "zh-cn": "15 分钟负载"
       },
+      "desc": {
+        "de": "Prozesse, die im Mittel die CPU nutzen oder auf sie warten — mit der Kernzahl vergleichen, nicht mit 100.",
+        "en": "Processes using or waiting for the CPU on average — compare it with the core count, not with 100.",
+        "es": "Procesos que en promedio usan la CPU o esperan por ella — compárelo con el número de núcleos, no con 100.",
+        "fr": "Processus utilisant le CPU ou l'attendant en moyenne — à comparer au nombre de cœurs, pas à 100.",
+        "it": "Processi che in media usano la CPU o la attendono — da confrontare con il numero di core, non con 100.",
+        "nl": "Processen die gemiddeld de CPU gebruiken of erop wachten — vergelijk met het aantal cores, niet met 100.",
+        "pl": "Procesy średnio korzystające z CPU lub czekające na nie — porównuj z liczbą rdzeni, nie ze 100.",
+        "pt": "Processos que em média usam a CPU ou esperam por ela — compare com o número de núcleos, não com 100.",
+        "ru": "Среднее число процессов, использующих ЦП или ожидающих его — сравнивайте с числом ядер, а не со 100.",
+        "uk": "Процеси, що в середньому використовують ЦП або чекають на нього — порівнюйте з кількістю ядер, а не зі 100.",
+        "zh-cn": "平均占用或等待 CPU 的进程数——应与核心数比较，而不是与 100 比较。"
+      },
       "type": "number",
       "role": "value",
       "read": true,
@@ -1615,6 +1732,19 @@
         "uk": "Load Average 1хв",
         "zh-cn": "1 分钟负载"
       },
+      "desc": {
+        "de": "Prozesse, die im Mittel die CPU nutzen oder auf sie warten — mit der Kernzahl vergleichen, nicht mit 100.",
+        "en": "Processes using or waiting for the CPU on average — compare it with the core count, not with 100.",
+        "es": "Procesos que en promedio usan la CPU o esperan por ella — compárelo con el número de núcleos, no con 100.",
+        "fr": "Processus utilisant le CPU ou l'attendant en moyenne — à comparer au nombre de cœurs, pas à 100.",
+        "it": "Processi che in media usano la CPU o la attendono — da confrontare con il numero di core, non con 100.",
+        "nl": "Processen die gemiddeld de CPU gebruiken of erop wachten — vergelijk met het aantal cores, niet met 100.",
+        "pl": "Procesy średnio korzystające z CPU lub czekające na nie — porównuj z liczbą rdzeni, nie ze 100.",
+        "pt": "Processos que em média usam a CPU ou esperam por ela — compare com o número de núcleos, não com 100.",
+        "ru": "Среднее число процессов, использующих ЦП или ожидающих его — сравнивайте с числом ядер, а не со 100.",
+        "uk": "Процеси, що в середньому використовують ЦП або чекають на нього — порівнюйте з кількістю ядер, а не зі 100.",
+        "zh-cn": "平均占用或等待 CPU 的进程数——应与核心数比较，而不是与 100 比较。"
+      },
       "type": "number",
       "role": "value",
       "read": true,
@@ -1638,6 +1768,19 @@
         "ru": "Load Average 5м",
         "uk": "Load Average 5хв",
         "zh-cn": "5 分钟负载"
+      },
+      "desc": {
+        "de": "Prozesse, die im Mittel die CPU nutzen oder auf sie warten — mit der Kernzahl vergleichen, nicht mit 100.",
+        "en": "Processes using or waiting for the CPU on average — compare it with the core count, not with 100.",
+        "es": "Procesos que en promedio usan la CPU o esperan por ella — compárelo con el número de núcleos, no con 100.",
+        "fr": "Processus utilisant le CPU ou l'attendant en moyenne — à comparer au nombre de cœurs, pas à 100.",
+        "it": "Processi che in media usano la CPU o la attendono — da confrontare con il numero di core, non con 100.",
+        "nl": "Processen die gemiddeld de CPU gebruiken of erop wachten — vergelijk met het aantal cores, niet met 100.",
+        "pl": "Procesy średnio korzystające z CPU lub czekające na nie — porównuj z liczbą rdzeni, nie ze 100.",
+        "pt": "Processos que em média usam a CPU ou esperam por ela — compare com o número de núcleos, não com 100.",
+        "ru": "Среднее число процессов, использующих ЦП или ожидающих его — сравнивайте с числом ядер, а не со 100.",
+        "uk": "Процеси, що в середньому використовують ЦП або чекають на нього — порівнюйте з кількістю ядер, а не зі 100.",
+        "zh-cn": "平均占用或等待 CPU 的进程数——应与核心数比较，而不是与 100 比较。"
       },
       "type": "number",
       "role": "value",
@@ -3012,6 +3155,19 @@
         "uk": "Онлайн",
         "zh-cn": "在线"
       },
+      "desc": {
+        "de": "Nur wahr, solange der Hub „up“ meldet; beim Beenden des Adapters oder bei nicht erreichbarem Hub wird der Wert ebenfalls falsch.",
+        "en": "True only while the Hub reports \"up\"; it also turns false when the adapter stops or cannot reach the Hub.",
+        "es": "Verdadero solo mientras el Hub informa «up»; también pasa a falso cuando el adaptador se detiene o no alcanza el Hub.",
+        "fr": "Vrai uniquement tant que le Hub indique « up » ; devient également faux quand l'adaptateur s'arrête ou n'atteint pas le Hub.",
+        "it": "Vero solo finché l'hub riporta «up»; diventa falso anche quando l'adapter si ferma o non raggiunge l'hub.",
+        "nl": "Alleen waar zolang de hub \"up\" meldt; wordt ook onwaar als de adapter stopt of de hub niet bereikbaar is.",
+        "pl": "Prawda tylko wtedy, gdy hub zgłasza „up“; staje się fałszem także po zatrzymaniu adaptera lub gdy hub jest nieosiągalny.",
+        "pt": "Verdadeiro apenas enquanto o Hub reporta «up»; também fica falso quando o adaptador para ou não alcança o Hub.",
+        "ru": "Истинно только пока хаб сообщает «up»; при остановке адаптера или недоступном хабе значение тоже становится ложным.",
+        "uk": "Істинно лише поки хаб повідомляє «up»; стає хибним також після зупинки адаптера або коли хаб недоступний.",
+        "zh-cn": "仅当 Hub 报告 “up” 时为真；适配器停止或无法连接 Hub 时同样变为假。"
+      },
       "type": "boolean",
       "role": "indicator.reachable",
       "read": true,
@@ -3059,6 +3215,19 @@
         "ru": "Версия ОС",
         "uk": "Версія ОС",
         "zh-cn": "系统版本"
+      },
+      "desc": {
+        "de": "Die Distribution oder Ausgabe, die der Agent meldet, etwa „Ubuntu 24.04.1 LTS“ oder „macOS 15.1“.",
+        "en": "The distribution or release the agent reports, for example \"Ubuntu 24.04.1 LTS\" or \"macOS 15.1\".",
+        "es": "La distribución o versión que informa el agente, por ejemplo «Ubuntu 24.04.1 LTS» o «macOS 15.1».",
+        "fr": "La distribution ou l'édition que l'agent indique, par exemple « Ubuntu 24.04.1 LTS » ou « macOS 15.1 ».",
+        "it": "La distribuzione o release riportata dall'agent, per esempio «Ubuntu 24.04.1 LTS» o «macOS 15.1».",
+        "nl": "De distributie of uitgave die de agent meldt, bijvoorbeeld \"Ubuntu 24.04.1 LTS\" of \"macOS 15.1\".",
+        "pl": "Dystrybucja lub wydanie zgłaszane przez agenta, na przykład „Ubuntu 24.04.1 LTS“ lub „macOS 15.1“.",
+        "pt": "A distribuição ou versão que o agente reporta, por exemplo «Ubuntu 24.04.1 LTS» ou «macOS 15.1».",
+        "ru": "Дистрибутив или выпуск, о котором сообщает агент, например «Ubuntu 24.04.1 LTS» или «macOS 15.1».",
+        "uk": "Дистрибутив або випуск, який повідомляє агент, наприклад «Ubuntu 24.04.1 LTS» або «macOS 15.1».",
+        "zh-cn": "代理报告的发行版或版本，例如 “Ubuntu 24.04.1 LTS” 或 “macOS 15.1”。"
       },
       "type": "string",
       "role": "text",
@@ -4041,6 +4210,19 @@
         "uk": "ЦП",
         "zh-cn": "CPU"
       },
+      "desc": {
+        "de": "Anteil an der gesamten CPU des Hosts, alle Kerne zusammen sind 100 % — ein ausgelasteter Kern von acht zeigt rund 12 %.",
+        "en": "Share of the whole host's CPU, so all cores together make 100% — one busy core of eight reads about 12%.",
+        "es": "Proporción de toda la CPU del host, todos los núcleos juntos son 100 % — un núcleo ocupado de ocho muestra cerca del 12 %.",
+        "fr": "Part du CPU total de l'hôte, tous les cœurs réunis font 100 % — un cœur occupé sur huit affiche environ 12 %.",
+        "it": "Quota della CPU complessiva dell'host, tutti i core insieme sono 100 % — un core occupato su otto mostra circa 12 %.",
+        "nl": "Aandeel van de volledige CPU van de host, alle cores samen zijn 100 % — één bezette core van acht toont ongeveer 12 %.",
+        "pl": "Udział w całym CPU hosta, wszystkie rdzenie razem to 100 % — jeden obciążony rdzeń z ośmiu pokazuje około 12 %.",
+        "pt": "Percentagem da CPU total do host, todos os núcleos juntos são 100 % — um núcleo ocupado de oito mostra cerca de 12 %.",
+        "ru": "Доля всего ЦП хоста: все ядра вместе — 100 %, поэтому одно загруженное ядро из восьми даёт около 12 %.",
+        "uk": "Частка всього ЦП хоста: усі ядра разом — 100 %, тож одне завантажене ядро з восьми показує близько 12 %.",
+        "zh-cn": "占主机全部 CPU 的比例，所有核心合计为 100%——八核中有一个满载约显示 12%。"
+      },
       "type": "number",
       "role": "value",
       "unit": "%",
@@ -4374,6 +4556,19 @@
         "ru": "Циклы включения",
         "uk": "Цикли живлення",
         "zh-cn": "通电次数"
+      },
+      "desc": {
+        "de": "Wie oft das Laufwerk über seine gesamte Lebensdauer eingeschaltet wurde.",
+        "en": "Times the drive has been powered up over its whole life.",
+        "es": "Cuántas veces se ha encendido la unidad durante toda su vida.",
+        "fr": "Nombre de mises sous tension du disque sur toute sa vie.",
+        "it": "Quante volte il disco è stato acceso nell'intero ciclo di vita.",
+        "nl": "Hoe vaak de schijf gedurende zijn hele leven is ingeschakeld.",
+        "pl": "Ile razy dysk był włączany przez cały okres życia.",
+        "pt": "Quantas vezes o disco foi ligado durante toda a sua vida.",
+        "ru": "Сколько раз накопитель включался за всю жизнь.",
+        "uk": "Скільки разів накопичувач вмикався за весь час.",
+        "zh-cn": "硬盘一生中的累计通电次数。"
       },
       "type": "number",
       "role": "value",
@@ -5168,6 +5363,19 @@
         "ru": "Ошибки scrub",
         "uk": "Помилки scrub",
         "zh-cn": "Scrub 错误数"
+      },
+      "desc": {
+        "de": "Fehler, die der letzte Scrub oder Resilver nicht beheben konnte; der Wert bleibt bis zum Ende des nächsten Laufs stehen.",
+        "en": "Errors the last scrub or resilver could not repair; the value stays until the next one finishes.",
+        "es": "Errores que el último scrub o resilver no pudo reparar; el valor se mantiene hasta que termine el siguiente.",
+        "fr": "Erreurs que le dernier scrub ou resilver n'a pas pu réparer ; la valeur reste jusqu'à la fin du suivant.",
+        "it": "Errori che l'ultimo scrub o resilver non ha potuto riparare; il valore resta fino al termine del successivo.",
+        "nl": "Fouten die de laatste scrub of resilver niet kon herstellen; de waarde blijft staan tot de volgende klaar is.",
+        "pl": "Błędy, których ostatni scrub lub resilver nie zdołał naprawić; wartość utrzymuje się do zakończenia kolejnego.",
+        "pt": "Erros que o último scrub ou resilver não conseguiu reparar; o valor permanece até o próximo terminar.",
+        "ru": "Ошибки, которые последний scrub или resilver не смог исправить; значение сохраняется до завершения следующего.",
+        "uk": "Помилки, які останній scrub чи resilver не зміг виправити; значення зберігається до завершення наступного.",
+        "zh-cn": "上一次 scrub 或 resilver 未能修复的错误数；该值一直保留到下一次结束。"
       },
       "type": "number",
       "role": "value",

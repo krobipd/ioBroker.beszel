@@ -75,15 +75,29 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     Nutzers und blockiert nichts, was der Adapter ausliefert. Preis der Umstellung: eine vom Nutzer
     in der Admin vergebene Datenpunkt-Umbenennung wird beim nächsten Start überschrieben
     (krobi 2026-09-03).
-27. **`common.desc` = Erklärung, sonst leer (v0.14.0)** — 24 i18n-Schlüssel (`desc…`) in elf
-    Sprachen, über `tDesc()` und das neue optionale `descKey` der `MetricDef` verdrahtet. Sie
-    hängen an genau den Datenpunkten, deren Bedeutung man nicht raten kann: Mittel der drei
+27. **`common.desc` = Erklärung, sonst DEKLARIERT stumm (v0.14.0, für jeden Datenpunkt entschieden
+    2026-09-07)** — 40 i18n-Schlüssel (`desc…`) in elf Sprachen, über `tDesc()` und das optionale
+    `descKey` der `MetricDef` bzw. die `LEAF_COMMONS`-Tabelle verdrahtet. Sie hängen an genau den
+    Datenpunkten, deren Bedeutung man nicht raten kann: Mittel der drei
     heißesten Sensoren, Spitzenwert im Aggregationsintervall, `io_util` und die beiden
     `io_await`-Werte (gegen `agent/disk.go` der gebündelten 0.18.8-Quelle geprüft: Anteil der
     Zeit mit mindestens einer offenen Anfrage bzw. Durchschnittsdauer EINER Operation, wie
     `iostat` r_await/w_await), kumulative Interface-Summen, `battery.charging`, Container-`health`,
-    `power_package`, Root-Dateisystem, systemd-Einheiten, Buffers/ZFS-ARC, `cpu.steal`/`iowait`.
-    Alle übrigen Datenpunkte tragen bewusst KEINE Beschreibung.
+    `power_package`, Root-Dateisystem, systemd-Einheiten, Buffers/ZFS-ARC, `cpu.steal`/`iowait` —
+    dazu seit 2026-09-07 sechs weitere, alle an der Quelle geprüft: Load-Average (einheitenlos,
+    gegen die KERNZAHL zu lesen), `info.online` (wahr nur bei „up", falsch auch sobald der Adapter
+    nichts liest — `markAllOffline` schreibt nur den WERT, das `common` bleibt stehen),
+    `info.os_name` (die Distribution neben der Plattform-Familie in `info.os`; der Agent füllt sie
+    aus der Docker-Info bzw. `PRETTY_NAME`), Container- **und** systemd-CPU (ein gemeinsamer
+    Schlüssel: beide teilen durch `Kerne × Zeit`, alle Kerne zusammen sind 100 % — `docker stats`
+    teilt durch EINEN Kern und zeigt darum mehr), `scrub_errors` (aus der `scan:`-Zeile von
+    `zpool status`, bleibt bis zum nächsten Lauf stehen) und `power_cycles` (Lebensdauer-Zähler
+    wie `power_on_hours`). **Jeder übrige Datenpunkt steht mit englischer Begründung in
+    `test/self-explaining.json`** (Muster → Grund, `*` = genau EIN Id-Abschnitt, ohne Namensraum):
+    58 Muster decken die 90 stummen Datenpunkte des Inventars. Das Flotten-Gate D08
+    (`../scripts/check-object-inventory.py`) verlangt für JEDEN Datenpunkt eine Beschreibung ODER
+    einen passenden Eintrag — und meldet ebenso ein Muster, das auf nichts (mehr) passt: darum
+    nichts auf Vorrat deklarieren.
 28. **Einfrieren vs. Zurücksetzen, restart-fest (v0.14.0)** — `applyMetrics` unterscheidet jetzt die
     beiden Gründe, aus denen eine Metrik „nicht verfügbar" ist. **Kein Stats-Datensatz** (System
     down/paused) ⇒ nichts anfassen, die letzten Werte bleiben stehen — dieselbe Linie, der die
@@ -246,6 +260,7 @@ Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vite
 npm run build         # Production (esbuild)
 npm test              # vitest src/**/*.test.ts + @iobroker/testing packageFiles (mocha)
 npm run test:inventory  # Adapter gegen Fake-Hub starten, test/objects.inventory.json erzeugen (Design 32)
+                        # danach `python3 ../scripts/check-object-inventory.py --adapter-dir .` (D08, Design 27)
 npm run coverage      # vitest run --coverage
 npm run lint          # ESLint
 npm run format:check  # Prettier --check

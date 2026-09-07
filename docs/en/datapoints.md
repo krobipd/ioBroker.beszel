@@ -17,8 +17,12 @@ Only the System category has no such base switch; its three entries are independ
 | System info      | `info.hostname`, `info.os`, `info.os_name`, `info.kernel`, `info.cpu_model`, `info.arch`, `info.cores`, `info.threads`, `info.podman`, `info.agent_version` | static data, read once at start and when a new system appears |
 | Systemd Services | `info.services_total`, `info.services_failed`                                                                                                               | Linux with systemd only                                       |
 
+`info.os` is the platform family (`Linux`, `macOS`, `Windows`, `FreeBSD`); `info.os_name` is the
+distribution or release the agent reports next to it, for example `Ubuntu 24.04.1 LTS`.
+
 Always present, independent of any switch: `info.online` and `info.status`. `info.online` is what
-the device icon in the object tree reads. `info.status` carries the Hub's four values
+the device icon in the object tree reads: true only while the Hub reports `up`, and false again as
+soon as nothing is being read. `info.status` carries the Hub's four values
 (`up`, `down`, `paused`, `pending`) plus a fifth of the adapter's own, `unknown`, used while the
 adapter is stopped or cannot reach the Hub — claiming one of the Hub's values there would assert
 something nobody measured.
@@ -32,6 +36,9 @@ something nobody measured.
 | CPU Breakdown       | `cpu.user`, `cpu.system`, `cpu.iowait`, `cpu.steal`, `cpu.idle` |
 | Per-core usage      | `cpu.cores.core0`, `core1`, …                                   |
 | Peak values         | `cpu.peak`                                                      |
+
+The three load averages have no unit: they count the processes using or waiting for the CPU, so
+read them against the core count — 4.0 is a busy quad-core and a quiet 32-core machine.
 
 `cpu.steal` is the share of time the hypervisor gave to other guests — on bare metal it stays at
 zero, on an oversubscribed VM it is the number that explains why everything feels slow.
@@ -126,8 +133,9 @@ GPU memory is reported in MB.
 | Container Monitoring | `containers.<name>.status`, `.health`, `.cpu`, `.memory`, `.image`, `.network` |
 
 `health` is the result of the image's own health check and reads `none` when the image defines
-none. `network` is sent and received together in bytes per second, and only appears when the Hub
-provides it.
+none. `cpu` is the share of the whole host's CPU, so all cores together make 100% — `docker stats`
+divides by a single core instead and therefore prints a higher number for the same load. `network`
+is sent and received together in bytes per second, and only appears when the Hub provides it.
 
 ## Battery
 
@@ -147,7 +155,8 @@ battery is removed.
 | SMART devices | `smart.<device>.state`, `.model`, `.serial`, `.firmware`, `.interface`, `.temperature`, `.capacity`, `.power_on_hours`, `.power_cycles` | needs smartctl on the host; read every 15 min |
 
 `state` is the drive's own overall verdict (`PASSED` / `FAILED`) — a failing drive says so
-here before it dies. A column smartctl did not fill stays empty rather than reporting a
+here before it dies. `power_on_hours` and `power_cycles` count over the drive's whole life, not
+since the last boot. A column smartctl did not fill stays empty rather than reporting a
 zero that looks like a measurement.
 
 ## ZFS pool details
@@ -157,6 +166,9 @@ zero that looks like a measurement.
 | ZFS details | `zfs.<pool>.scrub_state`, `.scrub_progress`, `.scrub_errors`                         | needs the ZFS switch                    |
 | ZFS details | `zfs.<pool>.vdevs.<vdev>.state`, `.read_errors`, `.write_errors`, `.checksum_errors` | counted since the pool was last cleared |
 | ZFS details | `zfs.<pool>.datasets.<dataset>.used`, `.avail`, `.mountpoint`                        | GB                                      |
+
+`scrub_errors` is what the last scrub or resilver could not repair; it stays put until the next
+run finishes, so a zero there is only as fresh as the last scrub.
 
 The Hub refreshes these details about once an hour, so the adapter reads them every 15
 minutes at most — the per-minute pool usage and health stay in the ZFS group above.
@@ -168,4 +180,5 @@ minutes at most — the per-minute pool usage and health stay in the ZFS group a
 | Service details | `services.<unit>.state`, `.sub_state`, `.cpu`, `.cpu_peak`, `.memory`, `.memory_peak` | needs the Systemd Services switch |
 
 One channel per unit — on a busy host that is a lot of datapoints. `state` and `sub_state`
-carry the systemd word (`active`, `running`, …), not the Hub's number.
+carry the systemd word (`active`, `running`, …), not the Hub's number. `cpu` is measured like the
+container one: a share of the whole host, all cores together making 100%.
