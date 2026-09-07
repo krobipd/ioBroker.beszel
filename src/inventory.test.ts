@@ -21,10 +21,11 @@ import { buildMetricDefs } from "./lib/metric-registry";
  * metric group Beszel 0.18.8 can deliver (test/fixtures/inventory/hub.json). This test is the
  * adapter's side of the fleet contract (CLAUDE_TEMPLATES.md, Objekt-Inventar): every datapoint
  * the registry can create appears under the fully equipped system, every dynamic group has at
- * least one member, and every description that exists is a translation object. Which datapoints
- * carry a description at all is decided in the registry (`descKey`, Design 27: the rest is
- * deliberately self-explaining) — this test only proves the inventory is complete, it does not
- * invent explanations.
+ * least one member, and every description that exists is a translation object. WHICH datapoints
+ * carry a description is not this test's business (Design 27): the explained ones get their
+ * `descKey` here in the code, every other one is declared with a reason in
+ * `test/self-explaining.json`, and the fleet gate D08 (`check-object-inventory.py`) refuses an
+ * inventory where a datapoint is neither. This test only proves the inventory is complete.
  */
 const NS = "beszel.0.";
 const FULL = `${NS}systems.homelab_server.`;

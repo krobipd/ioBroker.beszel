@@ -34,7 +34,9 @@ export interface MetricDef {
   /**
    * i18n key for the state's `common.desc` — one plain sentence explaining what the
    * value means. Omitted where the name and unit already say everything: the fleet
-   * standard wants an empty desc rather than an invented one.
+   * standard wants an empty desc rather than an invented one. Leaving it out is a
+   * DECISION, not a gap — the datapoint then needs its reason in
+   * `test/self-explaining.json`, or gate D08 blocks the next release.
    */
   descKey?: I18nKey;
   /** Which common shape to build. */
