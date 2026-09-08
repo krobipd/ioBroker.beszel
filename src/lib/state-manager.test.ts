@@ -2955,6 +2955,15 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.temperature.sensors.zombie")).to.be.false;
       await manager.cleanupSystems([]); // system disappears from the Hub
       expect(adapter.objects.has("systems.my_server")).to.be.false;
+      // Second life: the same leftover is in the tree again (a re-added system may carry
+      // objects from an older version). Only a reconcile against the snapshot finds it —
+      // a stale in-memory set from the first life does not (mutation M51, 2026-09-08).
+      adapter.objects.set("systems.my_server.temperature.sensors.zombie", {
+        type: "state",
+        common: { name: "zombie" },
+        native: {},
+      });
+      await manager.snapshotExistingStates();
 
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
       expect(adapter.states.has("systems.my_server.temperature.sensors.core_0")).to.be.true;
