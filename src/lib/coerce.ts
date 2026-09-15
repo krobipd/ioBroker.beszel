@@ -511,12 +511,6 @@ export function coerceSystemStats(value: unknown): SystemStats {
     "dw",
     "ns",
     "nr",
-    "cpum",
-    "mm",
-    "drm",
-    "dwm",
-    "nsm",
-    "nrm",
   ];
   for (const k of NUMBER_FIELDS) {
     const n = coerceFiniteNumber(obj[k]);
@@ -550,9 +544,18 @@ export function coerceSystemStats(value: unknown): SystemStats {
   if (cpub) {
     s.cpub = cpub;
   }
+  // Canonical byte/s rate tuples since Beszel 0.18.3 (`omitzero`: absent while idle).
+  // Kept as present/absent on purpose — their absence is what tells the registry to
+  // fall back to the deprecated `ns/nr` / `dr/dw` scalars of an older Hub.
+  const b = coerceNumberTuple(obj.b, 2);
+  if (b) {
+    s.b = [b[0], b[1]];
+  }
+  const dio = coerceNumberTuple(obj.dio, 2);
+  if (dio) {
+    s.dio = [dio[0], dio[1]];
+  }
   // v0.18.7: variable-length number arrays — per-core usage + disk-IO stats.
-  // (b/bm/dio/diom byte-rate tuples are intentionally not coerced; they
-  // duplicate ns/nr and dr/dw — see types.ts.)
   const cpus = coerceNumberArray(obj.cpus);
   if (cpus) {
     s.cpus = cpus;

@@ -127,27 +127,11 @@
       "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
     },
     "docs": {
-      "en": [
-        "docs/en/README.md",
-        "docs/en/datapoints.md",
-        "docs/en/faq.md"
-      ],
-      "de": [
-        "docs/de/README.md",
-        "docs/de/datapoints.md",
-        "docs/de/faq.md"
-      ]
+      "en": ["docs/en/README.md", "docs/en/datapoints.md", "docs/en/faq.md"],
+      "de": ["docs/de/README.md", "docs/de/datapoints.md", "docs/de/faq.md"]
     },
-    "authors": [
-      "krobi <krobi@power-dreams.com>"
-    ],
-    "keywords": [
-      "beszel",
-      "monitoring",
-      "server",
-      "metrics",
-      "hardware"
-    ],
+    "authors": ["krobi <krobi@power-dreams.com>"],
+    "keywords": ["beszel", "monitoring", "server", "metrics", "hardware"],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -374,15 +358,8 @@
       "native": {}
     }
   ],
-  "encryptedNative": [
-    "username",
-    "password"
-  ],
-  "protectedNative": [
-    "username",
-    "password",
-    "url"
-  ],
+  "encryptedNative": ["username", "password"],
+  "protectedNative": ["username", "password", "url"],
   "native": {
     "url": "",
     "username": "",
@@ -408,12 +385,8 @@
     "metrics_containers": false,
     "metrics_battery": false,
     "metrics_cpuCores": false,
-    "metrics_cpuPeak": false,
-    "metrics_memoryPeak": false,
     "metrics_diskIo": false,
-    "metrics_diskPeak": false,
     "metrics_networkInterfaces": false,
-    "metrics_networkPeak": false,
     "metrics_gpuDetails": false,
     "metrics_fans": false,
     "metrics_zfs": false,

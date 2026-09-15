@@ -4,9 +4,11 @@
 //
 // Suite 1 "object inventory": start the adapter in the throwaway js-controller against
 //   a fake Beszel hub (test/fixtures/inventory/hub.json — a fully equipped Linux system
-//   with every metric group Beszel 0.18.8 can deliver, plus a system that is down),
-//   every metric toggle on, then dump every beszel.0.* object to
-//   test/objects.inventory.json in the ioBroker object-structure bot's format.
+//   with every metric group Beszel 0.19.0 can deliver, a system that is down, a bare VM
+//   without sensors/battery/swap/ZFS so the inventory also proves what must NOT exist,
+//   and a pending system that never connected), every metric toggle on, then dump every
+//   beszel.0.* object to test/objects.inventory.json in the ioBroker object-structure
+//   bot's format.
 // Suite 2 "upgrade from the previous release" (only when INVENTORY_PREVIOUS is set —
 //   pre-release.py exports the last tag's inventory): seed the previous objects BEFORE
 //   start, start, feed, then assert that every object carries the current

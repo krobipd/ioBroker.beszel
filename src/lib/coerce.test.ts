@@ -486,20 +486,30 @@ describe("coerce", () => {
 
     // --- v0.18.7 fields (absent on older Beszel → skipped, never crash) ---
 
-    it("coerces the v0.18.7 peak scalars", () => {
-      const s = coerceSystemStats({ cpum: 92.3, mm: 15.2, drm: 120, dwm: 80, nsm: 5.5, nrm: 6.6 });
-      expect(s.cpum).to.equal(92.3);
-      expect(s.mm).to.equal(15.2);
-      expect(s.drm).to.equal(120);
-      expect(s.dwm).to.equal(80);
-      expect(s.nsm).to.equal(5.5);
-      expect(s.nrm).to.equal(6.6);
+    it("coerces the canonical byte/s rate tuples b and dio", () => {
+      const s = coerceSystemStats({ b: [1258291, 5033165], dio: [13107200, 34708275] });
+      expect(s.b).to.deep.equal([1258291, 5033165]);
+      expect(s.dio).to.deep.equal([13107200, 34708275]);
     });
 
-    it("drops a peak scalar when not finite", () => {
-      const s = coerceSystemStats({ cpum: Infinity, mm: "bad" });
-      expect(s.cpum).to.be.undefined;
-      expect(s.mm).to.be.undefined;
+    it("leaves b and dio absent when the Hub omits them (idle link / idle disk / older Hub)", () => {
+      // Present/absent is the signal the registry falls back on — a filled [0, 0] would
+      // hide an older Hub's `ns`/`nr` behind an always-truthy tuple.
+      const s = coerceSystemStats({ cpu: 5, ns: 1.5 });
+      expect(s.b).to.be.undefined;
+      expect(s.dio).to.be.undefined;
+      expect(s.ns).to.equal(1.5);
+    });
+
+    it("drops a malformed b / dio tuple instead of crashing", () => {
+      const s = coerceSystemStats({ b: [1, "x"], dio: [NaN, 2] });
+      expect(s.b).to.be.undefined;
+      expect(s.dio).to.be.undefined;
+    });
+
+    it("ignores the peak fields — the Hub never puts them into a 1m record", () => {
+      const s = coerceSystemStats({ cpum: 92.3, mm: 15.2, drm: 120, dwm: 80, nsm: 5.5, nrm: 6.6, bm: [1, 2] });
+      expect(s).to.deep.equal({});
     });
 
     it("coerces variable-length arrays cpus / dios", () => {
@@ -515,11 +525,11 @@ describe("coerce", () => {
       expect(coerceSystemStats({ cpus: [10, NaN, 30] }).cpus).to.be.undefined;
     });
 
-    it("ignores the redundant byte-rate fields b/bm/dio/diom (duplicates of ns/nr and dr/dw)", () => {
+    it("keeps the canonical b/dio tuples and ignores their aggregate-only peaks bm/diom", () => {
       const s = coerceSystemStats({ b: [1, 2], bm: [3, 4], dio: [5, 6], diom: [7, 8] }) as Record<string, unknown>;
-      expect(s.b).to.be.undefined;
+      expect(s.b).to.deep.equal([1, 2]);
+      expect(s.dio).to.deep.equal([5, 6]);
       expect(s.bm).to.be.undefined;
-      expect(s.dio).to.be.undefined;
       expect(s.diom).to.be.undefined;
     });
 

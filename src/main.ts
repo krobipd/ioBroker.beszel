@@ -82,24 +82,38 @@ export class BeszelAdapter extends utils.Adapter {
    * that table on every agent sample, so it is read with the containers.
    */
   private lastDetailFetch = 0;
+  /**
+   * v0.18.0: the extra collections this Hub definitively does not serve (404 on an older
+   * release, 403 without the read rule). Asking again every poll would be three dead
+   * requests a minute for the life of the process; they are asked once more after a
+   * restart. Transient failures (network, timeout, 5xx) are NOT recorded here.
+   */
+  private extrasUnsupported = new Set<"zfs" | "smart" | "services">();
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   private containersUnavailable = false;
   private authFailCount = 0;
   private failedSystems = new Set<string>();
   /**
-   * v0.6.0 (F2): cache of static system_details (hardware/OS) keyed by system
-   * id, plus the set of system ids we've already *attempted* to fetch. Fetched
-   * only when "System info" is enabled and only when a never-seen system id
-   * appears — the data is static, so re-fetching every 60 s would be waste.
+   * v0.6.0 (F2): cache of the `system_details` collection (hardware/OS) keyed by system
+   * id — `null` until it was read successfully once in this process, so that "never
+   * read" (freeze what exists, leave the device icon alone) stays distinct from "read,
+   * and this system has no row" (pending system: nothing to show). Plus the set of
+   * system ids already *attempted*. The data changes only when a system (re)connects,
+   * so it is fetched for a never-seen id and again when a system comes back up
+   * (v0.18.0: the Hub re-reads the details from the agent on every reconnect —
+   * `detailsFetched` is reset in `setDown` — so a kernel update shows after the reboot).
    *
    * The trigger keys on *attempted* ids (added after each attempt, success or
    * failure), NOT on which ids ended up in `systemDetails`: a `pending` system
    * with no details row, or an older Hub that 404s, must not retrigger a fetch
-   * every single poll. A config toggle change restarts the instance, resetting
-   * both back to empty.
+   * every single poll. Since v0.18.0 the collection is read regardless of the
+   * "System info" toggle — the toggle gates the `info.*` datapoints, the OS icon on the
+   * device needs the details either way.
    */
-  private systemDetails: Map<string, SystemDetails> = new Map();
+  private systemDetails: Map<string, SystemDetails> | null = null;
   private detailsAttempted = new Set<string>();
+  /** Status of each system as of the previous poll — the `→ up` transition re-reads its details. */
+  private lastStatus = new Map<string, string>();
   /**
    * v0.4.5: short-lived test-clients spawned from `checkConnection` admin
    * messages. The prod-`this.client` is what `onUnload` cancels, so these
@@ -305,10 +319,10 @@ export class BeszelAdapter extends utils.Adapter {
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
 
-      // F3: the system devices come from the startup snapshot, and both the legacy
-      // migration and the metric cleanup reuse that one list.
+      // F3: the system devices come from the startup snapshot, and both the retired-state
+      // sweep and the metric cleanup reuse that one list.
       const existingNames = this.stateManager.getExistingSystemNames();
-      await this.setupStep("legacy migration", () => this.stateManager!.migrateLegacyStates(existingNames));
+      await this.setupStep("retired states", () => this.stateManager!.removeRetiredStates(existingNames));
       await this.setupStep("metric cleanup", async () => {
         // Per system, like the poll's fan-out: one system whose cleanup fails must not
         // take the other systems — or the start — with it.
@@ -325,6 +339,11 @@ export class BeszelAdapter extends utils.Adapter {
       this.log.debug(`cleanupMetrics: ran for ${existingNames.length} existing system(s)`);
 
       await this.poll();
+      if (this.unloaded) {
+        // Stopped while the first poll was running: js-controller refuses timers during
+        // shutdown (with a warning), and "started" would be a lie.
+        return;
+      }
 
       const pollSec = coercePollInterval(config.pollInterval);
       this.log.debug(`pollInterval: raw=${JSON.stringify(config.pollInterval)} resolved=${pollSec}s`);
@@ -628,12 +647,14 @@ export class BeszelAdapter extends utils.Adapter {
         }
       }
 
-      // v0.6.0 (F2): attach static hardware/OS details when "System info" is on
-      // (F3/N5: the fetch is extracted to keep the poll body readable; the attach stays
-      // here so the data flow is visible rather than a side effect of the fetch).
-      const details = await this.fetchSystemDetails(systems, config);
+      // v0.6.0 (F2): attach the hardware/OS details (F3/N5: the fetch is extracted to keep
+      // the poll body readable; the attach stays here so the data flow is visible rather
+      // than a side effect of the fetch). `null` = never read in this process: the
+      // `info.*` states then freeze and the device icon is left as it is.
+      const details = await this.fetchSystemDetails(systems);
+      const detailsAvailable = details !== null;
       for (const system of systems) {
-        const d = details.get(system.id);
+        const d = details?.get(system.id);
         if (d) {
           system.details = d;
         }
@@ -644,7 +665,13 @@ export class BeszelAdapter extends utils.Adapter {
       // slow cadence — reading them every 60s would ask the Hub for data it refreshes
       // roughly hourly. Each failure is non-fatal: the group is simply not passed on,
       // which freezes its datapoints instead of pruning them.
-      const extrasBySystem = await this.fetchExtras(config);
+      const extrasBySystem = await this.fetchExtras(config, systems);
+      if (this.unloaded) {
+        // The detail requests above are what `cancelAll` aborted — each one is caught as
+        // non-fatal, so without this check the fan-out below would still run and write
+        // `info.online = true` on top of the offline states onUnload just wrote.
+        return;
+      }
 
       // v0.4.3 (SM5): pre-resolve safeNames deterministically so collisions
       // between two systems with the same sanitized name get suffixed
@@ -670,6 +697,7 @@ export class BeszelAdapter extends utils.Adapter {
               config,
               containersAvailable,
               extrasBySystem.get(system.id) ?? {},
+              detailsAvailable,
             );
             this.failedSystems.delete(system.id);
           } catch (err) {
@@ -683,6 +711,10 @@ export class BeszelAdapter extends utils.Adapter {
           }
         }),
       );
+
+      if (this.unloaded) {
+        return;
+      }
 
       // Cleanup stale systems — but ONLY on a non-empty result. An empty list
       // (transient API issue, or a Hub momentarily reporting zero systems right
@@ -700,7 +732,10 @@ export class BeszelAdapter extends utils.Adapter {
         const activeIds = new Set(systems.map(s => s.id));
         BeszelAdapter.pruneByActiveIds(this.failedSystems, activeIds);
         BeszelAdapter.pruneByActiveIds(this.detailsAttempted, activeIds);
-        BeszelAdapter.pruneByActiveIds(this.systemDetails, activeIds);
+        BeszelAdapter.pruneByActiveIds(this.lastStatus, activeIds);
+        if (this.systemDetails) {
+          BeszelAdapter.pruneByActiveIds(this.systemDetails, activeIds);
+        }
 
         // DP4: fleet rollup for dashboards (non-empty poll only, like the cleanup).
         await this.writeRollup(systems.length, systems.filter(s => s.status === "up").length);
@@ -737,26 +772,35 @@ export class BeszelAdapter extends utils.Adapter {
    *
    * Each fetch is guarded on its own: a collection an older Hub does not have (404) or a
    * request that fails must not cost the other two, and must not look like "no records"
-   * to the pruner — the group is then simply absent from the result.
+   * to the pruner — the group is then simply absent from the result. The other way round
+   * matters just as much: after a SUCCESSFUL read, every polled system gets an explicit
+   * (possibly empty) list, so the last SMART device / pool / unit of a system is pruned
+   * like any other — seeding only the systems that still have a record would freeze it.
    *
    * @param config Adapter configuration.
+   * @param systems The systems of this poll — every one of them is seeded per collection read.
    * @returns Extras by system id (empty map when every toggle is off).
    */
-  private async fetchExtras(config: AdapterConfig): Promise<Map<string, SystemExtras>> {
+  private async fetchExtras(config: AdapterConfig, systems: BeszelSystem[]): Promise<Map<string, SystemExtras>> {
     const out = new Map<string, SystemExtras>();
+    const entryOf = (systemId: string): SystemExtras => {
+      const entry = out.get(systemId) ?? {};
+      out.set(systemId, entry);
+      return entry;
+    };
     const put = <K extends keyof SystemExtras>(
       systemId: string,
       key: K,
       value: NonNullable<SystemExtras[K]>[0],
     ): void => {
-      const entry = out.get(systemId) ?? {};
+      const entry = entryOf(systemId);
       const list = (entry[key] ?? []) as NonNullable<SystemExtras[K]>;
       (list as unknown[]).push(value);
       entry[key] = list;
-      out.set(systemId, entry);
     };
     const seed = <K extends keyof SystemExtras>(key: K): void => {
-      for (const entry of out.values()) {
+      for (const system of systems) {
+        const entry = entryOf(system.id);
         entry[key] = entry[key] ?? [];
       }
     };
@@ -768,14 +812,14 @@ export class BeszelAdapter extends utils.Adapter {
       return out;
     }
 
-    if (wantServices) {
+    if (wantServices && !this.extrasUnsupported.has("services")) {
       try {
         for (const unit of await this.client!.getSystemdServices()) {
           put(unit.system, "systemdServices", unit);
         }
         seed("systemdServices");
       } catch (err) {
-        this.log.debug(`systemd_services fetch failed (non-fatal): ${errText(err)}`);
+        this.noteExtrasFailure("services", "systemd_services", err);
       }
     }
 
@@ -783,61 +827,82 @@ export class BeszelAdapter extends utils.Adapter {
     if (!dueForDetails) {
       return out;
     }
-    let any = false;
-    if (wantZfs) {
+    // Stamped per ATTEMPT, not per success: a Hub that is briefly unreachable gets the
+    // next try after the usual 15 minutes, not sixty tries an hour.
+    this.lastDetailFetch = Date.now();
+    if (wantZfs && !this.extrasUnsupported.has("zfs")) {
       try {
         for (const pool of await this.client!.getZfsPoolDetails()) {
           put(pool.system, "zfsPools", pool);
         }
         seed("zfsPools");
-        any = true;
       } catch (err) {
-        this.log.debug(`zfs_pools fetch failed (non-fatal): ${errText(err)}`);
+        this.noteExtrasFailure("zfs", "zfs_pools", err);
       }
     }
-    if (wantSmart) {
+    if (wantSmart && !this.extrasUnsupported.has("smart")) {
       try {
         for (const dev of await this.client!.getSmartDevices()) {
           put(dev.system, "smartDevices", dev);
         }
         seed("smartDevices");
-        any = true;
       } catch (err) {
-        this.log.debug(`smart_devices fetch failed (non-fatal): ${errText(err)}`);
+        this.noteExtrasFailure("smart", "smart_devices", err);
       }
-    }
-    if (any) {
-      this.lastDetailFetch = Date.now();
     }
     return out;
   }
 
   /**
-   * F2/F3: fetch the static `system_details` collection (hardware/OS) for the current
-   * systems. No-op unless "System info" is enabled. Only fetched when a system id we've
-   * never attempted appears (first poll or a new system) — the data is static, so
-   * re-fetching each poll would be waste. A failed fetch is non-fatal (details stay
-   * absent → no hardware states); a transient NETWORK/TIMEOUT is retried next poll
-   * rather than marked attempted.
+   * A failed read of one of the extra collections. A collection the Hub does not serve
+   * (404 — older release) or does not let this user read (403) is definitive: it is
+   * recorded once at info level and not asked for again until the next restart.
+   * Anything else (network, timeout, 5xx) is a transient and traced at debug level.
+   *
+   * @param key Which collection, as tracked in `extrasUnsupported`.
+   * @param collection The Hub's collection name, for the log line.
+   * @param err The rejection.
+   */
+  private noteExtrasFailure(key: "zfs" | "smart" | "services", collection: string, err: unknown): void {
+    const code = this.classifyError(err);
+    if (code === "NOT_FOUND" || code === "FORBIDDEN") {
+      this.extrasUnsupported.add(key);
+      this.log.info(
+        `The Hub does not serve the ${collection} collection (${code}) — not asked again until the adapter restarts`,
+      );
+      return;
+    }
+    this.log.debug(`${collection} fetch failed (non-fatal, ${code}): ${errText(err)}`);
+  }
+
+  /**
+   * F2/F3: fetch the `system_details` collection (hardware/OS) for the current systems.
+   * Read for a system id never attempted before (first poll, new system) and again when
+   * a system comes back `up`: the Hub re-reads the details from the agent on every
+   * reconnect, so that is exactly when a kernel or hardware change shows. A failed
+   * fetch is non-fatal; a transient NETWORK/TIMEOUT is retried next poll rather than
+   * marked attempted.
+   *
+   * v0.18.0: read regardless of the "System info" toggle (that toggle gates the `info.*`
+   * datapoints in the registry) — the OS icon on the device object needs the details
+   * either way. Returns `null` until the first successful read of this process.
    *
    * v0.16.0: returns the map instead of writing `system.details` into the caller's array
    * behind its back. The attach still happens — the metric registry reads
    * `system.details` — but it is now one visible line in the poll.
    *
    * @param systems Systems from the current poll.
-   * @param config Adapter configuration.
-   * @returns Details by system id (empty when the toggle is off or nothing was fetched).
+   * @returns Details by system id, or `null` while nothing has ever been fetched.
    */
-  private async fetchSystemDetails(
-    systems: BeszelSystem[],
-    config: AdapterConfig,
-  ): Promise<Map<string, SystemDetails>> {
-    if (!config.metrics_agentVersion) {
-      return new Map();
+  private async fetchSystemDetails(systems: BeszelSystem[]): Promise<Map<string, SystemDetails> | null> {
+    for (const s of systems) {
+      const was = this.lastStatus.get(s.id);
+      if (s.status === "up" && was !== undefined && was !== "up") {
+        // Back up (or up for the first time after `pending`): the Hub has fresh details.
+        this.detailsAttempted.delete(s.id);
+      }
+      this.lastStatus.set(s.id, s.status);
     }
-    // Edge: a system that is `pending` right now gets marked attempted, so its
-    // hardware info appears only after the next adapter restart — an accepted
-    // trait of the "static data, restart-to-refresh" model.
     const needFetch = shouldFetchSystemDetails(
       systems.map(s => s.id),
       this.detailsAttempted,

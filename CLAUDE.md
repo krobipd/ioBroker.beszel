@@ -22,7 +22,7 @@ src/lib/beszel-client.ts        → HTTP Client (Auth, Systems, Stats, Container
 src/lib/coerce.ts               → Boundary-Validator (NaN/Infinity/Typ-Drift) + errText + validateHubUrl + coercePollInterval/coerceTimeoutMs (v0.5.0 S1)
 src/lib/state-manager.ts        → ioBroker States erstellen/updaten/cleanup, createdIds-Cache
 src/lib/i18n.ts                 → tName(key, ...args) + tDesc(key) über I18n.getTranslatedObject() (adapter-core I18n-Framework)
-admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations, Namen UND Beschreibungen (194 Keys × 11 Sprachen)
+admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations, Namen, Beschreibungen UND die Antworten des Verbindungstests (278 Keys × 11 Sprachen)
 src/lib/message-router.ts       → onMessage-Dispatcher (default-Branch-Contract, v0.4.5 testClient-Hooks)
 src/lib/types.ts                → TypeScript Interfaces (API + Config)
 ../scripts/sync-iopackage-from-i18n.py → regeneriert io-package.json:instanceObjects.common.name + .desc aus admin/i18n/ (zentral, source: admin-i18n)
@@ -38,18 +38,18 @@ docs/<en|de>/                   → Nutzerdoku im Repo (README/datapoints/faq), 
 5. **Empty-Systems-Guard** — leere API-Antwort löscht NICHT alle Geräte
 6. **Metric-Cleanup** — deaktivierte Metriken werden beim Start gelöscht
 7. **Channel-basierter State-Tree** — States in Channels organisiert (info, cpu, memory, disk, network, temperature, battery)
-8. **Legacy-Migration** — `migrateLegacyStates()` löscht alte flache State-Pfade aus pre-0.3.0
+8. **Retired-State-Sweep (bis 0.17.1 Legacy-Migration)** — `removeRetiredStates()` löscht aus dem Start-Schnappschuss die Datenpunkte, die ein Release zurückgezogen hat (`RETIRED_STATE_IDS`; 0.18.0: die sechs Peaks — siehe Design 44), plus den alten `info.legacyMigrated`-Marker. Der pre-0.3.0-Sweep der flachen State-Pfade ist entfallen: öffentlich ist der Adapter seit 2026-06-06 mit ≥ 0.6, kein Nutzer hatte je die flachen States.
 9. **State-Common Factories** — `percentCommon`, `numCommon`, `textCommon`, `boolCommon` eliminieren Boilerplate
 10. **Load-Avg Fallback** — `stats.la` bevorzugt, Fallback auf `system.info.la`
 11. **Temperatur** — Durchschnitt der 3 heißesten Sensoren + heißester Einzelsensor (`temperature.max`, F7)
 12. **Name-Sanitization** — lowercase, non-alphanumeric → `_`, max 50 chars
-13. **Metrik-Registry (K1)** — eine deklarative `metricDefs()`-Tabelle treibt sowohl `applyMetrics` (anlegen+setzen) als auch `cleanupMetrics` (löschen); `available(stats, system)` gated die Erstellung auf Daten-Präsenz (z.B. Peak-Felder, `system.details`) → kein leerer State auf älteren Beszel-Versionen, keine Create/Cleanup-Drift. Dynamische Gruppen (Sensoren/Lüfter/Akkus/GPU/Filesystems/Cores/Interfaces/Engines/Container) bleiben in `updateDynamicStats`/`updateContainers`.
+13. **Metrik-Registry (K1)** — eine deklarative `metricDefs()`-Tabelle treibt sowohl `applyMetrics` (anlegen+setzen) als auch `cleanupMetrics` (löschen); `available(stats, system)` gated die Erstellung auf Daten-Präsenz (z.B. `dios`, `system.details`, seit 0.18.0 auch Sensoren/Batterie/Swap/ARC — Design 45) → kein leerer State auf älteren Beszel-Versionen oder Rechnern ohne die Hardware, keine Create/Cleanup-Drift. Dynamische Gruppen (Sensoren/Lüfter/Akkus/GPU/Filesystems/Cores/Interfaces/Engines/Container) bleiben in `updateDynamicStats`/`updateContainers`.
 14. **Version-Robustheit (v0.18.8-verifiziert)** — alle Felder durch Coercer (absent → null/skip), neue Felder `available`-gated. Datenmodell gegen die gebündelte Quelle geprüft (NICHT main): `os_name` ist snake_case, `os` numerisches Enum, Container-`net` = Bytes/s (Sent+Recv), `bat` = `[2]uint8`. Snapshot `Ressourcen/beszel/beszel-0.18.8/` (+ `VERIFIED-v0.18.8.md` mit dem 0.18.7→0.18.8-Delta); der 0.18.7-Snapshot bleibt als Referenz für Adapter ≤ v0.10.1 liegen.
-15. **system_details (F2)** — statische Hardware/OS-Info aus eigener Collection (`getSystemDetails()`), Zugriff `systemScopedReadRule` wie system_stats. Nur wenn „System-Infos" an, selten geholt (Start + neues System, NICHT im 60s-Poll) und per `system.details` an die Registry gereicht.
+15. **system_details (F2)** — Hardware/OS-Info aus eigener Collection (`getSystemDetails()`), Zugriff `systemScopedReadRule` wie system_stats. Seit 0.18.0 IMMER gelesen (das Geräte-Icon braucht `os`, Design 47), der Schalter „System-Infos" gated nur die neun `info.*`-Datenpunkte; geholt beim Start, für neue Systeme und bei jedem Übergang `→ up` (Design 46), NICHT im 60s-Poll; per `system.details` an die Registry gereicht, `detailsAvailable` sagt dem Manager, ob die Sammlung je gelesen wurde.
 16. **Dynamic-Group-Pruning (v0.7.2)** — `pruneDynamicChildren(base, activeIds, childType)` löscht verschwundene Mitglieder jeder dynamischen Gruppe (Sensoren, Lüfter, Akkus, Cores, Interfaces, GPUs, Engines, Filesystems, Container). Kostenmodell: Object-View nur beim ERSTEN Poll je Gruppe nach Adapter-Start (Zombie-Reconcile), danach in-memory-Diff. Kein Prune ohne Daten (down-System mit `stats=undefined` fasst keine Gruppe an). Toggle-Wechsel = Instanz-Restart → Start-Cleanup (`cleanupMetrics`) deckt Toggle-offs, inkl. gpuDetails (power_package+engines je GPU via View-Enumeration).
-17. **Poll-Write-Sparsamkeit (v0.7.2)** — `getLatestStats` bricht die Pagination ab, sobald eine Seite keinen neuen System-Key liefert (1m-Retention = 8 h ≙ 480 Records/System, der neueste je System liegt bei `sort=-updated` auf den ersten Seiten); Device-Objekt-`extendObject` nur bei geänderter id/host/name-Signatur.
+17. **Poll-Write-Sparsamkeit (v0.7.2)** — `getLatestStats` bricht die Pagination ab, sobald eine Seite keinen neuen System-Key liefert (1m-Retention = **1 h ≙ 60 Records/System** — 0.19.0 `records_deletion.go`; die frühere Angabe „8 h/480" war falsch; der neueste je System liegt bei `sort=-updated` auf den ersten Seiten); Device-Objekt-`extendObject` nur bei geänderter Signatur `id/host/name/icon` (seit 0.18.0 aus dem Start-Schnappschuss geprimt, Design 47).
 18. **Lüfter + Multi-Akku (v0.11.0, Beszel 0.18.8)** — beides sind normale dynamische Gruppen über `syncDynamicGroup` (Prune + H2-Entprellung inklusive). **Lüfter** = eigener Kanal `<sys>.fans` je System (NICHT unter `temperature`: eigene Agent-Quelle `agent/fans.go`, eigenes Hub-Diagramm), ein State je Lüfter, Einheit `rpm`, Rolle schlicht `value` — der Rollen-Katalog hat keine Rolle für gemessene Drehzahl (`value.speed` = Wind, `level.speed` = schreibbarer Stellwert). **0 rpm ist ein Messwert** (stehender Lüfter), kein Falsy-Filter. Eigener opt-in-Schalter `metrics_fans` ohne Kategorie-Abhängigkeit. **Multi-Akku** = `<sys>.battery.batteries.<name>` (Prozent, `value.battery`) neben den bestehenden Aggregat-States; **bewusst OHNE „nur ab 2 Akkus"-Schwelle** — eine Schwelle würde beim Wechsel 2→1 Akku die Kinder LÖSCHEN, was wie ein Fehler aussieht. Hängt am `metrics_battery`-Schalter, kein eigener.
-19. **Datenpunkt-Zähler (v0.11.0)** — eine Info-Zeile pro Poll: „Object tree updated: created N datapoint(s), removed M datapoint(s)", still wenn sich nichts geändert hat. Grundlage ist `knownStateIds`: `snapshotExistingStates()` liest beim Start EINMAL alle vorhandenen States (Object-View) — **muss vor `cleanupMetrics` und dem ersten Poll laufen**. Nötig, weil `createAndSetState` bei JEDEM Neustart ein `extendObject`-Rollen-Retrofit fährt (Design 16/Rollen-Retrofit) und ohne Basislinie jeder Neustart alle States als „neu" melden würde. Gelöschte IDs verlassen das Set → ein Wiederauftauchen zählt wieder. Rekursive Löschungen (Kanal/Gerät/Gruppen-Kind) zählen per Object-View VOR dem Löschen. Ein Sonderfall: die Legacy-Migration ist bewusst AUSGENOMMEN (`deleteChannelIfExists(id, false)`), weil sie ihre eigene Summe meldet — seit v0.14.0 ist auch ihr Marker weg (Design 29), gezählt wird nur noch dessen einmalige Entfernung. Die drei Rollup-States sind seit v0.13.0 statische `instanceObjects` (Design 25) und liegen damit von Anfang an im Start-Schnappschuss.
+19. **Datenpunkt-Zähler (v0.11.0)** — eine Info-Zeile pro Poll: „Object tree updated: created N datapoint(s), removed M datapoint(s)", still wenn sich nichts geändert hat. Grundlage ist `knownStateIds`: `snapshotExistingStates()` liest beim Start EINMAL alle vorhandenen States (Object-View) — **muss vor `cleanupMetrics` und dem ersten Poll laufen**. Nötig, weil `createAndSetState` bei JEDEM Neustart ein `extendObject`-Rollen-Retrofit fährt (Design 16/Rollen-Retrofit) und ohne Basislinie jeder Neustart alle States als „neu" melden würde. Gelöschte IDs verlassen das Set → ein Wiederauftauchen zählt wieder. Rekursive Löschungen (Kanal/Gerät/Gruppen-Kind) zählen per Object-View VOR dem Löschen. Seit 0.18.0 zählt auch der Retired-State-Sweep (Design 8) normal mit — der Sonderfall „Legacy-Migration meldet ihre eigene Summe" ist mit ihr entfallen. Die drei Rollup-States sind seit v0.13.0 statische `instanceObjects` (Design 25) und liegen damit von Anfang an im Start-Schnappschuss.
 
 ## Metric-Toggles
 
@@ -69,12 +69,12 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     korrigierte Übersetzung erreichte nur Neuinstallationen, und kein Gate sah es (nur der
     Live-Baum). Jetzt: `ensureInstanceObjects()` in `onReady` erneuert alle sechs Manifest-Objekte
     per `extendObject` (ohne `preserve`), `ensureChannel` schreibt per `extendObject`, und
-    `createAndSetState` verzichtet auf `preserve`. **Einzige Ausnahme ist das GERÄTE-Objekt** — sein
-    Name ist der Systemname vom Hub, und ein Hub-seitiges Umbenennen erzeugt ohnehin eine neue
-    sanitisierte id, also ein neues Objekt; `preserve` schützt dort nur eine Umbenennung des
-    Nutzers und blockiert nichts, was der Adapter ausliefert. Preis der Umstellung: eine vom Nutzer
-    in der Admin vergebene Datenpunkt-Umbenennung wird beim nächsten Start überschrieben
-    (krobi 2026-09-03).
+    `createAndSetState` verzichtet auf `preserve`. Die Ausnahme „Geräte-Objekt behält `preserve`" ist
+    **mit 0.18.0 gefallen** (Design 47): die Begründung „Umbenennung ⇒ andere Id" stimmte nicht —
+    `sanitize` faltet Groß/Klein und Sonderzeichen („nas"→„NAS" bleibt `systems.nas`), und so eine
+    Hub-Umbenennung kam nie an. Preis der Umstellung: eine vom Nutzer in der Admin vergebene
+    Umbenennung wird beim nächsten Abgleich überschrieben (krobi 2026-09-03; der Hub ist die
+    Benennungsstelle).
 27. **`common.desc` = Erklärung, sonst DEKLARIERT stumm (v0.14.0, für jeden Datenpunkt entschieden
     2026-09-07)** — 40 i18n-Schlüssel (`desc…`) in elf Sprachen, über `tDesc()` und das optionale
     `descKey` der `MetricDef` bzw. die `LEAF_COMMONS`-Tabelle verdrahtet. Sie hängen an genau den
@@ -99,14 +99,18 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     (`../scripts/check-object-inventory.py`) verlangt für JEDEN Datenpunkt eine Beschreibung ODER
     einen passenden Eintrag — und meldet ebenso ein Muster, das auf nichts (mehr) passt: darum
     nichts auf Vorrat deklarieren.
-28. **Einfrieren vs. Zurücksetzen, restart-fest (v0.14.0)** — `applyMetrics` unterscheidet jetzt die
-    beiden Gründe, aus denen eine Metrik „nicht verfügbar" ist. **Kein Stats-Datensatz** (System
-    down/paused) ⇒ nichts anfassen, die letzten Werte bleiben stehen — dieselbe Linie, der die
-    dynamischen Gruppen schon folgten. **Datensatz da, FELD fehlt** (`dios`/`cpub` sind
-    omitzero/omitempty) ⇒ auf `null` zurücksetzen, und zwar über `knownStateIds` statt nur
-    `createdIds`: der Cache ist nach jedem Neustart leer, deshalb hörte das Zurücksetzen bisher
-    still auf zu wirken und der alte Messwert stand unbegrenzt. Vorher waren beide Fälle vertauscht
-    abhängig davon, ob der Adapter zwischendurch neu gestartet war.
+28. **Einfrieren vs. Zurücksetzen vs. Entfernen, restart-fest (v0.14.0, erweitert 0.18.0)** —
+    `applyMetrics` unterscheidet die Gründe, aus denen eine Metrik „nicht verfügbar" ist. **Kein
+    Stats-Datensatz** (System down/paused) ⇒ nichts anfassen, die letzten Werte bleiben stehen —
+    dieselbe Linie, der die dynamischen Gruppen schon folgten (seit 0.18.0 auch Container und
+    systemd-Units, Design 46). **Datensatz da, FELD fehlt** — zwei Fälle: ein nur vorübergehend
+    fehlendes Feld (`dios`/`cpub` sind omitzero/omitempty) ⇒ auf `null` zurücksetzen, über
+    `knownStateIds` statt nur `createdIds` (der Cache ist nach jedem Neustart leer); Hardware, die
+    der Rechner nicht hat (`goneWhenAbsent`: Sensoren, Batterie, Swap, ZFS-ARC) ⇒ den Datenpunkt
+    nach zwei Polls in Folge LÖSCHEN, samt leerem Elternkanal — sonst behielte jede Anlage, die eine
+    ältere Version lief, dauerhafte `null`-Datenpunkte (Design 45). Die Details-Datenpunkte
+    (`info.*`) frieren, solange `system_details` in diesem Prozess nie gelesen wurde
+    (`detailsAvailable`), statt beim ersten langsamen Start alle neun auf `null` zu setzen.
 29. **`info.legacyMigrated` ist ersatzlos entfallen (v0.14.0)** — der Marker sparte nur den
     Legacy-Scan (34 Einzelabfragen je System). Seit v0.11.0 liest `snapshotExistingStates()` beim
     Start ohnehin einmal alles und läuft VOR der Migration, also entscheidet der Sweep jetzt aus
@@ -125,10 +129,12 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     den Wert. Ein nie angelegter Datenpunkt entsteht weiterhin nicht (`createdIds`/`knownStateIds`).
     Dasselbe eine Ebene tiefer: `refreshDynamicObjects()` läuft im `else`-Zweig von
     `if (stats)` und frischt die adapter-benannten Blätter der dynamischen Gruppen
-    (`DYNAMIC_LEAF_COMMONS`) plus die Gruppen-Kanäle aus dem Start-Schnappschuss auf — ohne Daten,
+    (`DYNAMIC_LEAF_PATTERNS`) plus die Gruppen-Kanäle aus dem Start-Schnappschuss auf — ohne Daten,
     ohne Prune, ohne Wert. Hub-benannte Objekte (Sensor-/Container-/GPU-/Dateisystem-/Interface-Namen)
     bleiben bewusst außen vor: ohne Daten nicht rekonstruierbar, und ein Adapter-Update ändert sie
-    ohnehin nicht. **`DYNAMIC_LEAF_COMMONS` ist eine zweite Beschreibung der Erzeugungspfade** —
+    ohnehin nicht. Seit 0.18.0 erkennt der Lauf die Gruppenkanäle an ihrem PLATZ im Baum
+    (`DYNAMIC_CHANNEL_PATTERNS`, Design 48), nicht mehr am letzten Id-Segment — ein Container `gpu`
+    oder ein Dataset `containers` wurde vorher bei jedem Poll eines Down-Systems umbenannt. **`DYNAMIC_LEAF_COMMONS` ist eine zweite Beschreibung der Erzeugungspfade** —
     dagegen hält ein Invarianten-Test, der ein voll bestücktes System abläuft und jeden
     adapter-benannten Datenpunkt nennt, der in der Tabelle fehlt (am echten Defekt bewiesen).
 
@@ -141,8 +147,10 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     behaupten. Bestandsanlagen bekommen den Marker beim nächsten Start per `extendObject`.
 32. **Objekt-Inventar aus Fixtures (v0.14.2)** — `npm run test:inventory` startet den Adapter im
     Wegwerf-Controller gegen einen Fake-Hub (`test/fixtures/inventory/hub.json`: ein voll
-    bestücktes Linux-System mit jeder Metrikgruppe von Beszel 0.18.8 plus ein System `down`,
-    alle Schalter an) und schreibt `test/objects.inventory.json` im Format des
+    bestücktes Linux-System mit jeder Metrikgruppe von Beszel 0.19.0 in der 0.19.0-Drahtform,
+    ein System `down`, seit 0.18.0 dazu eine VM ohne Sensoren/Batterie/Swap/ZFS — damit das Inventar
+    auch ABWESENHEIT beweist — und ein `pending`-System ohne Datensätze; alle Schalter an) und
+    schreibt `test/objects.inventory.json` im Format des
     Objektstruktur-Bots; deterministisch (zwei Läufe byte-gleich). `src/inventory.test.ts` hält
     das Inventar gegen die Metrik-Registry (jeder Datenpunkt, jede dynamische Gruppe, jede
     Beschreibung als Übersetzungsobjekt, jeder feste Name als API-Name). Der Release-Vorlauf
@@ -249,9 +257,86 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     Die Pool-Ebene prunt weiterhin ALLEIN der Minutentakt aus `stats.z`: zwei Pruner auf
     einer Basis würden sich um jeden Pool streiten, den der andere noch nicht gesehen hat.
 
-## Tests (685 unit + 58 package + 1 integration + 1 inventory = 745)
+44. **`b`/`dio` sind die Draht-Wahrheit, die Peaks gibt es nicht (v0.18.0, forensisches Audit
+    2026-09-15)** — an der 0.19.0-Quelle belegt: der Agent setzt `ns/nr` auf Systemebene nicht
+    mehr (`agent/network.go`), der Hub-Migrator `migrateDeprecatedFields` rechnet alte Werte nach
+    `b`/`dio` um und **nullt** `ns/nr` bzw. `dr/dw`. `network.sent/recv` (default-on!) war damit
+    auf jedem aktuellen Hub dauerhaft `null` — durch 692 Tests, 13 Mutationstabellen und fünf Audits
+    unsichtbar, weil das Inventar-Fixture die alte Welt nachbaute. Jetzt: `b`/`dio` primär
+    (Bytes/s → MiB/s), `ns/nr`/`dr/dw` als Rückfall für Hubs < 0.19.0, und Abwesenheit (omitzero =
+    ruhend) ist **0**, nicht `null`. Die Tupel bleiben im Coercer present/absent — ihre Abwesenheit
+    ist der Unterscheider für den Rückfall. Die sechs Peak-Datenpunkte samt vier Schaltern sind
+    entfernt: `Max*` sind `cbor:"-"` und entstehen nur in den 10m+-Aggregaten, die der Adapter nie
+    liest; kein Nutzer hat je einen Wert gesehen. Weil die Aufstiegs-Suite das Inventar des
+    Vorgänger-Tags seedet und „removed objects are gone" verlangt, räumt `RETIRED_STATE_IDS`
+    (Design 8) die sechs Objekte ab — nach dem 0.18.0-Tag entfernbar. Retention-Korrektur:
+    1m-Records leben 1 h, nicht 8 h (Design 17); `containers`-Zeilen werden 10 min, `systemd_services`
+    20 min nach dem letzten Sample gesweept (Design 46).
+45. **Hardware, die der Rechner nicht hat, bekommt keinen Datenpunkt (v0.18.0)** — `t` (Sensoren)
+    ist eine omitempty-Map, `bat`, `s`/`su` und `mz` sind omitzero/omitempty: eine VM ohne Sensoren
+    trug zwei dauerhafte Temperatur-Nulls (default-on), dazu Batterie-, Swap- und ARC-Nulls je
+    Schalter. Jetzt gaten `hasSensors`/`hasBattery`/`hasSwap`/`mz != null` die Erstellung, und
+    `goneWhenAbsent` an diesen sieben Defs LÖSCHT einen bestehenden Datenpunkt nach zwei Polls in
+    Folge ohne das Feld (Design 28) — ein reines Erstellungs-Gate hätte jede Bestandsanlage mit den
+    `null`-Leichen zurückgelassen, und kein Gate sähe es (die Aufstiegs-Suite kennt kein
+    sensorloses System — darum hat das Fixture jetzt eines, Design 32). Bewusste Wahl bei `bat`:
+    `[0, 0]` ist auf dem Draht nicht von „keine Batterie" unterscheidbar. `dios` bleibt bei H2b-`null`:
+    „ruhend" und „nicht geliefert" sind dort nicht zu trennen, ein Löschen bei jeder Ruhephase würde
+    den Baum umbauen.
+46. **Lebende Sammlungen werden nur bei `up` abgeglichen; jedes gepollte System bekommt seine Liste
+    (v0.18.0)** — der Hub sweept `containers` 10 min und `systemd_services` 20 min nach dem letzten
+    Sample, ein Down-System antwortet danach mit einer ERFOLGREICHEN leeren Liste: nach zwei Polls
+    waren alle Container-Kanäle weg, während alles andere einfror. Beide Gruppen werden jetzt nur
+    für `status === "up"` abgeglichen; ZFS-Pools/SMART (kein Sweep) statusunabhängig. Dazu der
+    Seed-Fehler in `fetchExtras`: „leer" wurde nur für Systeme markiert, die noch mindestens einen
+    Datensatz hatten — das LETZTE SMART-Laufwerk/der letzte Pool/die letzte Unit eines Systems wurde
+    nie entfernt. `seed` läuft jetzt über alle gepollten Systeme, nur nach erfolgreichem Fetch der
+    Sammlung. Details werden bei jedem Übergang `→ up` neu gelesen (`lastStatus`; der Hub setzt
+    `detailsFetched` in `setDown` zurück und liest sie beim Reconnect neu — Kernel nach Reboot),
+    ein `pending`-System bekommt sie beim ersten Kontakt. Eine Sammlung, die der Hub definitiv nicht
+    serviert (404 = neuer Fehlercode `NOT_FOUND`, 403), landet in `extrasUnsupported` und wird bis
+    zum Neustart nicht mehr angefragt (eine INFO-Zeile); transiente Fehler (Netz, Timeout, 5xx)
+    werden zum normalen Takt wiederholt, `lastDetailFetch` wird je VERSUCH gestempelt.
+47. **Geräte-Objekt: OS-Piktogramm, geprimte Signatur, kein `preserve` (v0.18.0)** — `common.icon`
+    am Gerät `systems.<name>` nach dem Flotten-Rezept (`../CLAUDE_PATTERNS.md` § Geräte-Piktogramme):
+    Inline `data:image/svg+xml;base64`-URI, `currentColor`/`none`, nur `path`/`circle`, 64er
+    viewBox, LF-normalisiert; die vier OS-Logos sind die Icon-Set-Logos aus Beszels eigener UI
+    (Phosphor-Tux MIT · teenyicons-Apple MIT · IconPark-Windows Apache-2.0 · MDI-FreeBSD
+    Apache-2.0, `admin/icons/LICENSES.md`), Rückfall ein Server-Rack (krobi 16:03: „Variante A
+    alle"). Das OS kommt NUR aus `system_details.os` (`Info.Os` ist deprecated und wird genullt) —
+    darum wird die Sammlung seit 0.18.0 unabhängig vom Schalter gelesen (Design 15). Das Icon ist
+    EINGANG der Signatur (`deviceSignature(id, host, name, icon)`), nie im Bauer abgeleitet; solange
+    die Details in diesem Prozess nie gelesen wurden (`detailsAvailable=false`), ist der GESPEICHERTE
+    Wert der Eingang und das Feld bleibt unangetastet — ein Hub, der beim Start langsam ist, tauscht
+    kein Tux gegen das Rack. `snapshotExistingStates` primt `deviceWritten`, `deviceIcons` und
+    `deviceOwners` aus den gespeicherten Geräteobjekten: ein Neustart ohne Änderung schreibt kein
+    Gerät, ein Bestandsgerät bekommt das Icon genau einmal (Heilungs-Test mit byte-gleichem Fixture
+    außer `icon`). `preserve: common.name` ist weg (Design 26): der Hub ist die Benennungsstelle, und
+    „nas"→„NAS" behält die Id. Kollisionen: der BESITZER des nackten Geräts (`native.id`) behält es,
+    der Neuling bekommt den Suffix — vorher übernahm ein Neuling mit kleinerer Id still den Baum
+    samt Historie. `knownSystemIds()` kommt aus `knownStateIds` (`systems.*.info.online`): der
+    Per-Poll-Namenscache wurde von einer transienten leeren Hub-Antwort geleert, dann schrieb weder
+    der Fehlerpfad noch `onUnload` einen Offline-Marker.
+48. **Zwei Lebenszyklus-Löcher und der Rest des Audits (v0.18.0)** — `onReady` bricht nach dem
+    ersten Poll ab, wenn der Stop währenddessen kam (js-controller verweigert `setInterval` mit WARN,
+    „started" wäre gelogen); `poll()` prüft `unloaded` auch nach den Detail-Fetches und vor dem
+    Cleanup (die abgebrochenen Anfragen werden dort als non-fatal gefangen — der Fan-out schrieb
+    `info.online = true` über die Offline-Marker von `onUnload`). `refreshDynamicObjects` erkennt
+    Gruppenkanäle an `DYNAMIC_CHANNEL_PATTERNS` (Design 30). `markAllOffline` schreibt `info.status`
+    als vollständiges Objekt EINMAL je Start (in `createdIds` → der Poll wiederholt es nicht).
+    Antworten des Verbindungstests kommen aus `admin/i18n` in der Systemsprache (`tText`), der Test
+    läuft mit dem konfigurierten `requestTimeout`. Die drei Extra-Fetcher rufen `ensureToken()`.
+    `numCommon` setzt keine leere Einheit; abwesende SMART-/Dataset-Textspalten sind `null`.
+    `dropCacheUnder` ist eine Schleife über alle Caches. Bericht: `Ressourcen/beszel/audit-2026-09-15.md`.
 
-Zusammensetzung (gemessen 2026-09-06 nach den drei Detail-Collections): state-manager 314 · coerce 158 · main 102 · beszel-client 70 · message-router 16 · repo-standards 12 · i18n 7 · inventory 6 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version). Deckung **99,2 % Stmts · 98,6 % Branch · 97,1 % Funcs**; `src/lib` 100 % Funktionen, `state-manager.ts` 100 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server, `?? ""` auf einer garantiert gesetzten Map-Id) oder Test-Seam/Bootstrap in `main.ts`.
+## Tests (773 unit + 58 package + 1 integration + 2 inventory)
+
+Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit, `vitest run`): state-manager 359 ·
+coerce 160 · main 114 · beszel-client 75 · message-router 17 · repo-standards 18 (aus
+`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · device-icons 13 · inventory 9 · i18n 7.
+`vitest list` (das Maß des D10-Gates) zählt 736, weil die Prüfpaket-Tests erst zur Laufzeit entstehen.
+Deckung **99,0 % Stmts · 97,7 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt,
+ist unerreichbar (https-Transport ohne TLS-Server) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 

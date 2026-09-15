@@ -65,7 +65,7 @@
         "checkConnection": {
           "type": "sendTo",
           "command": "checkConnection",
-          "jsonData": "{\"url\": \"${data.url}\", \"username\": \"${data.username}\", \"password\": \"${data.password}\"}",
+          "jsonData": "{\"url\": \"${data.url}\", \"username\": \"${data.username}\", \"password\": \"${data.password}\", \"requestTimeout\": \"${data.requestTimeout}\"}",
           "label": "btn_checkConnection",
           "xs": 12,
           "sm": 12,
@@ -234,18 +234,6 @@
           "lg": 6,
           "xl": 6
         },
-        "metrics_cpuPeak": {
-          "type": "checkbox",
-          "label": "metric_cpuPeak",
-          "help": "help_metric_cpuPeak",
-          "disabled": "!data.metrics_cpu",
-          "default": false,
-          "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 6,
-          "xl": 6
-        },
         "header_memory": {
           "type": "header",
           "text": "header_memory",
@@ -282,18 +270,6 @@
           "type": "checkbox",
           "label": "metric_swap",
           "help": "help_metric_swap",
-          "disabled": "!data.metrics_memory",
-          "default": false,
-          "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 6,
-          "xl": 6
-        },
-        "metrics_memoryPeak": {
-          "type": "checkbox",
-          "label": "metric_memoryPeak",
-          "help": "help_metric_memoryPeak",
           "disabled": "!data.metrics_memory",
           "default": false,
           "xs": 12,
@@ -358,18 +334,6 @@
           "lg": 6,
           "xl": 6
         },
-        "metrics_diskPeak": {
-          "type": "checkbox",
-          "label": "metric_diskPeak",
-          "help": "help_metric_diskPeak",
-          "disabled": "!data.metrics_disk",
-          "default": false,
-          "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 6,
-          "xl": 6
-        },
         "header_network": {
           "type": "header",
           "text": "header_network",
@@ -394,18 +358,6 @@
           "type": "checkbox",
           "label": "metric_networkInterfaces",
           "help": "help_metric_networkInterfaces",
-          "disabled": "!data.metrics_network",
-          "default": false,
-          "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 6,
-          "xl": 6
-        },
-        "metrics_networkPeak": {
-          "type": "checkbox",
-          "label": "metric_networkPeak",
-          "help": "help_metric_networkPeak",
           "disabled": "!data.metrics_network",
           "default": false,
           "xs": 12,

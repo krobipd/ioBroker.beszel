@@ -46,3 +46,16 @@ export function tDesc(key: I18nKey): ioBroker.StringOrTranslated {
 export function tState(key: I18nKey): string {
   return I18n.translate(key);
 }
+
+/**
+ * Translated PLAIN STRING for a message that reaches the user as text — the response of
+ * the connection test in the admin dialog. Same rule as {@link tState}: user-facing text
+ * follows the system language, and a response field is a string, not a translation
+ * object.
+ *
+ * @param key Translation key from admin/i18n/en.json (the `msg…` keys)
+ * @param args Values for the `%s` placeholders of that key
+ */
+export function tText(key: I18nKey, ...args: (string | number)[]): string {
+  return I18n.translate(key, ...args);
+}

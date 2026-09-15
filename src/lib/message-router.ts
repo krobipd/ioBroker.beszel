@@ -1,5 +1,6 @@
 import { BeszelClient, type BeszelClientLogger } from "./beszel-client";
-import { coerceObject, errText } from "./coerce";
+import { coerceObject, coerceTimeoutMs, errText } from "./coerce";
+import { tText } from "./i18n";
 import type { AdapterConfig } from "./types";
 
 /**
@@ -35,7 +36,7 @@ export interface MessageRouterDeps {
    * Factory for the throwaway BeszelClient used by `checkConnection`.
    * Injected so the test can swap in a fake instead of a live HTTP client.
    */
-  createTestClient: (url: string, username: string, password: string) => BeszelClient;
+  createTestClient: (url: string, username: string, password: string, timeoutMs: number) => BeszelClient;
   /**
    * v0.4.5: optional registration hook called right after `createTestClient`
    * returns a fresh client. Adapter holds a Set so `onUnload` can `cancelAll()`
@@ -67,15 +68,16 @@ export function makeTestClientFactory(
   logger: BeszelClientLogger,
   delay: (ms: number) => Promise<void>,
 ): MessageRouterDeps["createTestClient"] {
-  return (url, username, password) => new BeszelClient(url, username, password, undefined, logger, delay);
+  return (url, username, password, timeoutMs) => new BeszelClient(url, username, password, timeoutMs, logger, delay);
 }
 
 /**
  * Dispatch a single `ioBroker.Message`. Mirrors the previous inline
  * switch in `main.ts:onMessage` 1:1 — entry-trace before the early-return
  * so broadcast messages without callback are still visible at debug
- * level, and an explicit `default:` branch so unknown commands get
- * `{ error: "Unknown command" }` instead of leaving the callback hanging.
+ * level, and an explicit `default:` branch so unknown commands get an error response
+ * instead of leaving the callback hanging. Every text in a response is user-facing (the
+ * admin shows it verbatim), so it comes from `admin/i18n` in the system language.
  *
  * @param obj The incoming message payload from the ioBroker framework.
  * @param deps Test-injectable dependencies (logger + sendTo + client factory).
@@ -100,12 +102,7 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         const from = typeof obj.from === "string" ? obj.from : "";
         if (from && !from.startsWith("system.adapter.admin.") && !from.startsWith("system.adapter.web.")) {
           deps.log.warn(`checkConnection rejected from '${from}' — only the admin/web config UI may run it`);
-          deps.sendTo(
-            obj.from,
-            obj.command,
-            { error: "checkConnection is only available from the admin UI" },
-            obj.callback,
-          );
+          deps.sendTo(obj.from, obj.command, { error: tText("msgAdminOnly") }, obj.callback);
           return;
         }
         // v0.5.0 (S3): obj.message is typed `unknown` in @iobroker/types ≥7.1
@@ -121,11 +118,13 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         if (!url || !username || !password) {
           // v0.4.4 (H2): trace missing-config before sendTo.
           deps.log.debug("checkConnection: missing url/username/password in message");
-          deps.sendTo(obj.from, obj.command, { error: "URL, username and password are required" }, obj.callback);
+          deps.sendTo(obj.from, obj.command, { error: tText("msgCredentialsRequired") }, obj.callback);
           return;
         }
 
-        const testClient = deps.createTestClient(url, username, password);
+        // v0.18.0: the test runs with the timeout the instance will run with — a test that
+        // passes at 15 s while the configured 5 s would time out is no test.
+        const testClient = deps.createTestClient(url, username, password, coerceTimeoutMs(config.requestTimeout));
         // v0.4.5: register the test-client so onUnload can abort an
         // inflight HTTPS request — the adapter's `this.client.cancelAll()`
         // only touches the prod-client, not these short-lived testClients.
@@ -133,15 +132,15 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         try {
           const result = await testClient.checkConnection();
           // v0.4.4 (H3): trace checkConnection result.
-          deps.log.debug(`checkConnection: result=${result.success ? "ok" : "fail"} (${result.message})`);
+          deps.log.debug(`checkConnection: result=${result.success ? "ok" : `fail (${result.reason})`}`);
           // H1: the admin ConfigSendto component reads ONLY response.error/result —
-          // never success/message. Map the internal {success,message} to that
-          // contract so a FAILED test shows the real error instead of a
-          // false-positive "Ok" (fleet fix, see reference_jsonconfig_sendto_connection_test).
+          // never success/message. Map the outcome to that contract so a FAILED test
+          // shows the real error instead of a false-positive "Ok" (fleet fix, see
+          // reference_jsonconfig_sendto_connection_test).
           deps.sendTo(
             obj.from,
             obj.command,
-            result.success ? { result: result.message } : { error: result.message },
+            result.success ? { result: tText("msgConnected") } : { error: tText("msgConnectionFailed", result.reason) },
             obj.callback,
           );
         } finally {
@@ -155,7 +154,7 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         // timed out (~5 s). Now: an explicit error response.
         // See `reference_onmessage_default_branch.md` for the pattern.
         deps.log.debug(`onMessage: unknown command '${obj.command}'`);
-        deps.sendTo(obj.from, obj.command, { error: "Unknown command" }, obj.callback);
+        deps.sendTo(obj.from, obj.command, { error: tText("msgUnknownCommand") }, obj.callback);
     }
   } catch (err) {
     // v0.4.4 (H5): trace catch so the debug log shows what failed.

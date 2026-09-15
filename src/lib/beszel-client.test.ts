@@ -18,6 +18,10 @@ interface MockServerConfig {
   statsHandler?: () => MockReply;
   containersHandler?: () => MockReply;
   detailsHandler?: () => MockReply;
+  /** The three extra collections (v0.17.0); omitted = the default one-row reply. */
+  zfsPoolsHandler?: () => MockReply;
+  smartDevicesHandler?: () => MockReply;
+  systemdServicesHandler?: () => MockReply;
 }
 
 function createMockServer(config: MockServerConfig = {}): {
@@ -65,6 +69,18 @@ function createMockServer(config: MockServerConfig = {}): {
       } else if (path.includes("/api/collections/system_details/records")) {
         const handler = config.detailsHandler || defaultSystemDetailsHandler;
         const result = handler();
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
+        res.end(result.body);
+      } else if (path.includes("/api/collections/zfs_pools/records")) {
+        const result = (config.zfsPoolsHandler ?? defaultZfsPoolsHandler)();
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
+        res.end(result.body);
+      } else if (path.includes("/api/collections/smart_devices/records")) {
+        const result = (config.smartDevicesHandler ?? defaultSmartDevicesHandler)();
+        res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
+        res.end(result.body);
+      } else if (path.includes("/api/collections/systemd_services/records")) {
+        const result = (config.systemdServicesHandler ?? defaultSystemdServicesHandler)();
         res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else {
@@ -232,6 +248,62 @@ function defaultSystemDetailsHandler(): MockReply {
   };
 }
 
+/**
+ * One-page list envelope for the extra collections.
+ *
+ * @param items Rows the page carries
+ */
+function listOf(items: unknown[]): MockReply {
+  return {
+    status: 200,
+    body: JSON.stringify({ page: 1, perPage: 200, totalItems: items.length, totalPages: 1, items }),
+  };
+}
+
+function defaultZfsPoolsHandler(): MockReply {
+  return listOf([
+    {
+      id: "z001",
+      system: "sys001",
+      name: "tank",
+      scrub: { state: "FINISHED", progress: "repaired 0B", errors: 0 },
+      vdevs: [{ name: "mirror-0", state: "ONLINE", readErrs: 0, writeErrs: 0, checksumErrs: 1 }],
+      datasets: [{ name: "tank/media", used: 1073741824, avail: 2147483648, mount: "/tank/media" }],
+    },
+  ]);
+}
+
+function defaultSmartDevicesHandler(): MockReply {
+  return listOf([
+    {
+      id: "s001",
+      system: "sys001",
+      name: "/dev/sda",
+      state: "PASSED",
+      model: "WD40EFRX",
+      temp: 34,
+      hours: 100,
+      cycles: 7,
+    },
+  ]);
+}
+
+function defaultSystemdServicesHandler(): MockReply {
+  return listOf([
+    {
+      id: "u001",
+      system: "sys001",
+      name: "ssh.service",
+      state: 0,
+      sub: 1,
+      cpu: 1.5,
+      cpuPeak: 2,
+      memory: 1048576,
+      memPeak: 2097152,
+    },
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -304,10 +376,7 @@ describe("BeszelClient", () => {
       try {
         const client = new BeszelClient(`http://[::1]:${port}`, "admin", "secret");
         const result = await client.checkConnection();
-        expect(result, "the IPv6 literal must be usable as a Hub address").to.deep.equal({
-          success: true,
-          message: "Connected successfully",
-        });
+        expect(result, "the IPv6 literal must be usable as a Hub address").to.deep.equal({ success: true });
       } finally {
         await new Promise<void>(resolve => server.close(() => resolve()));
       }
@@ -420,8 +489,7 @@ describe("BeszelClient", () => {
 
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
       const result = await client.checkConnection();
-      expect(result.success).to.be.true;
-      expect(result.message).to.equal("Connected successfully");
+      expect(result).to.deep.equal({ success: true });
     });
 
     it("should return failure on invalid credentials", async () => {
@@ -431,7 +499,7 @@ describe("BeszelClient", () => {
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "wrong", "wrong");
       const result = await client.checkConnection();
       expect(result.success).to.be.false;
-      expect(result.message).to.include("401");
+      expect(result.success === false && result.reason).to.include("401");
     });
 
     it("should return failure on connection error", async () => {
@@ -439,7 +507,7 @@ describe("BeszelClient", () => {
       const client = new BeszelClient("http://127.0.0.1:1", "admin", "secret");
       const result = await client.checkConnection();
       expect(result.success).to.be.false;
-      expect(result.message.length).to.be.greaterThan(0);
+      expect(result.success === false && result.reason.length).to.be.greaterThan(0);
     });
 
     it("should invalidate token before testing", async () => {
@@ -542,8 +610,8 @@ describe("BeszelClient", () => {
       expect(stats.size).to.equal(0);
     });
 
-    it("v0.7.2: stops paging once a page brings no new system (8h of 1m history is NOT walked)", async () => {
-      // The Hub keeps ~480 1m records per system. Simulate 10 pages of
+    it("v0.7.2: stops paging once a page brings no new system (the hour of 1m history is NOT walked)", async () => {
+      // The Hub keeps 60 1m records per system. Simulate 10 pages of
       // history where page 1 already contains the newest record of both
       // systems — the client must stop after page 2 (the first all-known
       // page), not walk all 10.
@@ -652,6 +720,110 @@ describe("BeszelClient", () => {
       expect(containers[0].cpu).to.equal(5.0);
       expect(containers[0].memory).to.equal(128);
       expect(containers[0].image).to.equal("nginx:latest");
+    });
+  });
+
+  describe("the three extra collections (v0.17.0 / v0.18.0)", () => {
+    it("getZfsPoolDetails authenticates first, reads the collection and coerces the rows", async () => {
+      mock = createMockServer();
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+
+      const pools = await client.getZfsPoolDetails();
+
+      expect(pools).to.have.lengthOf(1);
+      expect(pools[0]).to.include({
+        id: "z001",
+        system: "sys001",
+        name: "tank",
+        scrubState: "FINISHED",
+        scrubErrors: 0,
+      });
+      expect(pools[0].vdevs[0]).to.deep.include({ name: "mirror-0", checksumErrors: 1 });
+      expect(pools[0].datasets[0].mountpoint).to.equal("/tank/media");
+      const auth = mock.requestLog.find(r => r.path.includes("auth-with-password"));
+      const read = mock.requestLog.find(r => r.path.includes("/api/collections/zfs_pools/records"));
+      expect(auth, "authenticated before the read").to.not.be.undefined;
+      expect(read?.headers.authorization, "the read carries the token").to.equal("test-token-abc123");
+      expect(read?.path).to.include("sort=system%2Cname");
+    });
+
+    it("getSmartDevices authenticates first, reads the collection and coerces the rows", async () => {
+      mock = createMockServer();
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+
+      const devices = await client.getSmartDevices();
+
+      expect(devices).to.have.lengthOf(1);
+      expect(devices[0]).to.include({
+        name: "/dev/sda",
+        state: "PASSED",
+        model: "WD40EFRX",
+        temperature: 34,
+        hours: 100,
+        cycles: 7,
+      });
+      const read = mock.requestLog.find(r => r.path.includes("/api/collections/smart_devices/records"));
+      expect(read?.headers.authorization).to.equal("test-token-abc123");
+    });
+
+    it("getSystemdServices authenticates first, reads the collection and coerces the rows", async () => {
+      mock = createMockServer();
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+
+      const units = await client.getSystemdServices();
+
+      expect(units).to.deep.equal([
+        {
+          id: "u001",
+          system: "sys001",
+          name: "ssh.service",
+          state: 0,
+          sub: 1,
+          cpu: 1.5,
+          cpuPeak: 2,
+          memory: 1048576,
+          memPeak: 2097152,
+        },
+      ]);
+      const read = mock.requestLog.find(r => r.path.includes("/api/collections/systemd_services/records"));
+      expect(read?.headers.authorization).to.equal("test-token-abc123");
+    });
+
+    it("a Hub without the collection (404) rejects with NOT_FOUND so the caller can stop asking", async () => {
+      mock = createMockServer({
+        systemdServicesHandler: () => ({
+          status: 404,
+          body: JSON.stringify({ code: 404, message: "Missing collection" }),
+        }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+
+      let code: string | undefined;
+      try {
+        await client.getSystemdServices();
+      } catch (err) {
+        code = (err as NodeJS.ErrnoException).code;
+      }
+      expect(code).to.equal("NOT_FOUND");
+    });
+
+    it("a 5xx keeps the generic HTTP_ERROR code — not something a caller writes off", async () => {
+      mock = createMockServer({
+        smartDevicesHandler: () => ({ status: 502, body: "bad gateway" }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      let code: string | undefined;
+      try {
+        await client.getSmartDevices();
+      } catch (err) {
+        code = (err as NodeJS.ErrnoException).code;
+      }
+      expect(code).to.equal("HTTP_ERROR");
     });
   });
 
@@ -1683,7 +1855,7 @@ describe("BeszelClient", () => {
         try {
           await client.checkConnection().then(r => {
             if (!r.success) {
-              throw new Error(r.message);
+              throw new Error(r.reason);
             }
           });
         } catch {

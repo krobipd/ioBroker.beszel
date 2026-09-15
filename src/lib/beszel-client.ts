@@ -171,18 +171,16 @@ export class BeszelClient {
 
   /**
    * Test the connection to Beszel.
-   * Returns { success: true } or { success: false, message: reason }.
+   * Returns { success: true } or { success: false, reason } — the reason is the raw
+   * error text; the caller turns the outcome into the user's language.
    */
-  public async checkConnection(): Promise<{
-    success: boolean;
-    message: string;
-  }> {
+  public async checkConnection(): Promise<{ success: true } | { success: false; reason: string }> {
     try {
       this.invalidateToken();
       await this.authenticate();
-      return { success: true, message: "Connected successfully" };
+      return { success: true };
     } catch (err) {
-      return { success: false, message: errText(err) };
+      return { success: false, reason: errText(err) };
     }
   }
 
@@ -202,14 +200,15 @@ export class BeszelClient {
    *
    * v0.4.3 (B2): paginated so big setups (200+ systems) aren't truncated.
    *
-   * v0.7.2: early-exit — the Hub keeps ~8 h of 1m records (480 per system),
-   * but only the newest record per system is consumed, and `sort=-updated`
-   * puts those on the earliest pages. Walking the full history burned one
-   * round-trip per 200 stale records on every poll. We stop as soon as a
-   * page contributes no new system to the map. Trade-off: a system whose
-   * last 1m record is hours old (agent down) no longer gets those stale
-   * stats applied — it is offline via `status` anyway and its states simply
-   * keep their last values.
+   * v0.7.2: early-exit — the Hub keeps one hour of 1m records (60 per system,
+   * `internal/records/records_deletion.go` of Beszel 0.19.0), but only the newest
+   * record per system is consumed, and `sort=-updated` puts those on the earliest
+   * pages. Walking the full history burned one round-trip per 200 stale records on
+   * every poll. We stop as soon as a page contributes no new system to the map.
+   * Trade-off: a system whose last 1m record is older than the walk (agent down) no
+   * longer gets those stale stats applied — it is offline via `status` anyway and
+   * its states simply keep their last values. With more than ~200 systems a page
+   * full of repeats could end the walk before a rarely-sampled system was seen.
    */
   public async getLatestStats(): Promise<Map<string, SystemStats>> {
     await this.ensureToken();
@@ -263,6 +262,7 @@ export class BeszelClient {
    * Read access is the same `systemScopedReadRule` as `system_stats`.
    */
   public async getZfsPoolDetails(): Promise<ZfsPoolDetail[]> {
+    await this.ensureToken();
     this.log?.debug("HTTP getZfsPoolDetails");
     return this.fetchAllPages("/api/collections/zfs_pools/records?sort=system%2Cname", coerceZfsPoolDetail);
   }
@@ -273,6 +273,7 @@ export class BeszelClient {
    * details, so it shares their cadence.
    */
   public async getSmartDevices(): Promise<SmartDevice[]> {
+    await this.ensureToken();
     this.log?.debug("HTTP getSmartDevices");
     return this.fetchAllPages("/api/collections/smart_devices/records?sort=system%2Cname", coerceSmartDevice);
   }
@@ -286,6 +287,7 @@ export class BeszelClient {
    * — paging the list is the only permitted access, a single-record read is refused.
    */
   public async getSystemdServices(): Promise<SystemdService[]> {
+    await this.ensureToken();
     this.log?.debug("HTTP getSystemdServices");
     return this.fetchAllPages("/api/collections/systemd_services/records?sort=system%2Cname", coerceSystemdService);
   }
@@ -549,6 +551,10 @@ export class BeszelClient {
               }
             } else if (res.statusCode === 403) {
               err.code = "FORBIDDEN" satisfies BeszelErrorCode;
+            } else if (res.statusCode === 404) {
+              // A collection this Hub does not have (older release) — the caller may stop
+              // asking for it, which a 5xx must never trigger.
+              err.code = "NOT_FOUND" satisfies BeszelErrorCode;
             } else {
               err.code = "HTTP_ERROR" satisfies BeszelErrorCode;
             }

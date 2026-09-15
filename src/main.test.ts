@@ -53,7 +53,7 @@ interface FakeClient {
 }
 
 interface FakeStateMgr {
-  migrateLegacyStates: ReturnType<typeof vi.fn>;
+  removeRetiredStates: ReturnType<typeof vi.fn>;
   getExistingSystemNames: ReturnType<typeof vi.fn>;
   cleanupMetrics: ReturnType<typeof vi.fn>;
   prepareForPoll: ReturnType<typeof vi.fn>;
@@ -88,8 +88,11 @@ function internalOf(adapter: BeszelAdapter): {
   lastErrorCode: string;
   authFailCount: number;
   failedSystems: Set<string>;
-  systemDetails: Map<string, SystemDetails>;
+  systemDetails: Map<string, SystemDetails> | null;
   detailsAttempted: Set<string>;
+  lastStatus: Map<string, string>;
+  lastDetailFetch: number;
+  extrasUnsupported: Set<string>;
   testClients: Set<{ cancelAll: () => void }>;
   pollTimer: unknown;
   config: Record<string, unknown>;
@@ -150,7 +153,7 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     cancelAll: vi.fn(),
   };
   const stateMgr: FakeStateMgr = {
-    migrateLegacyStates: vi.fn(async () => {}),
+    removeRetiredStates: vi.fn(async () => {}),
     getExistingSystemNames: vi.fn(() => []),
     cleanupMetrics: vi.fn(async () => {}),
     prepareForPoll: vi.fn(),
@@ -244,7 +247,7 @@ describe("BeszelAdapter onReady", () => {
     stateMgr.getExistingSystemNames.mockReturnValue(["server_a", "old_box"]);
     await i.onReady();
 
-    expect(stateMgr.migrateLegacyStates).toHaveBeenCalledTimes(1);
+    expect(stateMgr.removeRetiredStates).toHaveBeenCalledTimes(1);
     expect(stateMgr.cleanupMetrics).toHaveBeenCalledTimes(2);
     expect(client.getSystems).toHaveBeenCalledTimes(1); // first poll ran
     expect(i.setInterval).toHaveBeenCalledTimes(1);
@@ -273,14 +276,14 @@ describe("BeszelAdapter onReady", () => {
     expect(order).toEqual(["snapshot", "cleanup", "poll"]);
   });
 
-  it("F3: fetches existing system names once and hands them to migrateLegacyStates", async () => {
+  it("F3: fetches existing system names once and hands them to removeRetiredStates", async () => {
     const { adapter, stateMgr } = setup();
     const i = internalOf(adapter);
     stateMgr.getExistingSystemNames.mockReturnValue(["server_a", "old_box"]);
     await i.onReady();
     // The names are fetched once in onReady and threaded into the migration, so the
     // real StateManager needn't re-run the object view a second time on startup.
-    expect(stateMgr.migrateLegacyStates).toHaveBeenCalledWith(["server_a", "old_box"]);
+    expect(stateMgr.removeRetiredStates).toHaveBeenCalledWith(["server_a", "old_box"]);
   });
 
   it("reports disconnected at start (info.connection false before the first poll)", async () => {
@@ -297,9 +300,9 @@ describe("BeszelAdapter onReady", () => {
     // only a manual restart brought the instance back.
     const { adapter, stateMgr, client } = setup();
     const i = internalOf(adapter);
-    stateMgr.migrateLegacyStates.mockRejectedValue(new Error("db down"));
+    stateMgr.removeRetiredStates.mockRejectedValue(new Error("db down"));
     await i.onReady();
-    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("'legacy migration' failed"));
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("'retired states' failed"));
     expect(client.getSystems, "the first poll must still happen").toHaveBeenCalledTimes(1);
     expect(i.setInterval, "the poll timer must still be armed").toHaveBeenCalledTimes(1);
   });
@@ -538,6 +541,66 @@ describe("BeszelAdapter shutdown while a poll is in flight", () => {
 
     expect(stateMgr.updateSystem).not.toHaveBeenCalled();
     expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.connection", { val: true, ack: true });
+  });
+
+  it("drops a poll whose DETAIL requests are what the shutdown aborted (v0.18.0)", async () => {
+    // The three start requests are done; the shutdown lands while the extra collections
+    // are in flight. Those rejections are caught as non-fatal inside fetchExtras — so
+    // without the second check the fan-out would still run and write `info.online = true`
+    // over the offline states onUnload just wrote.
+    const { adapter, client, stateMgr } = await setupReady({
+      metrics_services: true,
+      metrics_servicesDetails: true,
+    });
+    const i = internalOf(adapter);
+    let rejectUnits!: (err: Error) => void;
+    client.getSystemdServices.mockImplementationOnce(
+      () =>
+        new Promise<never>((_resolve, reject) => {
+          rejectUnits = reject;
+        }),
+    );
+    const callsBefore = client.getSystemdServices.mock.calls.length;
+    const running = i.poll();
+    // Let the poll get PAST its first shutdown check (the three start requests are
+    // answered) and into the stalled unit request — only then does the shutdown land.
+    await vi.waitFor(() => expect(client.getSystemdServices.mock.calls.length).toBe(callsBefore + 1));
+    stateMgr.updateSystem.mockClear();
+    stateMgr.prepareForPoll.mockClear();
+    stateMgr.cleanupSystems.mockClear();
+    client.cancelAll.mockImplementation(() => rejectUnits(new Error("Request aborted")));
+
+    i.onUnload(vi.fn());
+    await running;
+
+    expect(stateMgr.prepareForPoll).not.toHaveBeenCalled();
+    expect(stateMgr.updateSystem).not.toHaveBeenCalled();
+    expect(stateMgr.cleanupSystems).not.toHaveBeenCalled();
+  });
+
+  it("onReady stops after a first poll that the shutdown interrupted — no timer, no 'started' line (v0.18.0)", async () => {
+    // js-controller refuses setInterval during shutdown (with a warning) and returns
+    // undefined; the adapter must not even try, nor announce a start that is over.
+    const { adapter, client } = setup();
+    const i = internalOf(adapter);
+    let resolveSystems!: (systems: BeszelSystem[]) => void;
+    client.getSystems.mockImplementationOnce(
+      () =>
+        new Promise<BeszelSystem[]>(resolve => {
+          resolveSystems = resolve;
+        }),
+    );
+    const starting = i.onReady();
+    await vi.waitFor(() => expect(client.getSystems).toHaveBeenCalled());
+    i.setInterval.mockClear();
+    i.log.info.mockClear();
+
+    i.onUnload(vi.fn());
+    resolveSystems([makeSystem()]);
+    await starting;
+
+    expect(i.setInterval).not.toHaveBeenCalled();
+    expect(i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("started"));
   });
 
   it("a container fetch aborted by the shutdown is not a warning either", async () => {
@@ -1011,29 +1074,77 @@ describe("BeszelAdapter poll — system_details cadence (F2)", () => {
     expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("willRetry=true"));
   });
 
-  it("never fetches details when System info is disabled", async () => {
-    const { adapter, client } = await setupReady({ metrics_agentVersion: false });
-    await internalOf(adapter).poll();
-    expect(client.getSystemDetails).not.toHaveBeenCalled();
+  it("reads the details even with System info disabled — the device icon needs the OS", async () => {
+    const { adapter, client, stateMgr } = setup({ metrics_agentVersion: false });
+    client.getSystemDetails.mockImplementation(() =>
+      Promise.resolve(new Map<string, SystemDetails>([["sys001", { os: 2, hostname: "win" }]])),
+    );
+    await internalOf(adapter).onReady();
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(1);
+    // …and hands them over: the registry decides (per toggle) whether `info.*` gets written.
+    const [system, , , , , , detailsAvailable] = stateMgr.updateSystem.mock.calls[0] as unknown[];
+    expect((system as BeszelSystem).details).to.deep.equal({ os: 2, hostname: "win" });
+    expect(detailsAvailable).to.equal(true);
+  });
+
+  it("marks the details UNKNOWN (not available) while no read has succeeded yet", async () => {
+    const { adapter, client, stateMgr } = setup({ metrics_agentVersion: true });
+    client.getSystemDetails.mockRejectedValue(errnoError("slow hub", "ETIMEDOUT"));
+    await internalOf(adapter).onReady();
+    const [, , , , , , detailsAvailable] = stateMgr.updateSystem.mock.calls[0] as unknown[];
+    expect(detailsAvailable).to.equal(false);
+  });
+
+  it("re-reads the details when a system comes back UP — the Hub refreshed them on reconnect", async () => {
+    const { adapter, client } = setup({ metrics_agentVersion: true });
+    const i = internalOf(adapter);
+    client.getSystems.mockImplementation(() => Promise.resolve([makeSystem({ status: "up" })]));
+    await i.onReady();
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(1);
+    await i.poll();
+    expect(client.getSystemDetails, "steady up: no re-read").toHaveBeenCalledTimes(1);
+    client.getSystems.mockImplementation(() => Promise.resolve([makeSystem({ status: "down" })]));
+    await i.poll();
+    expect(client.getSystemDetails, "going down alone re-reads nothing").toHaveBeenCalledTimes(1);
+    client.getSystems.mockImplementation(() => Promise.resolve([makeSystem({ status: "up" })]));
+    await i.poll();
+    expect(client.getSystemDetails, "back up: the Hub has fresh details").toHaveBeenCalledTimes(2);
+    await i.poll();
+    expect(client.getSystemDetails, "and then it is quiet again").toHaveBeenCalledTimes(2);
+  });
+
+  it("reads the details of a pending system once it connects for the first time", async () => {
+    const { adapter, client } = setup({ metrics_agentVersion: true });
+    const i = internalOf(adapter);
+    client.getSystems.mockImplementation(() => Promise.resolve([makeSystem({ status: "pending" })]));
+    await i.onReady();
+    await i.poll();
+    expect(client.getSystemDetails, "pending is attempted once, then left alone").toHaveBeenCalledTimes(1);
+    client.getSystems.mockImplementation(() => Promise.resolve([makeSystem({ status: "up" })]));
+    await i.poll();
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("BeszelAdapter poll — v0.7.2 bookkeeping pruning", () => {
-  it("drops failedSystems/detailsAttempted/systemDetails entries of removed systems", async () => {
+  it("drops failedSystems/detailsAttempted/lastStatus/systemDetails entries of removed systems", async () => {
     const { adapter, client } = await setupReady({ metrics_agentVersion: true });
     const i = internalOf(adapter);
     i.failedSystems.add("Old Box");
     i.detailsAttempted.add("sysOLD");
-    i.systemDetails.set("sysOLD", { hostname: "old" });
+    i.lastStatus.set("sysOLD", "up");
+    i.systemDetails!.set("sysOLD", { hostname: "old" });
 
     client.getSystems.mockResolvedValue([makeSystem()]);
     await i.poll();
 
     expect(i.failedSystems.has("Old Box")).toBe(false);
     expect(i.detailsAttempted.has("sysOLD")).toBe(false);
-    expect(i.systemDetails.has("sysOLD")).toBe(false);
+    expect(i.lastStatus.has("sysOLD")).toBe(false);
+    expect(i.systemDetails!.has("sysOLD")).toBe(false);
     // Current system's bookkeeping survives.
     expect(i.detailsAttempted.has("sys001")).toBe(true);
+    expect(i.lastStatus.get("sys001")).toBe("up");
   });
 
   it("keeps the bookkeeping when a transient empty list arrives (same guard as cleanup)", async () => {
@@ -1060,7 +1171,8 @@ describe("BeszelAdapter onMessage", () => {
     expect(i.sendTo).toHaveBeenCalledWith(
       "system.adapter.admin.0",
       "noSuchCommand",
-      { error: "Unknown command" },
+      // the adapter-core stand-in renders the catalog key of the translated text
+      { error: "msgUnknownCommand" },
       expect.anything(),
     );
   });
@@ -1414,13 +1526,120 @@ describe("BeszelAdapter — cadence of the detail collections (v0.17.0)", () => 
   });
 
   it("a failing detail fetch costs neither the other collections nor the poll", async () => {
-    const { adapter, client } = await setupReady({
+    const { adapter, client } = setup({
       metrics_zfs: true,
       metrics_zfsDetails: true,
       metrics_smart: true,
     });
-    client.getZfsPoolDetails.mockImplementationOnce(() => Promise.reject(new Error("404 collection missing")));
-    await internalOf(adapter).poll();
+    client.getZfsPoolDetails.mockImplementationOnce(() => Promise.reject(new Error("boom")));
+    await internalOf(adapter).onReady();
     expect(client.getSmartDevices.mock.calls.length, "the other one still ran").to.equal(1);
+  });
+
+  it("stops asking for a collection the Hub does not have (404) until the next restart (v0.18.0)", async () => {
+    // An older Hub without `systemd_services` used to cost one dead request per poll —
+    // for the life of the process.
+    const { adapter, client } = setup({ metrics_services: true, metrics_servicesDetails: true });
+    const i = internalOf(adapter);
+    client.getSystemdServices.mockImplementation(() => Promise.reject(errnoError("HTTP 404", "NOT_FOUND")));
+    await i.onReady();
+    await i.poll();
+    await i.poll();
+    expect(client.getSystemdServices).toHaveBeenCalledTimes(1);
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("systemd_services"));
+  });
+
+  it("treats 403 (no read rule for this user) as definitive too", async () => {
+    const { adapter, client } = setup({ metrics_smart: true });
+    const i = internalOf(adapter);
+    client.getSmartDevices.mockImplementation(() => Promise.reject(errnoError("HTTP 403", "FORBIDDEN")));
+    i.lastDetailFetch = 0;
+    await i.onReady();
+    i.lastDetailFetch = 0; // pretend the 15 minutes passed
+    await i.poll();
+    expect(client.getSmartDevices).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient failure of a slow collection after the usual 15 minutes, not every poll", async () => {
+    const { adapter, client } = setup({ metrics_smart: true });
+    const i = internalOf(adapter);
+    client.getSmartDevices.mockImplementation(() => Promise.reject(errnoError("slow hub", "ETIMEDOUT")));
+    await i.onReady();
+    await i.poll();
+    await i.poll();
+    expect(client.getSmartDevices, "not retried on the very next polls").toHaveBeenCalledTimes(1);
+    i.lastDetailFetch = 0; // the 15 minutes are over
+    await i.poll();
+    expect(client.getSmartDevices).toHaveBeenCalledTimes(2);
+    expect(i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("smart_devices"));
+  });
+
+  it("a 5xx from the Hub is transient as well — the collection is not written off", async () => {
+    const { adapter, client } = setup({ metrics_services: true, metrics_servicesDetails: true });
+    const i = internalOf(adapter);
+    client.getSystemdServices.mockImplementation(() => Promise.reject(errnoError("HTTP 502", "HTTP_ERROR")));
+    await i.onReady();
+    await i.poll();
+    expect(client.getSystemdServices).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("BeszelAdapter — what each system gets from the detail collections (v0.18.0)", () => {
+  /**
+   * The `extras` argument `updateSystem` received for a system id in the LAST poll.
+   *
+   * @param stateMgr The fake state manager whose `updateSystem` calls are inspected.
+   * @param id Hub id of the system.
+   */
+  const extrasFor = (stateMgr: FakeStateMgr, id: string): Record<string, unknown> | undefined => {
+    const calls = stateMgr.updateSystem.mock.calls as unknown[][];
+    const call = [...calls].reverse().find(c => (c[0] as BeszelSystem).id === id);
+    return call?.[5] as Record<string, unknown> | undefined;
+  };
+  const twoSystems = [makeSystem(), makeSystem({ id: "sys002", name: "Server B" })];
+
+  it("hands EVERY polled system an explicit list after a successful read — an empty one prunes", async () => {
+    // Only sys001 has a SMART device. The old seeding only marked systems that already
+    // had a record, so a system whose last device was pulled kept it forever.
+    // The slow collections are read on the FIRST poll (onReady) and then not for 15 min,
+    // so the fixtures go in before the start.
+    const { adapter, client, stateMgr } = setup({ metrics_smart: true });
+    client.getSystems.mockImplementation(() => Promise.resolve(twoSystems));
+    client.getSmartDevices.mockImplementation(() =>
+      Promise.resolve([{ id: "d1", system: "sys001", name: "sda", state: "PASSED" }]),
+    );
+    await internalOf(adapter).onReady();
+    expect(extrasFor(stateMgr, "sys001")?.smartDevices).to.have.lengthOf(1);
+    expect(extrasFor(stateMgr, "sys002")?.smartDevices, "no record → explicit empty list").to.deep.equal([]);
+  });
+
+  it("hands nobody a list for a collection whose read failed — not even a system with rows elsewhere", async () => {
+    const { adapter, client, stateMgr } = setup({
+      metrics_smart: true,
+      metrics_services: true,
+      metrics_servicesDetails: true,
+    });
+    client.getSystems.mockImplementation(() => Promise.resolve(twoSystems));
+    client.getSystemdServices.mockImplementation(() =>
+      Promise.resolve([{ id: "u1", system: "sys001", name: "sshd.service", state: "active", sub: "running" }]),
+    );
+    client.getSmartDevices.mockImplementation(() => Promise.reject(new Error("404 collection missing")));
+    await internalOf(adapter).onReady();
+    for (const id of ["sys001", "sys002"]) {
+      expect(extrasFor(stateMgr, id)?.smartDevices, `${id}: failed read must not look like "nothing there"`).to.be
+        .undefined;
+    }
+    expect(extrasFor(stateMgr, "sys001")?.systemdServices).to.have.lengthOf(1);
+    expect(extrasFor(stateMgr, "sys002")?.systemdServices).to.deep.equal([]);
+  });
+
+  it("leaves the slow collections out of the extras on the polls between their reads", async () => {
+    const { adapter, client, stateMgr } = setup({ metrics_zfs: true, metrics_zfsDetails: true });
+    client.getSystems.mockImplementation(() => Promise.resolve(twoSystems));
+    const i = internalOf(adapter);
+    await i.onReady();
+    expect(extrasFor(stateMgr, "sys002")?.zfsPools, "first poll reads").to.deep.equal([]);
+    await i.poll();
+    expect(extrasFor(stateMgr, "sys002")?.zfsPools, "second poll: not read → not handed over").to.be.undefined;
   });
 });

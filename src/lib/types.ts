@@ -63,25 +63,17 @@ export interface AdapterConfig {
   /** Enable battery states */
   metrics_battery: boolean;
 
-  // --- v0.6.0 additions (all default off — opt-in detail/peaks) ---
+  // --- v0.6.0 additions (all default off — opt-in details) ---
   // v0.16.0: required like every other toggle. They were optional only because they
   // arrived later; the manifest ships all of them with a default, `effectiveConfig`
   // writes to them, and one interface with two rules for the same kind of field was a
   // trap waiting for the next addition.
   /** Per-core CPU usage states */
   metrics_cpuCores: boolean;
-  /** Peak CPU usage state */
-  metrics_cpuPeak: boolean;
-  /** Peak memory state */
-  metrics_memoryPeak: boolean;
   /** Disk I/O detail (bytes + utilization + wait times) */
   metrics_diskIo: boolean;
-  /** Peak disk read/write speed states */
-  metrics_diskPeak: boolean;
   /** Per-network-interface states */
   metrics_networkInterfaces: boolean;
-  /** Peak network sent/received states */
-  metrics_networkPeak: boolean;
   /** GPU detail states (package power + per-engine usage) */
   metrics_gpuDetails: boolean;
   // --- v0.11.0 additions (Beszel 0.18.8) ---
@@ -264,14 +256,33 @@ export interface SystemStats {
   d?: number;
   /** Disk % */
   dp?: number;
-  /** Disk read MB/s */
+  /**
+   * Disk read MB/s — deprecated on the wire since Beszel 0.18.3 (`dio` is the canonical
+   * field). Still sent by 0.19.0 agents while the disk is busy; the Hub zeroes it for
+   * older agents after back-filling `dio`. Read only as a fallback when `dio` is absent.
+   */
   dr?: number;
-  /** Disk write MB/s */
+  /** Disk write MB/s — see `dr`. */
   dw?: number;
-  /** Network sent MB/s */
+  /**
+   * Network sent MB/s — deprecated on the wire since Beszel 0.18.3 (`b` is the canonical
+   * field). A Hub >= 0.19.0 never delivers it: the agent no longer fills it and the Hub's
+   * `migrateDeprecatedFields` zeroes it after back-filling `b`. Read only as a fallback
+   * for older Hubs without that migration.
+   */
   ns?: number;
-  /** Network recv MB/s */
+  /** Network recv MB/s — see `ns`. */
   nr?: number;
+  /**
+   * Bandwidth [sent bytes/s, recv bytes/s] — the canonical network rate since Beszel 0.18.3
+   * (`omitzero`: absent while the network is idle, i.e. both are zero).
+   */
+  b?: [number, number];
+  /**
+   * Disk I/O [read bytes/s, write bytes/s] — the canonical disk rate since Beszel 0.18.3
+   * (`omitzero`: absent while the disk is idle).
+   */
+  dio?: [number, number];
   /** Temperatures map sensor->°C */
   t?: Record<string, number>;
   /** Load avg [1m, 5m, 15m] */
@@ -285,18 +296,6 @@ export interface SystemStats {
   /** CPU breakdown [user, sys, iowait, steal, idle] % */
   cpub?: number[];
   // --- v0.18.7 additions (all optional → absent on older Beszel versions) ---
-  /** Peak CPU usage % in the interval */
-  cpum?: number;
-  /** Peak RAM used GB */
-  mm?: number;
-  /** Peak disk read MB/s */
-  drm?: number;
-  /** Peak disk write MB/s */
-  dwm?: number;
-  /** Peak network sent MB/s */
-  nsm?: number;
-  /** Peak network received MB/s */
-  nrm?: number;
   /**
    * Per-interface bandwidth: name -> [up bytes/s, down bytes/s, total up bytes,
    * total down bytes]. up/down are rates; total_up/total_down are cumulative
@@ -327,11 +326,11 @@ export interface SystemStats {
   diot?: [number, number];
 }
 
-// Note: `b`/`bm` (Bandwidth) and `dio`/`diom` (DiskIO) are deliberately NOT in
-// this interface. Verified against beszel v0.18.7 agent/network.go:231 +
-// agent/disk.go:638-641: they are byte/s *rates*, identical to `ns`/`nr` and
-// `dr`/`dw` in different units — redundant, so not surfaced. `diosm` (peak
-// dios) has no consumer either.
+// Note: the peak fields (`cpum`, `mm`, `drm`, `dwm`, `nsm`, `nrm`, `bm`, `diom`, `diosm`)
+// are deliberately NOT in this interface. They are `cbor:"-"` in Beszel's Stats struct —
+// the agent never transmits them; the Hub computes them only while aggregating 1m records
+// into the 10m/20m/120m/480m resolutions (`internal/records/records.go`). The adapter reads
+// the 1m records, where they never exist (verified against Beszel 0.19.0).
 
 /**
  * A system_stats record from /api/collections/system_stats/records
@@ -405,7 +404,7 @@ export interface AuthResponse {
  * uses ETIMEDOUT so classification no longer depends on a message substring (N6).
  */
 export type BeszelErrorCode =
-  "UNAUTHORIZED" | "FORBIDDEN" | "RATE_LIMITED" | "HTTP_ERROR" | "INVALID_AUTH_RESPONSE" | "ETIMEDOUT";
+  "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMITED" | "HTTP_ERROR" | "INVALID_AUTH_RESPONSE" | "ETIMEDOUT";
 
 /**
  * One row of the Hub's `zfs_pools` collection — the DETAIL record the agent refreshes

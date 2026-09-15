@@ -47,6 +47,15 @@ export interface MetricDef {
   role?: string;
   /** Gate state creation on data shape; default is always-available. */
   available?: (stats: SystemStats | undefined, system: BeszelSystem) => boolean;
+  /**
+   * The metric describes hardware the system may simply not have (sensors, a battery,
+   * swap, a ZFS ARC). When a record is there but `available` says no, the datapoint is
+   * not "unknown" — it is meaningless for this machine, so an existing state is
+   * REMOVED (after two consecutive polls, so a single odd sample cannot churn the tree)
+   * instead of being reset to null. Without the flag, an existing state is reset to null
+   * (the H2b rule for fields that are only transiently absent from a record).
+   */
+  goneWhenAbsent?: true;
   /** Pull the state value from a system and its stats. */
   extract: (system: BeszelSystem, stats: SystemStats | undefined) => ioBroker.StateValue;
 }
@@ -274,17 +283,6 @@ export const CHANNEL_NAME_KEY = {
 export type ChannelKey = keyof typeof CHANNEL_NAME_KEY;
 
 /**
- * Narrow an arbitrary path segment to a channel the adapter names. Needed where the
- * segment comes from the object tree rather than from a literal — a Hub-named channel
- * (`gpu.<id>`, `containers.<name>`) is not in the catalog and keeps its own name.
- *
- * @param segment Last path segment of a channel id.
- */
-export function isChannelKey(segment: string): segment is ChannelKey {
-  return Object.prototype.hasOwnProperty.call(CHANNEL_NAME_KEY, segment);
-}
-
-/**
  * v0.7.2: dynamic-group toggles that write into a scalar channel without
  * appearing in `metricDefs` (their states fan out per item in
  * `updateDynamicStats`). Merged into the derived per-channel toggle sets
@@ -341,16 +339,12 @@ export const METRIC_DEPENDENCIES = {
   metrics_loadAvg: "metrics_cpu",
   metrics_cpuBreakdown: "metrics_cpu",
   metrics_cpuCores: "metrics_cpu",
-  metrics_cpuPeak: "metrics_cpu",
   metrics_memoryDetails: "metrics_memory",
   metrics_swap: "metrics_memory",
-  metrics_memoryPeak: "metrics_memory",
   metrics_diskSpeed: "metrics_disk",
   metrics_extraFs: "metrics_disk",
   metrics_diskIo: "metrics_disk",
-  metrics_diskPeak: "metrics_disk",
   metrics_networkInterfaces: "metrics_network",
-  metrics_networkPeak: "metrics_network",
   metrics_temperatureDetails: "metrics_temperature",
   metrics_gpuDetails: "metrics_gpu",
   // v0.17.0: the ZFS detail collection extends the ZFS group, the systemd unit
@@ -400,7 +394,8 @@ export function numCommon(
     ...(desc ? { desc } : {}),
     type: "number",
     role,
-    unit,
+    // A count has no unit — the field is left out rather than set to "".
+    ...(unit ? { unit } : {}),
     read: true,
     write: false,
   };
@@ -532,8 +527,8 @@ export function clampPercent(v: number | null): number | null {
  * The parameter is the CHANNEL KEY TYPE, not a bare string: an unmapped segment used to
  * hand `undefined` to adapter-core, which answers `{ en: undefined }` without a word in
  * the log — and the fleet's i18n gate cannot see it because the key is computed, not
- * literal. Now that is a compile error. Callers holding a runtime segment narrow it with
- * {@link isChannelKey} first.
+ * literal. Now that is a compile error. The refresh walk, which starts from runtime ids,
+ * resolves them through {@link DYNAMIC_CHANNEL_PATTERNS} instead.
  *
  * @param ch Channel key (e.g. "cpu", "cores", "containers").
  */
@@ -693,11 +688,11 @@ export const LEAF_COMMONS = {
     states: scrubStates(),
   }),
   scrubProgress: () => textCommon(tName("scrubProgress"), "text", tDesc("descScrubProgress")),
-  scrubErrors: () => numCommon(tName("scrubErrors"), "", "value", tDesc("descScrubErrors")),
+  scrubErrors: () => numCommon(tName("scrubErrors"), undefined, "value", tDesc("descScrubErrors")),
   vdevState: () => ({ ...textCommon(tName("vdevState"), "info.status"), states: zfsHealthStates() }),
-  vdevRead: () => numCommon(tName("vdevRead"), "", "value", tDesc("descVdevErrors")),
-  vdevWrite: () => numCommon(tName("vdevWrite"), "", "value", tDesc("descVdevErrors")),
-  vdevChecksum: () => numCommon(tName("vdevChecksum"), "", "value", tDesc("descVdevErrors")),
+  vdevRead: () => numCommon(tName("vdevRead"), undefined, "value", tDesc("descVdevErrors")),
+  vdevWrite: () => numCommon(tName("vdevWrite"), undefined, "value", tDesc("descVdevErrors")),
+  vdevChecksum: () => numCommon(tName("vdevChecksum"), undefined, "value", tDesc("descVdevErrors")),
   datasetUsed: () => numCommon(tName("datasetUsed"), "GB"),
   datasetAvail: () => numCommon(tName("datasetAvail"), "GB"),
   datasetMount: () => textCommon(tName("datasetMount"), "text"),
@@ -713,7 +708,7 @@ export const LEAF_COMMONS = {
   smartTemp: () => numCommon(tName("smartTemp"), "°C", "value.temperature"),
   smartCapacity: () => numCommon(tName("smartCapacity"), "GB"),
   smartHours: () => numCommon(tName("smartHours"), "h", "value", tDesc("descSmartHours")),
-  smartCycles: () => numCommon(tName("smartCycles"), "", "value", tDesc("descSmartCycles")),
+  smartCycles: () => numCommon(tName("smartCycles"), undefined, "value", tDesc("descSmartCycles")),
   // v0.17.0 — systemd units (`systemd_services`)
   serviceState: () => ({ ...textCommon(tName("serviceState"), "info.status"), states: serviceStates() }),
   serviceSub: () => ({
@@ -728,6 +723,31 @@ export const LEAF_COMMONS = {
 
 /** Id of a leaf in {@link LEAF_COMMONS} — a typo is a compile error at both call sites. */
 export type DynamicLeafId = keyof typeof LEAF_COMMONS;
+
+/**
+ * The group channels the ADAPTER names (translated) below a system, as patterns on the
+ * id relative to the system. Only the refresh walk needs this direction: it starts from
+ * the object tree of a system without a reading and has to tell an adapter-named group
+ * (`containers`, `zfs.<pool>.datasets`) from a Hub-named member whose name merely equals
+ * a catalog key (a container called `gpu`, a dataset called `containers`, a systemd unit
+ * called `network`) — the latter keeps the name the Hub gave it.
+ */
+export const DYNAMIC_CHANNEL_PATTERNS: { key: ChannelKey; match: RegExp }[] = [
+  { key: "cores", match: /^cpu\.cores$/ },
+  { key: "sensors", match: /^temperature\.sensors$/ },
+  { key: "batteries", match: /^battery\.batteries$/ },
+  { key: "fans", match: /^fans$/ },
+  { key: "interfaces", match: /^network\.interfaces$/ },
+  { key: "gpu", match: /^gpu$/ },
+  { key: "engines", match: /^gpu\.[^.]+\.engines$/ },
+  { key: "filesystems", match: /^filesystems$/ },
+  { key: "zfs", match: /^zfs$/ },
+  { key: "vdevs", match: /^zfs\.[^.]+\.vdevs$/ },
+  { key: "datasets", match: /^zfs\.[^.]+\.datasets$/ },
+  { key: "containers", match: /^containers$/ },
+  { key: "smart", match: /^smart$/ },
+  { key: "services", match: /^services$/ },
+];
 
 /**
  * Which id a state id below the system belongs to. Only the refresh walk needs this
@@ -815,6 +835,16 @@ export function buildMetricDefs(): MetricDef[] {
   // verbatim across their metric defs — hoist to one predicate each.
   const hasCpub = (s: SystemStats | undefined): boolean => !!s?.cpub && s.cpub.length >= 5;
   const hasDio = (s: SystemStats | undefined, n: number): boolean => !!s?.dios && s.dios.length >= n;
+  // Hardware the machine may not have: the field is omitted on the wire, so "absent" means
+  // "not there", not "unknown" — these gate the datapoint's existence (see goneWhenAbsent).
+  const hasSensors = (s: SystemStats | undefined): boolean => !!s?.t && Object.keys(s.t).length > 0;
+  const hasBattery = (s: SystemStats | undefined, system: BeszelSystem): boolean => (s?.bat ?? system.info.bat) != null;
+  const hasSwap = (s: SystemStats | undefined): boolean => s?.s != null;
+  // The `systems` record keeps `info` from the last contact, so these exist for a system
+  // that is down; a system that never connected (`pending`, `info: {}`) gets none of them
+  // until its first sample instead of a row of empty datapoints.
+  const hasUptime = (_st: SystemStats | undefined, s: BeszelSystem): boolean => s.info.u != null;
+  const hasLoad = (st: SystemStats | undefined, s: BeszelSystem): boolean => la(s, st) !== undefined;
   return [
     // info (no stats required)
     {
@@ -824,6 +854,7 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "uptime",
       kind: "num",
       unit: "s",
+      available: hasUptime,
       extract: s => s.info.u ?? null,
     },
     {
@@ -832,6 +863,7 @@ export function buildMetricDefs(): MetricDef[] {
       id: "info.uptime_text",
       nameKey: "uptimeFormatted",
       kind: "text",
+      available: hasUptime,
       extract: s => (s.info.u != null ? formatUptime(s.info.u) : null),
     },
     {
@@ -840,6 +872,7 @@ export function buildMetricDefs(): MetricDef[] {
       id: "info.agent_version",
       nameKey: "agentVersion",
       kind: "text",
+      available: (_st, s) => s.info.v != null,
       extract: s => s.info.v ?? null,
     },
     // F2: static hardware/OS info from the system_details collection (attached
@@ -949,7 +982,7 @@ export function buildMetricDefs(): MetricDef[] {
       available: (_st, s) => s.info.sv != null,
       extract: s => s.info.sv?.[1] ?? null,
     },
-    // load average — always created if toggled (stats.la or info.la fallback)
+    // load average — stats.la with the info.la fallback, so a system that is down keeps it
     {
       toggle: "metrics_loadAvg",
       channel: "cpu",
@@ -957,6 +990,7 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "load1m",
       descKey: "descLoadAvg",
       kind: "num",
+      available: hasLoad,
       extract: (s, st) => la(s, st)?.[0] ?? null,
     },
     {
@@ -966,6 +1000,7 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "load5m",
       descKey: "descLoadAvg",
       kind: "num",
+      available: hasLoad,
       extract: (s, st) => la(s, st)?.[1] ?? null,
     },
     {
@@ -975,6 +1010,7 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "load15m",
       descKey: "descLoadAvg",
       kind: "num",
+      available: hasLoad,
       extract: (s, st) => la(s, st)?.[2] ?? null,
     },
     // stats-gated scalar metrics
@@ -1071,7 +1107,9 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descMemoryBuffers",
       kind: "num",
       unit: "GB",
-      available: hasStats,
+      // `mb` is omitempty and a Linux notion — a Windows or macOS agent never sends it.
+      available: st => st?.mb != null,
+      goneWhenAbsent: true,
       extract: (_s, st) => st?.mb ?? null,
     },
     {
@@ -1082,7 +1120,9 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descMemoryZfsArc",
       kind: "num",
       unit: "GB",
-      available: hasStats,
+      // `mz` is `omitempty`: a machine without ZFS never sends it → no datapoint.
+      available: st => st?.mz != null,
+      goneWhenAbsent: true,
       extract: (_s, st) => st?.mz ?? null,
     },
     {
@@ -1092,8 +1132,12 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "swapUsed",
       kind: "num",
       unit: "GB",
-      available: hasStats,
-      extract: (_s, st) => st?.su ?? null,
+      // `s`/`su` are `omitempty` on the wire: no swap configured → both absent → no
+      // datapoint (like sensors and battery). Swap configured but unused → `s` present,
+      // `su` absent → 0, the true reading.
+      available: hasSwap,
+      goneWhenAbsent: true,
+      extract: (_s, st) => st?.su ?? 0,
     },
     {
       toggle: "metrics_swap",
@@ -1102,7 +1146,8 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "swapTotal",
       kind: "num",
       unit: "GB",
-      available: hasStats,
+      available: hasSwap,
+      goneWhenAbsent: true,
       extract: (_s, st) => st?.s ?? null,
     },
     {
@@ -1146,7 +1191,10 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "MB/s",
       available: hasStats,
-      extract: (_s, st) => st?.dr ?? null,
+      // `dio` [read, write] bytes/s is canonical since Beszel 0.18.3; `dr` is the
+      // deprecated MB/s scalar an older Hub still stores. Both are omitzero, so an
+      // idle disk sends neither — and idle is 0, not unknown.
+      extract: (_s, st) => (st?.dio ? bytesToMib(st.dio[0]) : (st?.dr ?? 0)),
     },
     {
       toggle: "metrics_diskSpeed",
@@ -1157,7 +1205,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "MB/s",
       available: hasStats,
-      extract: (_s, st) => st?.dw ?? null,
+      extract: (_s, st) => (st?.dio ? bytesToMib(st.dio[1]) : (st?.dw ?? 0)),
     },
     // Beszel 0.19.0: cumulative device read/write counters (bytes since boot) — a volume,
     // not a rate; shown in GB like the per-interface totals. Rides on the I/O toggle.
@@ -1204,7 +1252,10 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "MB/s",
       available: hasStats,
-      extract: (_s, st) => st?.ns ?? null,
+      // `b` [sent, recv] bytes/s is canonical since Beszel 0.18.3 and the ONLY field a
+      // Hub >= 0.19.0 delivers (its migration zeroes `ns`/`nr`); the scalar stays as the
+      // fallback for an older Hub. Both omitzero: an idle link sends neither → 0.
+      extract: (_s, st) => (st?.b ? bytesToMib(st.b[0]) : (st?.ns ?? 0)),
     },
     {
       toggle: "metrics_network",
@@ -1214,7 +1265,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "MB/s",
       available: hasStats,
-      extract: (_s, st) => st?.nr ?? null,
+      extract: (_s, st) => (st?.b ? bytesToMib(st.b[1]) : (st?.nr ?? 0)),
     },
     {
       toggle: "metrics_temperature",
@@ -1225,7 +1276,10 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "°C",
       role: "value.temperature",
-      available: hasStats,
+      // `t` is an omitempty map: a machine without sensors (VM, container host, most
+      // Windows boxes) never sends it → no datapoint instead of a permanent null.
+      available: hasSensors,
+      goneWhenAbsent: true,
       extract: (_s, st) => computeTopAvgTemp(st?.t),
     },
     {
@@ -1237,7 +1291,8 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "°C",
       role: "value.temperature",
-      available: hasStats,
+      available: hasSensors,
+      goneWhenAbsent: true,
       extract: (_s, st) => computeMaxTemp(st?.t),
     },
     {
@@ -1247,7 +1302,11 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "batteryPercent",
       kind: "percent",
       role: "value.battery",
-      available: hasStats,
+      // `bat` is an omitzero tuple: no battery → absent → no datapoint. Deliberate edge:
+      // a fully drained battery in charge state 0 serialises as [0, 0], which the wire
+      // cannot tell from "no battery" — it vanishes until a non-zero reading arrives.
+      available: hasBattery,
+      goneWhenAbsent: true,
       extract: (s, st) => (st?.bat ?? s.info.bat)?.[0] ?? null,
     },
     {
@@ -1257,7 +1316,8 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "batteryCharging",
       descKey: "descBatteryCharging",
       kind: "bool",
-      available: hasStats,
+      available: hasBattery,
+      goneWhenAbsent: true,
       extract: (s, st) => {
         const b = st?.bat ?? s.info.bat;
         if (!b) {
@@ -1270,73 +1330,8 @@ export function buildMetricDefs(): MetricDef[] {
         return b[1] === BATTERY_STATE_CHARGING;
       },
     },
-    // --- v0.6.0 peaks + detail (available-gated on the field being present,
-    // so an older Beszel that doesn't send it gets no empty state) ---
-    {
-      toggle: "metrics_cpuPeak",
-      channel: "cpu",
-      id: "cpu.peak",
-      nameKey: "cpuPeak",
-      descKey: "descPeak",
-      kind: "percent",
-      available: st => st?.cpum != null,
-      extract: (_s, st) => st?.cpum ?? null,
-    },
-    {
-      toggle: "metrics_memoryPeak",
-      channel: "memory",
-      id: "memory.peak",
-      nameKey: "memoryPeak",
-      descKey: "descPeak",
-      kind: "num",
-      unit: "GB",
-      available: st => st?.mm != null,
-      extract: (_s, st) => st?.mm ?? null,
-    },
-    {
-      toggle: "metrics_diskPeak",
-      channel: "disk",
-      id: "disk.read_peak",
-      nameKey: "diskReadPeak",
-      descKey: "descPeak",
-      kind: "num",
-      unit: "MB/s",
-      available: st => st?.drm != null,
-      extract: (_s, st) => st?.drm ?? null,
-    },
-    {
-      toggle: "metrics_diskPeak",
-      channel: "disk",
-      id: "disk.write_peak",
-      nameKey: "diskWritePeak",
-      descKey: "descPeak",
-      kind: "num",
-      unit: "MB/s",
-      available: st => st?.dwm != null,
-      extract: (_s, st) => st?.dwm ?? null,
-    },
-    {
-      toggle: "metrics_networkPeak",
-      channel: "network",
-      id: "network.sent_peak",
-      nameKey: "networkSentPeak",
-      descKey: "descPeak",
-      kind: "num",
-      unit: "MB/s",
-      available: st => st?.nsm != null,
-      extract: (_s, st) => st?.nsm ?? null,
-    },
-    {
-      toggle: "metrics_networkPeak",
-      channel: "network",
-      id: "network.recv_peak",
-      nameKey: "networkRecvPeak",
-      descKey: "descPeak",
-      kind: "num",
-      unit: "MB/s",
-      available: st => st?.nrm != null,
-      extract: (_s, st) => st?.nrm ?? null,
-    },
+    // --- v0.6.0 details (available-gated on the field being present, so an older
+    // Beszel that doesn't send it gets no empty state) ---
     {
       toggle: "metrics_diskIo",
       channel: "disk",

@@ -14,7 +14,8 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 
 - Fetches metrics from all systems registered in your Beszel Hub
 - Per-system states: CPU, memory, disk, network, temperature, load average
-- Optional detail: per-core CPU, peak values, disk I/O load, per-interface traffic, fan speeds, GPU details, hardware/OS info, Docker/Podman containers, battery (incl. per-battery level), extra filesystems, CPU breakdown, systemd services
+- Every system carries a pictogram of its operating system (Linux, macOS, Windows, FreeBSD) in the object tree, drawn to read in the light and the dark theme
+- Optional detail: per-core CPU, disk I/O load, per-interface traffic, fan speeds, GPU details, hardware/OS info, Docker/Podman containers, battery (incl. per-battery level), extra filesystems, CPU breakdown, systemd services
 - Each option has a help text explaining the states it creates; detail options stay greyed out until their category is enabled
 - Configurable poll interval (10–300 seconds)
 - Automatic re-authentication when the token expires (including mid-poll)
@@ -79,19 +80,15 @@ Detail options stay greyed out until their category's main metric is enabled, an
 |                 | Load Average (1m / 5m / 15m)                          | on      |
 |                 | CPU Breakdown (User / System / IOWait / Steal / Idle) | off     |
 |                 | Per-core usage                                        | off     |
-|                 | Peak values                                           | off     |
 | **Memory**      | Memory Usage (% and GB)                               | on      |
 |                 | Memory Details (Buffers, ZFS ARC)                     | off     |
 |                 | Swap                                                  | off     |
-|                 | Peak values                                           | off     |
 | **Disk**        | Disk Usage (% and GB)                                 | on      |
 |                 | Read/Write Speed                                      | on      |
 |                 | I/O load (utilization, wait times, totals since boot) | off     |
 |                 | Additional Filesystems                                | off     |
-|                 | Peak values                                           | off     |
 | **Network**     | Network Traffic (Upload / Download MB/s)              | on      |
 |                 | Per interface                                         | off     |
-|                 | Peak values                                           | off     |
 | **Temperature** | Temperature (hottest sensors avg + hottest single)    | on      |
 |                 | Individual Temperature Sensors                        | off     |
 | **Fans**        | Fan Speeds (rpm, Beszel 0.18.8+, Linux hosts)         | off     |
@@ -107,7 +104,7 @@ Detail options stay greyed out until their category's main metric is enabled, an
 
 ## State Tree
 
-States are organized into channels per metric group. Optional channels (marked \*) are only created when the corresponding metric is enabled.
+States are organized into channels per metric group. Optional channels (marked \*) are only created when the corresponding metric is enabled. Datapoints that describe hardware a host may not have (temperature sensors, a battery, swap, a ZFS cache) exist only on hosts that report it. While a system is down or paused, all of its datapoints keep their last values.
 
 ```
 beszel.0.
@@ -144,43 +141,37 @@ beszel.0.
         │   ├── iowait *             — CPU I/O wait (%)
         │   ├── steal *              — CPU steal (%)
         │   ├── idle *               — CPU idle (%)
-        │   ├── peak *               — Peak CPU usage in interval (%)
         │   └── cores/ *             — Per-core usage (core0, core1, …) (%)
         ├── memory/                   — Memory metrics
         │   ├── percent              — RAM usage (%)
         │   ├── used                 — RAM used (GB)
         │   ├── total                — RAM total (GB)
         │   ├── buffers *            — Buffers + cache (GB)
-        │   ├── zfs_arc *            — ZFS ARC (GB)
-        │   ├── swap_used *          — Swap used (GB)
-        │   ├── swap_total *         — Swap total (GB)
-        │   └── peak *               — Peak RAM used in interval (GB)
+        │   ├── zfs_arc *            — ZFS ARC (GB, only on hosts with ZFS)
+        │   ├── swap_used *          — Swap used (GB, only on hosts with swap)
+        │   └── swap_total *         — Swap total (GB, only on hosts with swap)
         ├── disk/                     — Disk metrics
         │   ├── percent              — Disk usage (%)
         │   ├── used                 — Disk used (GB)
         │   ├── total                — Disk total (GB)
         │   ├── name *               — Root disk name set on the agent (Beszel 0.19.0+)
-        │   ├── read                 — Disk read (MB/s)
-        │   ├── write                — Disk write (MB/s)
-        │   ├── read_peak *          — Peak read in interval (MB/s)
-        │   ├── write_peak *         — Peak write in interval (MB/s)
+        │   ├── read                 — Disk read (MB/s, 0 while idle)
+        │   ├── write                — Disk write (MB/s, 0 while idle)
         │   ├── io_util *            — I/O utilization (%)
         │   ├── io_await_read *      — Read wait time (ms)
         │   ├── io_await_write *     — Write wait time (ms)
         │   ├── total_read *         — Read since boot (GB, Beszel 0.19.0+)
         │   └── total_write *        — Written since boot (GB, Beszel 0.19.0+)
         ├── network/                  — Network metrics
-        │   ├── sent                 — Upload (MB/s)
-        │   ├── recv                 — Download (MB/s)
-        │   ├── sent_peak *          — Peak upload in interval (MB/s)
-        │   ├── recv_peak *          — Peak download in interval (MB/s)
+        │   ├── sent                 — Upload (MB/s, 0 while idle)
+        │   ├── recv                 — Download (MB/s, 0 while idle)
         │   └── interfaces/ *        — Per interface: up, down (MB/s) + total_up, total_down (cumulative GB)
-        ├── temperature/              — Temperature metrics
+        ├── temperature/              — Temperature metrics (only on hosts that report sensors)
         │   ├── average              — Avg of top 3 sensors (°C)
         │   ├── max                  — Hottest single sensor (°C)
         │   └── sensors/ *           — Individual sensor readings
         ├── fans/ *                   — Fan speeds (rpm), one state per fan
-        ├── battery/ *                — Battery metrics
+        ├── battery/ *                — Battery metrics (only on hosts with a battery)
         │   ├── percent              — Battery level (%)
         │   ├── charging             — Is charging? (bool)
         │   └── batteries/ *         — Level per battery (%), on multi-battery systems
@@ -274,6 +265,7 @@ beszel.0.
 
 - The system may be `down` or `paused` in Beszel — no stats records exist yet
 - Verify the metric is enabled in the adapter configuration
+- Temperature, battery, swap and ZFS ARC datapoints exist only on hosts whose agent reports that hardware
 
 ---
 
@@ -283,6 +275,26 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- New: every system carries a pictogram of its operating system (Linux, macOS, Windows, FreeBSD) in the object tree — the icons the Beszel web UI uses, drawn to read in the light and the dark theme
+- Fixed: network upload/download were always empty against a Beszel Hub 0.19.0 or newer — the adapter now reads the bandwidth field the Hub actually stores (older Hubs keep working)
+- Fixed: disk read/write, network upload/download and swap used show 0 while idle instead of an empty value
+- Fixed: containers and systemd units of a system that is down or paused were deleted after a few minutes — they now keep their last values like every other datapoint
+- Fixed: the last SMART device, ZFS pool detail or systemd unit of a system was never removed once it disappeared on the Hub
+- Fixed: hardware and OS details are refreshed when a system reconnects — a new kernel shows after the reboot, not after the next adapter restart — and a system that was pending gets them on its first contact
+- Fixed: a Hub that is slow at adapter start no longer blanks the hardware/OS datapoints of all systems for one poll
+- Fixed: renaming a system on the Hub in a way that keeps its object id (e.g. only the case) now reaches the object tree
+- Fixed: a system added later with the same name as an existing one no longer takes over the existing system's object tree; the newcomer gets the suffix
+- Fixed: a container, dataset or unit whose name equals a group name (e.g. `gpu`, `network`, `containers`) kept being renamed while its system was down
+- Fixed: the adapter no longer writes states after being stopped when the shutdown lands while the detail collections are being read, and no longer tries to arm its timer during shutdown
+- Fixed: after the Hub briefly reported an empty system list, the offline markers written on errors and on shutdown reached no system
+- Fixed: a Hub without the ZFS, SMART or systemd collections (older release) or without read rights for them is asked once, not on every poll
+- Changed: temperature, battery, swap and ZFS ARC datapoints exist only on hosts that report that hardware; existing empty ones are removed
+- Changed: the four "Peak values" options are gone — a Hub never delivers peak values in the minute records the adapter reads, so they never produced a datapoint
+- Changed: the messages of the connection test follow the system language, and the test runs with the configured request timeout
+- Changed: SMART and dataset text columns the Hub does not carry read as empty (null) instead of an empty string
 
 ### 0.17.1 (2026-09-07)
 

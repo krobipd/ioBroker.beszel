@@ -1,5 +1,6 @@
 import type * as utils from "@iobroker/adapter-core";
 import { errText, sanitizeDisplayName, sanitizeForLog } from "./coerce";
+import { deviceIcon } from "./device-icons";
 import { tDesc, tName } from "./i18n";
 import {
   buildMetricDefs,
@@ -13,11 +14,11 @@ import {
   boolCommon,
   clampPercent,
   channelName,
-  isChannelKey,
   leafCommon,
   bytesToMib,
   bytesToGib,
   usedPercent,
+  DYNAMIC_CHANNEL_PATTERNS,
   DYNAMIC_CHANNEL_TOGGLES,
   DYNAMIC_LEAF_PATTERNS,
   DYNAMIC_SUBCHANNEL_TOGGLES,
@@ -64,43 +65,23 @@ export interface SystemExtras {
 }
 
 /**
- * Flat state ids used before 0.3.0, when every metric lived directly under the
- * system device instead of a channel. Swept once from the startup snapshot.
+ * State ids (relative to the system device) that a release retired. Swept from the
+ * startup snapshot: an id that exists gets deleted, an id that does not costs nothing.
+ *
+ * 0.18.0: the six peak datapoints. No real Hub ever delivered a peak value — the
+ * `Max*` fields are `cbor:"-"` and exist only in the 10m+ aggregates the adapter never
+ * reads — so on a real install this sweep is a no-op. It exists because the v0.17.1
+ * inventory fixture fabricated the fields, the promotion suite seeds that inventory
+ * before the upgrade and demands that removed objects are gone. Removable after the
+ * 0.18.0 tag.
  */
-const LEGACY_FLAT_STATE_IDS = [
-  "online",
-  "status",
-  "uptime",
-  "uptime_text",
-  "agent_version",
-  "services_total",
-  "services_failed",
-  "cpu_usage",
-  "load_avg_1m",
-  "load_avg_5m",
-  "load_avg_15m",
-  "cpu_user",
-  "cpu_system",
-  "cpu_iowait",
-  "cpu_steal",
-  "cpu_idle",
-  "memory_percent",
-  "memory_used",
-  "memory_total",
-  "buffers",
-  "zfs_arc",
-  "swap_used",
-  "swap_total",
-  "disk_percent",
-  "disk_used",
-  "disk_total",
-  "disk_read",
-  "disk_write",
-  "network_sent",
-  "network_recv",
-  "temperature",
-  "battery_percent",
-  "battery_charging",
+const RETIRED_STATE_IDS = [
+  "cpu.peak",
+  "memory.peak",
+  "disk.read_peak",
+  "disk.write_peak",
+  "network.sent_peak",
+  "network.recv_peak",
 ] as const;
 
 /**
@@ -144,12 +125,34 @@ export class StateManager {
   private readonly lastGroupEmpty = new Map<string, boolean>();
 
   /**
-   * v0.7.2: last-written device-object signature per sysId (`id|host|name`).
+   * Per `goneWhenAbsent` state id → was its field absent on the previous poll while a
+   * record was there. The same two-poll debounce as {@link lastGroupEmpty}: the state
+   * is removed only when the hardware is missing on two consecutive samples.
+   */
+  private readonly absentLastPoll = new Map<string, boolean>();
+
+  /**
+   * v0.7.2: last-written device-object signature per sysId ({@link deviceSignature}).
    * `updateSystem` used to extendObject the device on EVERY poll — one write
    * + objectChange event per system per minute for data that practically
    * never changes. Now the write happens only when the signature differs.
+   *
+   * v0.18.0: primed from the startup snapshot with the signature of the STORED object,
+   * so a restart with unchanged data writes nothing, and a field that arrived with a
+   * release (the icon) is written exactly once per existing device — the stored object
+   * lacks it, so the signatures differ once and then agree.
    */
   private readonly deviceWritten = new Map<string, string>();
+
+  /** The `common.icon` each device object currently carries (snapshot, then every write). */
+  private readonly deviceIcons = new Map<string, string | undefined>();
+
+  /**
+   * Hub id that owns each bare `systems.<safeName>` device object (`native.id` from the
+   * snapshot / the last write). When two systems sanitize to the same name, the owner
+   * keeps it and the newcomer gets the hash suffix — regardless of how their ids sort.
+   */
+  private readonly deviceOwners = new Map<string, string>();
 
   /**
    * v0.11.0: datapoint-change bookkeeping behind the user-facing "created /
@@ -225,9 +228,49 @@ export class StateManager {
         this.knownChannelIds.add(id);
       } else if (row.value?.type === "device") {
         this.knownDeviceIds.add(id);
+        this.primeDevice(id, row.value);
       }
     }
     this.snapshotTaken = true;
+  }
+
+  /**
+   * Remember what a stored `systems.<safeName>` device object carries, so the first poll
+   * compares against it instead of writing every device once per restart.
+   *
+   * @param id Device id, namespace-relative.
+   * @param obj The stored object.
+   */
+  private primeDevice(id: string, obj: ioBroker.Object): void {
+    const segments = id.split(".");
+    if (segments.length !== 2 || segments[0] !== "systems") {
+      return;
+    }
+    const native = obj.native as Record<string, unknown> | undefined;
+    const hubId = typeof native?.id === "string" ? native.id : "";
+    const host = typeof native?.host === "string" ? native.host : "";
+    const name = typeof obj.common?.name === "string" ? obj.common.name : "";
+    const icon = typeof obj.common?.icon === "string" ? obj.common.icon : undefined;
+    this.deviceWritten.set(id, StateManager.deviceSignature(hubId, host, name, icon));
+    this.deviceIcons.set(id, icon);
+    if (hubId) {
+      this.deviceOwners.set(segments[1], hubId);
+    }
+  }
+
+  /**
+   * Everything the device object is built from. An input that is missing from the
+   * stored object must be an INPUT here (not derived inside the write), otherwise the
+   * primed signature would agree with itself and no existing device would ever be
+   * brought up to date.
+   *
+   * @param hubId Beszel system id.
+   * @param host Host as reported by the Hub.
+   * @param name Display name.
+   * @param icon `common.icon` value, or undefined while unknown.
+   */
+  private static deviceSignature(hubId: string, host: string, name: string, icon: string | undefined): string {
+    return `${hubId}\u0000${host}\u0000${name}\u0000${icon ?? ""}`;
   }
 
   /**
@@ -286,13 +329,13 @@ export class StateManager {
    * Ids of `set` that are `prefix` itself or live below it. Materialised into an array
    * so the caller may delete from the set while iterating.
    *
-   * @param set One of the bookkeeping sets (states / channels / devices).
+   * @param ids The keys of one of the bookkeeping sets or maps.
    * @param prefix Object id prefix, namespace-relative.
    */
-  private static idsUnder(set: ReadonlySet<string>, prefix: string): string[] {
+  private static idsUnder(ids: Iterable<string>, prefix: string): string[] {
     const dot = `${prefix}.`;
     const out: string[] = [];
-    for (const id of set) {
+    for (const id of ids) {
       if (id === prefix || id.startsWith(dot)) {
         out.push(id);
       }
@@ -383,7 +426,15 @@ export class StateManager {
    */
   public prepareForPoll(systems: BeszelSystem[]): void {
     this.resolvedSafeNames.clear();
-    const sorted = [...systems].sort((a, b) => a.id.localeCompare(b.id));
+    // The system that already owns a bare device object keeps it — a newcomer whose
+    // id merely sorts first must not take over an existing tree (and its history).
+    // Only then id order, so the outcome stays deterministic for two new systems.
+    const sorted = [...systems].sort((a, b) => {
+      const safeA = this.sanitize(a.name);
+      const ownsA = this.deviceOwners.get(safeA) === a.id ? 0 : 1;
+      const ownsB = this.deviceOwners.get(this.sanitize(b.name)) === b.id ? 0 : 1;
+      return ownsA - ownsB || a.id.localeCompare(b.id);
+    });
     const seen = new Set<string>();
     const collisions = new Map<string, BeszelSystem[]>();
     for (const sys of sorted) {
@@ -410,7 +461,7 @@ export class StateManager {
       this.warnedCollisions.add(safe);
       const names = dupes.map(s => `${sanitizeForLog(s.name)}(${s.id.slice(0, 8)})`).join(", ");
       this.adapter.log.warn(
-        `Multiple systems sanitize to '${safe}' (${names}) — adding hash suffix to disambiguate. Consider renaming on the Hub.`,
+        `Multiple systems sanitize to '${safe}' — ${names} get a hash suffix, the existing '${safe}' keeps its tree. Consider renaming on the Hub.`,
       );
     }
   }
@@ -426,15 +477,19 @@ export class StateManager {
   }
 
   /**
-   * State prefixes (`systems.<safeName>`) of the systems resolved for the current poll.
-   * Synchronous and in-memory on purpose: `onUnload` must not await an object view.
-   * Empty until the first poll got far enough to call {@link prepareForPoll}.
+   * State prefixes (`systems.<safeName>`) of every system that has an `info.online`
+   * state — the startup snapshot plus what the polls created since, minus what the
+   * cleanup removed. Synchronous and in-memory on purpose: `onUnload` must not await an
+   * object view. Derived from the state ids (not the per-poll name cache, which a
+   * transient empty Hub answer clears, and not the device ids, which may lack the
+   * state), so every id returned is one the offline write can reach.
    */
   public knownSystemIds(): string[] {
     const out: string[] = [];
-    for (const safe of this.resolvedSafeNames.values()) {
-      if (safe) {
-        out.push(`systems.${safe}`);
+    for (const id of this.knownStateIds) {
+      const m = /^(systems\.[^.]+)\.info\.online$/.exec(id);
+      if (m) {
+        out.push(m[1]);
       }
     }
     return out;
@@ -466,11 +521,11 @@ export class StateManager {
       if (id.endsWith(".info.online")) {
         await this.adapter.setStateChangedAsync(id, { val: false, ack: true });
       } else if (id.endsWith(".info.status")) {
-        await this.adapter.extendObject(id, {
-          type: "state",
-          common: { states: systemStatusStates() },
-          native: {},
-        });
+        // The full object, not just the enum: this IS the every-restart refresh of
+        // `info.status` (name, description, five-value list), so the first poll does not
+        // write the same object a second time. `ensureStateObject` skips what is in
+        // `createdIds`.
+        await this.ensureStateObject(id, StateManager.systemStatusCommon());
         await this.adapter.setStateChangedAsync(id, { val: SYSTEM_STATUS_UNKNOWN, ack: true });
       }
     }
@@ -483,6 +538,14 @@ export class StateManager {
     if (this.knownStateIds.has("info.systemsAllUp")) {
       await this.adapter.setStateChangedAsync("info.systemsAllUp", { val: false, ack: true });
     }
+  }
+
+  /** `common` of `<sys>.info.status` — one definition for the poll and the offline reset. */
+  private static systemStatusCommon(): ioBroker.StateCommon {
+    return {
+      ...textCommon(tName("status"), "info.status", tDesc("descStatus")),
+      states: systemStatusStates(),
+    };
   }
 
   /**
@@ -564,12 +627,14 @@ export class StateManager {
    * @param system The Beszel system record
    * @param stats Latest stats, or undefined
    * @param config Current adapter configuration
+   * @param detailsAvailable Whether `system_details` was read at least once this process
    */
   private async applyMetrics(
     sysId: string,
     system: BeszelSystem,
     stats: SystemStats | undefined,
     config: AdapterConfig,
+    detailsAvailable: boolean,
   ): Promise<void> {
     // Two separate questions per metric, and they must not be answered together:
     // does its OBJECT belong in the tree, and is there a VALUE to write right now.
@@ -582,6 +647,7 @@ export class StateManager {
         continue;
       }
       if (!d.available || d.available(stats, system)) {
+        this.absentLastPoll.delete(`${sysId}.${d.id}`);
         touched.push({ def: d, writeValue: true });
         continue;
       }
@@ -591,20 +657,39 @@ export class StateManager {
       if (!this.createdIds.has(id) && !this.knownStateIds.has(id)) {
         continue;
       }
-      // It exists, so its object gets refreshed either way. Only the VALUE differs,
-      // and the two reasons for "not available" need opposite handling:
+      // It exists, and the reasons for "not available" need different handling:
       //
       // No stats at all (system down / paused, or its newest record is older than the
       // stats walk) — keep the last reading. The dynamic groups freeze in exactly this
       // case too, and "every ioBroker adapter leaves the last values standing" is the
-      // line krobi confirmed.
+      // line krobi confirmed. The object still gets its refresh.
       //
-      // H2b: the record IS there but one field went absent (`dios`/`cpub` are
-      // omitzero/omitempty on the wire, so a fully idle disk drops them) — then the
-      // state must be reset to null instead of freezing the last busy value.
+      // The record IS there but the field is one the machine may simply not have
+      // (`goneWhenAbsent`: sensors, battery, swap, ZFS ARC) — the datapoint is
+      // meaningless here, so it is REMOVED, debounced over two polls like the dynamic
+      // groups. Gating creation alone would leave every install that already ran an
+      // older version with a permanent-null state.
+      //
+      // H2b: the record IS there but a transiently absent field went missing (`dios`/
+      // `cpub` are omitzero/omitempty on the wire, so a fully idle disk drops them) —
+      // then the state is reset to null instead of freezing the last busy value.
       // `knownStateIds` alongside `createdIds`, because the latter is empty in a fresh
       // process: without it the reset silently stopped working after every restart.
-      touched.push({ def: d, writeValue: !!stats });
+      //
+      // The hardware/OS datapoints come from a different collection than the stats:
+      // "no details" is unknown (fetch never succeeded → freeze) unless the collection
+      // was read and simply has no row / no value for this system (→ null).
+      if (stats && d.goneWhenAbsent) {
+        if (this.absentLastPoll.get(id)) {
+          this.absentLastPoll.delete(id);
+          await this.deleteStateIfKnown(id);
+          await this.deleteChannelIfEmpty(`${sysId}.${d.channel}`);
+        } else {
+          this.absentLastPoll.set(id, true);
+        }
+        continue;
+      }
+      touched.push({ def: d, writeValue: d.toggle === "metrics_agentVersion" ? detailsAvailable : !!stats });
     }
 
     const channels = new Set(touched.map(t => t.def.channel));
@@ -634,6 +719,10 @@ export class StateManager {
    *   (403 / timeout) means "unknown" — the container tree is left untouched (frozen), never
    *   pruned. Defaults to `true` so unit tests exercising other metrics need not pass it.
    * @param extras Records of the three detail collections belonging to this system; a field left out means "not read this round" and freezes those datapoints.
+   * @param detailsAvailable Whether the `system_details` collection was read successfully at
+   *   least once in this process. `false` means the details are UNKNOWN: existing `info.*`
+   *   states freeze and the device icon is left as it is. `true` with no `system.details`
+   *   means the Hub really has no row (pending system). Defaults to `false`.
    */
   public async updateSystem(
     system: BeszelSystem,
@@ -642,6 +731,7 @@ export class StateManager {
     rawConfig: AdapterConfig,
     containersAvailable = true,
     extras: SystemExtras = {},
+    detailsAvailable = false,
   ): Promise<void> {
     // Detail toggles inherit their category's base toggle (off category → off
     // detail). Applied once here so applyMetrics + updateDynamicStats + the
@@ -660,32 +750,38 @@ export class StateManager {
     // useful when collisions cause SM5 suffix-disambiguation.
     this.adapter.log.debug(`updateSystem state-tree: '${sanitizeForLog(system.name)}' → safeName='${safeName}'`);
 
-    // Create/update device object with online indicator. v0.7.2: only write
-    // when id/host/name actually changed — extendObject on every poll meant
-    // one object write + objectChange event per system per minute for data
-    // that practically never changes.
-    const deviceSig = `${system.id} ${system.host} ${system.name}`;
+    // Create/update the device object with its online indicator and OS pictogram.
+    // v0.7.2: only write when something actually changed — extendObject on every poll
+    // meant one object write + objectChange event per system per minute for data that
+    // practically never changes. The signature is primed from the stored object at
+    // start, so a restart with unchanged data writes nothing at all.
+    //
+    // The icon is an INPUT of the signature, taken from the details when those were
+    // read (no row → the generic server), and from the stored object while the details
+    // are unknown — a Hub that is slow at start must not swap a correct pictogram for
+    // the fallback.
+    //
+    // No `preserve` on the name (v0.18.0): the Hub is where a system gets its name, and
+    // a rename there that keeps the sanitized id ("nas" → "NAS") has to reach the tree.
+    // The Hub name is the adapter's own text like every other name it writes.
+    const name = sanitizeDisplayName(system.name);
+    const icon = detailsAvailable ? deviceIcon(system.details?.os) : this.deviceIcons.get(sysId);
+    const deviceSig = StateManager.deviceSignature(system.id, system.host, name, icon);
     if (this.deviceWritten.get(sysId) !== deviceSig) {
-      await this.adapter.extendObject(
-        sysId,
-        {
-          type: "device",
-          common: {
-            name: system.name,
-            statusStates: {
-              onlineId: `${this.adapter.namespace}.${sysId}.info.online`,
-            },
+      await this.adapter.extendObject(sysId, {
+        type: "device",
+        common: {
+          name,
+          ...(icon !== undefined ? { icon } : {}),
+          statusStates: {
+            onlineId: `${this.adapter.namespace}.${sysId}.info.online`,
           },
-          native: { id: system.id, host: system.host },
         },
-        // The only object that KEEPS `preserve`. Its name is the system name from
-        // the Hub, and renaming a system there produces a different sanitized id —
-        // i.e. a new device object anyway. So preserving here can only ever protect
-        // a rename the user typed in the admin, and never blocks anything the
-        // adapter itself ships (unlike the channels/states below, v0.14.0).
-        { preserve: { common: ["name"] } },
-      );
+        native: { ...API_NAMED, id: system.id, host: system.host },
+      });
       this.deviceWritten.set(sysId, deviceSig);
+      this.deviceIcons.set(sysId, icon);
+      this.deviceOwners.set(safeName, system.id);
       // v0.16.0: the device bookkeeping mirrors the tree, so a system the Hub just
       // added has to join it — `getExistingSystemNames` reads this set now.
       this.knownDeviceIds.add(sysId);
@@ -700,20 +796,13 @@ export class StateManager {
       boolCommon(tName("online"), "indicator.reachable", tDesc("descOnline")),
       system.status === "up",
     );
-    await this.createAndSetState(
-      `${sysId}.info.status`,
-      {
-        ...textCommon(tName("status"), "info.status", tDesc("descStatus")),
-        states: systemStatusStates(),
-      },
-      system.status,
-    );
+    await this.createAndSetState(`${sysId}.info.status`, StateManager.systemStatusCommon(), system.status);
 
     // All toggled scalar metrics (info + cpu + memory + disk + network +
     // temperature + battery) are driven by the registry (K1) — single source
     // of truth shared with cleanupMetrics. loadAvg's old with-/without-stats
     // split is unified inside the registry (stats.la ?? info.la fallback).
-    await this.applyMetrics(sysId, system, stats, config);
+    await this.applyMetrics(sysId, system, stats, config, detailsAvailable);
 
     // Dynamic per-item groups (per-sensor temps, per-GPU, per-filesystem)
     // need live stats and fan out to N children — kept in their own handler.
@@ -725,27 +814,34 @@ export class StateManager {
       await this.refreshDynamicObjects(sysId);
     }
 
-    // Containers. F1: only touch the container tree when the fetch actually
-    // succeeded this poll. A failed fetch (403 / timeout) arrives as
-    // containersAvailable=false — skip entirely so existing states freeze (what
-    // the changelog promises with "skipped") instead of the prune deleting them.
-    // A SUCCESSFUL empty result (containersAvailable=true, containers=[]) still
-    // prunes, with the H2 two-poll debounce.
-    if (config.metrics_containers && containersAvailable) {
+    // Containers and systemd units are LIVE collections: the Hub rewrites their rows on
+    // every agent sample and sweeps stale rows — containers 10 minutes, systemd units
+    // 20 minutes after the last sample (`internal/records/records_deletion.go`). For a
+    // system that is down or paused the Hub therefore returns a SUCCESSFUL empty list,
+    // which must not be mistaken for "the containers are gone": both trees are only
+    // reconciled while the system is up, and freeze otherwise, exactly like the
+    // scalar metrics and the dynamic groups above.
+    //
+    // F1: a failed container fetch (403 / timeout) arrives as containersAvailable=false
+    // — skipped as well, so existing states freeze instead of the prune deleting them.
+    // A SUCCESSFUL empty result on an up system still prunes, with the H2 two-poll debounce.
+    const live = system.status === "up";
+    if (config.metrics_containers && containersAvailable && live) {
       await this.updateContainers(sysId, containers);
     }
 
     // v0.17.0 — the three extra collections. Each one is skipped unless its records were
     // actually fetched this round (`undefined` = not read, e.g. slow cadence or a failed
     // request): the same rule as the containers above — no reading must never look like
-    // "nothing there" to a pruner.
+    // "nothing there" to a pruner. ZFS pools and SMART devices are not swept by the Hub,
+    // so an empty list there means removed hardware regardless of the system's status.
     if (config.metrics_zfs && config.metrics_zfsDetails && extras.zfsPools) {
       await this.updateZfsDetails(sysId, extras.zfsPools);
     }
     if (config.metrics_smart && extras.smartDevices) {
       await this.updateSmartDevices(sysId, extras.smartDevices);
     }
-    if (config.metrics_services && config.metrics_servicesDetails && extras.systemdServices) {
+    if (config.metrics_services && config.metrics_servicesDetails && extras.systemdServices && live) {
       await this.updateSystemdServices(sysId, extras.systemdServices);
     }
   }
@@ -791,38 +887,28 @@ export class StateManager {
    * @param prefix State ID prefix (e.g. `systems.my_server`)
    */
   private dropCacheUnder(prefix: string): void {
-    const exact = prefix;
-    const dot = `${prefix}.`;
-    // v0.4.3 (SM4): snapshot to array first — defensive against any future
-    // engine that diverges from spec on Set.delete during for-of iteration.
-    for (const id of [...this.createdIds]) {
-      if (id === exact || id.startsWith(dot)) {
-        this.createdIds.delete(id);
+    // Every cache keyed by an object id follows the same lifecycle: a removed system
+    // that is re-added later must go through the full reconcile/write path again.
+    // `idsUnder` copies the matching keys first, so deleting while iterating is safe.
+    const caches: (Set<string> | Map<string, unknown>)[] = [
+      this.createdIds,
+      this.knownChannelIds,
+      this.knownDeviceIds,
+      this.dynamicChildren,
+      this.deviceWritten,
+      this.deviceIcons,
+      this.lastGroupEmpty,
+      this.absentLastPoll,
+    ];
+    for (const cache of caches) {
+      for (const id of StateManager.idsUnder(cache.keys(), prefix)) {
+        cache.delete(id);
       }
     }
-    for (const id of StateManager.idsUnder(this.knownChannelIds, prefix)) {
-      this.knownChannelIds.delete(id);
-    }
-    for (const id of StateManager.idsUnder(this.knownDeviceIds, prefix)) {
-      this.knownDeviceIds.delete(id);
-    }
-    // v0.7.2: the dynamic-group and device-signature caches must follow the
-    // same lifecycle — a removed system that is re-added later must go
-    // through the full reconcile/write path again.
-    for (const key of [...this.dynamicChildren.keys()]) {
-      if (key === exact || key.startsWith(dot)) {
-        this.dynamicChildren.delete(key);
-      }
-    }
-    for (const key of [...this.deviceWritten.keys()]) {
-      if (key === exact || key.startsWith(dot)) {
-        this.deviceWritten.delete(key);
-      }
-    }
-    for (const key of [...this.lastGroupEmpty.keys()]) {
-      if (key === exact || key.startsWith(dot)) {
-        this.lastGroupEmpty.delete(key);
-      }
+    // Keyed by safeName, not by object id: a removed system gives up its bare name.
+    const segments = prefix.split(".");
+    if (segments.length === 2 && segments[0] === "systems") {
+      this.deviceOwners.delete(segments[1]);
     }
   }
 
@@ -946,24 +1032,39 @@ export class StateManager {
   }
 
   /**
-   * Remove legacy flat state paths from pre-0.3.0 installations.
-   * Must be called once during onReady before the first poll.
+   * Delete a channel whose last datapoint just went away, so no empty `temperature` /
+   * `battery` … object lingers — the same H2d rule the dynamic groups apply to their
+   * emptied parent. A channel that still carries a state or a sub-channel stays.
    *
-   * v0.14.0: decided entirely from the startup snapshot — no probing of dozens of
-   * legacy ids per system, and therefore no `info.legacyMigrated` marker any more.
-   * The marker only ever existed to skip that probing; since v0.11.0 the snapshot
-   * reads every existing object once anyway (and runs BEFORE this), so the whole
-   * sweep is free and the marker datapoint was pure bookkeeping in the user's tree.
-   * An install that still carries it gets it removed here.
+   * @param id Channel id, namespace-relative.
+   */
+  private async deleteChannelIfEmpty(id: string): Promise<void> {
+    if (!this.knownChannelIds.has(id)) {
+      return;
+    }
+    const dot = `${id}.`;
+    for (const known of [this.knownStateIds, this.knownChannelIds]) {
+      for (const other of known) {
+        if (other.startsWith(dot)) {
+          return;
+        }
+      }
+    }
+    await this.adapter.delObjectAsync(id);
+    this.dropCacheUnder(id);
+  }
+
+  /**
+   * Delete the states a release retired ({@link RETIRED_STATE_IDS}) from every existing
+   * system, plus the obsolete `info.legacyMigrated` marker. Runs once during onReady,
+   * before the first poll.
    *
-   * F3: `existingNames` may be passed in when the caller (onReady) has already
-   * enumerated the system devices — then this method reuses that list instead of
-   * running the same object view a second time. Omitted (e.g. in unit tests) it
-   * enumerates on its own.
+   * Reads only the startup snapshot — an id that is not in it is skipped without a
+   * round-trip, so on an install that never had the objects the sweep costs nothing.
    *
    * @param existingNames Pre-enumerated system device names, or undefined to enumerate here.
    */
-  public async migrateLegacyStates(existingNames?: string[]): Promise<void> {
+  public async removeRetiredStates(existingNames?: string[]): Promise<void> {
     // The sweep reads the snapshot, so it has to exist. onReady always takes it
     // first; a direct caller (unit test) gets it taken here. Idempotent.
     if (!this.snapshotTaken) {
@@ -972,49 +1073,19 @@ export class StateManager {
     await this.removeLegacyMigrationMarker();
 
     const names = existingNames ?? this.getExistingSystemNames();
-    if (names.length === 0) {
-      return;
+    let removed = 0;
+    for (const name of names) {
+      for (const stateId of RETIRED_STATE_IDS) {
+        const fullId = `systems.${name}.${stateId}`;
+        if (!this.knownStateIds.has(fullId)) {
+          continue;
+        }
+        await this.deleteStateIfKnown(fullId);
+        removed++;
+      }
     }
-    // v0.4.4 (G4): trace the scan-start so the migration-summary at the end
-    // is anchored. If no states need migration, only this debug line fires;
-    // the existing info-summary stays silent.
-    this.adapter.log.debug(`migrateLegacyStates: scanning ${names.length} existing system(s) for legacy flat states`);
-
-    // v0.4.3 (SM3): per-system migration in parallel. Each system only touches
-    // the ids the snapshot actually lists, so there is no probing left to do.
-    const counts = await Promise.all(
-      names.map(async name => {
-        const sysId = `systems.${name}`;
-        let local = 0;
-        for (const stateId of LEGACY_FLAT_STATE_IDS) {
-          const fullId = `${sysId}.${stateId}`;
-          if (!this.knownStateIds.has(fullId)) {
-            continue;
-          }
-          await this.adapter.delObjectAsync(fullId);
-          this.createdIds.delete(fullId);
-          // Not counted (see the countRemoval=false note below) but dropped
-          // from the id set so the bookkeeping stays truthful.
-          this.knownStateIds.delete(fullId);
-          local++;
-        }
-        // The one legacy CHANNEL. The snapshot lists channels too, so this needs
-        // no object read either.
-        const legacyChannel = `${sysId}.temperatures`;
-        if (this.knownChannelIds.has(legacyChannel)) {
-          // countRemoval=false: the legacy sweep reports its own total below —
-          // letting it also feed the datapoint counter would report the same
-          // removals twice, in two differently-scoped lines.
-          await this.deleteChannelIfExists(legacyChannel, false);
-          this.knownChannelIds.delete(legacyChannel);
-        }
-        return local;
-      }),
-    );
-    const migrated = counts.reduce((a, b) => a + b, 0);
-
-    if (migrated > 0) {
-      this.adapter.log.info(`Migration: removed ${migrated} legacy state(s) from flat structure`);
+    if (removed > 0) {
+      this.adapter.log.info(`Removed ${removed} retired state(s)`);
     }
   }
 
@@ -1057,16 +1128,18 @@ export class StateManager {
    */
   private async refreshDynamicObjects(sysId: string): Promise<void> {
     const prefix = `${sysId}.`;
-    // Group channels the adapter names (temperature.sensors, cpu.cores, containers, …).
-    // A channel named by the Hub (gpu.<id>, containers.<name>) has a last segment that is
-    // not in the catalog and is skipped — its name never changes through an update.
+    // Group channels the adapter names (temperature.sensors, cpu.cores, containers, …),
+    // recognised by their PLACE in the tree. A channel named by the Hub (gpu.<id>,
+    // containers.<name>) is skipped even when its name happens to equal a catalog key —
+    // a container called `gpu` must keep its name, not become "GPU" on every poll.
     for (const id of this.knownChannelIds) {
       if (!id.startsWith(prefix)) {
         continue;
       }
-      const last = id.slice(id.lastIndexOf(".") + 1);
-      if (isChannelKey(last)) {
-        await this.ensureChannel(id, channelName(last));
+      const rel = id.slice(prefix.length);
+      const group = DYNAMIC_CHANNEL_PATTERNS.find(entry => entry.match.test(rel));
+      if (group) {
+        await this.ensureChannel(id, channelName(group.key));
       }
     }
     for (const id of this.knownStateIds) {
@@ -1402,7 +1475,7 @@ export class StateManager {
       await this.ensureChannel(base, sanitizeDisplayName(pool.name), API_NAMED);
 
       await this.createAndSetState(`${base}.scrub_state`, leafCommon("scrubState"), pool.scrubState ?? null);
-      await this.createAndSetState(`${base}.scrub_progress`, leafCommon("scrubProgress"), pool.scrubProgress ?? "");
+      await this.createAndSetState(`${base}.scrub_progress`, leafCommon("scrubProgress"), pool.scrubProgress ?? null);
       await this.createAndSetState(`${base}.scrub_errors`, leafCommon("scrubErrors"), pool.scrubErrors ?? null);
 
       await this.syncDynamicGroup(
@@ -1434,7 +1507,7 @@ export class StateManager {
           await this.ensureChannel(db, sanitizeDisplayName(rawName), API_NAMED);
           await this.createAndSetState(`${db}.used`, leafCommon("datasetUsed"), bytesToGib(ds.used));
           await this.createAndSetState(`${db}.avail`, leafCommon("datasetAvail"), bytesToGib(ds.avail));
-          await this.createAndSetState(`${db}.mountpoint`, leafCommon("datasetMount"), ds.mountpoint ?? "");
+          await this.createAndSetState(`${db}.mountpoint`, leafCommon("datasetMount"), ds.mountpoint ?? null);
         },
       );
     }
@@ -1460,10 +1533,10 @@ export class StateManager {
         const b = `${sysId}.smart.${safeId}`;
         await this.ensureChannel(b, sanitizeDisplayName(rawName), API_NAMED);
         await this.createAndSetState(`${b}.state`, leafCommon("smartState"), dev.state ?? null);
-        await this.createAndSetState(`${b}.model`, leafCommon("smartModel"), dev.model ?? "");
-        await this.createAndSetState(`${b}.serial`, leafCommon("smartSerial"), dev.serial ?? "");
-        await this.createAndSetState(`${b}.firmware`, leafCommon("smartFirmware"), dev.firmware ?? "");
-        await this.createAndSetState(`${b}.interface`, leafCommon("smartType"), dev.type ?? "");
+        await this.createAndSetState(`${b}.model`, leafCommon("smartModel"), dev.model ?? null);
+        await this.createAndSetState(`${b}.serial`, leafCommon("smartSerial"), dev.serial ?? null);
+        await this.createAndSetState(`${b}.firmware`, leafCommon("smartFirmware"), dev.firmware ?? null);
+        await this.createAndSetState(`${b}.interface`, leafCommon("smartType"), dev.type ?? null);
         await this.createAndSetState(`${b}.temperature`, leafCommon("smartTemp"), dev.temperature ?? null);
         await this.createAndSetState(`${b}.capacity`, leafCommon("smartCapacity"), bytesToGib(dev.capacity));
         await this.createAndSetState(`${b}.power_on_hours`, leafCommon("smartHours"), dev.hours ?? null);
@@ -1698,6 +1771,9 @@ export class StateManager {
     if (stale.length > 0 && activeIds.size === 0 && this.knownChannelIds.has(base)) {
       await this.adapter.delObjectAsync(base);
       this.dropCacheUnder(base);
+      // …and the parent channel with it when the group was its last member (a machine
+      // whose sensors vanished keeps no empty `temperature` channel either).
+      await this.deleteChannelIfEmpty(base.slice(0, base.lastIndexOf(".")));
     }
     this.dynamicChildren.set(base, new Set(activeIds));
   }
@@ -1732,17 +1808,13 @@ export class StateManager {
 
   /**
    * @param id Channel id to delete (recursively) if it exists.
-   * @param countRemoval Whether the removed states feed the datapoint counter.
-   *   `false` only for the legacy migration, which reports its own total.
    */
-  private async deleteChannelIfExists(id: string, countRemoval = true): Promise<void> {
+  private async deleteChannelIfExists(id: string): Promise<void> {
     if (!this.knownChannelIds.has(id)) {
       return;
     }
     try {
-      if (countRemoval) {
-        this.noteStatesRemovedUnder(id);
-      }
+      this.noteStatesRemovedUnder(id);
       await this.adapter.delObjectAsync(id, { recursive: true });
       this.dropCacheUnder(id);
     } catch (err) {
