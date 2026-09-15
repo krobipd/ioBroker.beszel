@@ -78,20 +78,26 @@ interface MockAdapter {
     endkey: string;
   }) => Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null>;
   delObjectAsync: (id: string, opts?: { recursive: boolean }) => Promise<void>;
+  /** Full replace, unlike the merge `extendObject` does. */
+  setObjectAsync: (id: string, obj: ObjectDef) => Promise<void>;
   /** Every `delObjectAsync` call, in order — for tests that prove a sweep touched nothing. */
   delObjectCalls: string[];
+  /** Every `setObjectAsync` call, in order — the full write is the exception, not the rule. */
+  setObjectCalls: string[];
 }
 
 function createMockAdapter(): MockAdapter {
   const objects = new Map<string, ObjectDef>();
   const states = new Map<string, StateValue>();
   const delObjectCalls: string[] = [];
+  const setObjectCalls: string[] = [];
 
   return {
     namespace: "beszel.0",
     objects,
     states,
     delObjectCalls,
+    setObjectCalls,
     log: {
       debug: (): void => {},
       info: (): void => {},
@@ -161,6 +167,11 @@ function createMockAdapter(): MockAdapter {
         objects.delete(id);
         states.delete(id);
       }
+      return Promise.resolve();
+    },
+    setObjectAsync: (id: string, obj: ObjectDef): Promise<void> => {
+      setObjectCalls.push(id);
+      objects.set(id, { type: obj.type, common: { ...obj.common }, native: { ...obj.native } });
       return Promise.resolve();
     },
   };
@@ -2719,11 +2730,64 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.no_la.cpu.load_15m")).to.be.false;
     });
 
-    it("resets existing load-average states to null when a later sample carries no la at all", async () => {
+    it("removes existing load-average states at once when neither sample nor systems row carries la", async () => {
+      // The load average of an agent too old to report one is not "unknown", it is not
+      // there — and `info.la` in the `systems` row is the Hub's own bookkeeping, not a
+      // sample that can drop a value: no second poll, unlike the sensor debounce.
       await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.cpu.load_1m")).to.be.true;
       const noLa: BeszelSystem = { ...testSystem, info: { u: 1, v: "0.8.0" } };
       await manager.updateSystem(noLa, { ...testStats, la: undefined }, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.cpu.load_1m")?.val).to.be.null;
+      expect(adapter.objects.has("systems.my_server.cpu.load_1m")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.cpu.load_5m")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.cpu.load_15m")).to.be.false;
+      // `cpu.usage` still lives there, so the channel stays.
+      expect(adapter.objects.has("systems.my_server.cpu")).to.be.true;
+      expect(manager.takeChangeCounts().removed).to.equal(3);
+    });
+
+    it("removes the load-average states of a DOWN system whose systems row never carried la", async () => {
+      // The upgrade case the promotion suite measures: v0.17.1 created `cpu.load_*` for
+      // every system; a system that is down and whose agent never reported a load average
+      // has no stats to judge by — the `systems` row is enough, and the empty `cpu`
+      // channel goes with the last state.
+      for (const s of ["load_1m", "load_5m", "load_15m"]) {
+        adapter.objects.set(`systems.my_server.cpu.${s}`, { type: "state", common: { type: "number" }, native: {} });
+      }
+      adapter.objects.set("systems.my_server.cpu", { type: "channel", common: {}, native: {} });
+      await manager.snapshotExistingStates();
+      const down: BeszelSystem = { ...testSystem, status: "down", info: { u: 1, v: "0.8.0" } };
+      await manager.updateSystem(down, undefined, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.cpu.load_1m")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.cpu.load_15m")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.cpu")).to.be.false;
+      // Frozen, not removed: the down system's other datapoints are untouched (none here).
+      expect(manager.takeChangeCounts().removed).to.equal(3);
+    });
+
+    it("keeps the load-average states of a DOWN system whose systems row carries la", async () => {
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      await manager.updateSystem({ ...testSystem, status: "down" }, undefined, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.cpu.load_1m")).to.be.true;
+      expect(adapter.states.get("systems.my_server.cpu.load_1m")?.val).to.equal(testSystem.info.la?.[0]);
+    });
+
+    it("removes existing uptime and agent-version states of a system whose info is empty", async () => {
+      // A `systems` row with `info: {}` has never had an agent connected: whatever an
+      // older version created for it is not frozen, it is gone — until the first sample.
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.info.uptime")).to.be.true;
+      const pending: BeszelSystem = { ...testSystem, status: "pending", info: {} };
+      await manager.updateSystem(pending, undefined, [], allMetricsConfig(), true, {}, true);
+      expect(adapter.objects.has("systems.my_server.info.uptime")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.info.uptime_text")).to.be.false;
+      expect(adapter.objects.has("systems.my_server.info.agent_version")).to.be.false;
+      // `info.online`/`info.status` keep the channel.
+      expect(adapter.objects.has("systems.my_server.info")).to.be.true;
+      // Back with an agent: created again, no debounce in either direction.
+      await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.info.uptime")).to.be.true;
+      expect(adapter.objects.has("systems.my_server.info.agent_version")).to.be.true;
     });
 
     it("uses only FINITE temperature readings for average and max", async () => {
@@ -4410,6 +4474,54 @@ describe("detail collections (v0.17.0)", () => {
     ]) {
       expect(adapter.objects.get(id)?.common, id).to.not.have.property("unit");
     }
+  });
+
+  it("clears the unit placeholder v0.17.x stored on a counter with ONE full write (v0.18.0)", async () => {
+    // `extendObject` merges: a key the new common no longer carries stays, and null would
+    // be stored as null. The stored object keeps everything else it holds (`custom`).
+    const stored = {
+      type: "state",
+      common: {
+        name: "Power cycles",
+        type: "number",
+        role: "value",
+        unit: "",
+        custom: { "history.0": { enabled: true } },
+      },
+      native: { apiNamed: true },
+    };
+    adapter.objects.set("systems.my_server.smart.dev_sda.power_cycles", stored);
+    adapter.objects.set("systems.my_server.smart.dev_sda.temperature", {
+      type: "state",
+      common: { type: "number", role: "value.temperature", unit: "°C" },
+      native: {},
+    });
+    await manager.snapshotExistingStates();
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    expect(adapter.setObjectCalls).to.deep.equal(["systems.my_server.smart.dev_sda.power_cycles"]);
+    const repaired = adapter.objects.get("systems.my_server.smart.dev_sda.power_cycles");
+    expect(repaired?.common).to.not.have.property("unit");
+    expect(repaired?.common.custom).to.deep.equal({ "history.0": { enabled: true } });
+    expect(repaired?.common.role).to.equal("value");
+    // A unit the store carries and the common carries too is a plain merge.
+    expect(adapter.objects.get("systems.my_server.smart.dev_sda.temperature")?.common.unit).to.equal("°C");
+    // Once repaired, the next touch (after a restart) is the ordinary merge again.
+    manager = new StateManager(adapter as never);
+    await manager.snapshotExistingStates();
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    expect(adapter.setObjectCalls).to.have.length(1);
+  });
+
+  it("leaves a stored empty unit alone while the current common carries a unit of its own", async () => {
+    adapter.objects.set("systems.my_server.smart.dev_sda.temperature", {
+      type: "state",
+      common: { type: "number", role: "value.temperature", unit: "" },
+      native: {},
+    });
+    await manager.snapshotExistingStates();
+    await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
+    expect(adapter.setObjectCalls).to.deep.equal([]);
+    expect(adapter.objects.get("systems.my_server.smart.dev_sda.temperature")?.common.unit).to.equal("°C");
   });
 
   it("an EMPTY result prunes — that is a real 'nothing there'", async () => {

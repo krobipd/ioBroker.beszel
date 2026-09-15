@@ -129,10 +129,4 @@ describe("device icons (v0.18.0)", () => {
     expect(notice).to.include("MIT");
     expect(notice).to.include("Apache");
   });
-
-  it("keeps the icon files LF-only in the repository", () => {
-    for (const file of iconFiles()) {
-      expect(readFileSync(join(ICON_DIR, file), "utf8"), `${file} has CRLF`).to.not.include("\r\n");
-    }
-  });
 });

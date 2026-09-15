@@ -125,11 +125,20 @@ export class StateManager {
   private readonly lastGroupEmpty = new Map<string, boolean>();
 
   /**
-   * Per `goneWhenAbsent` state id → was its field absent on the previous poll while a
-   * record was there. The same two-poll debounce as {@link lastGroupEmpty}: the state
-   * is removed only when the hardware is missing on two consecutive samples.
+   * Per `goneWhenAbsent: "stats"` state id → was its field absent on the previous poll
+   * while a record was there. The same two-poll debounce as {@link lastGroupEmpty}: the
+   * state is removed only when the hardware is missing on two consecutive samples.
    */
   private readonly absentLastPoll = new Map<string, boolean>();
+
+  /**
+   * Stored state objects that carry `unit: ""` — the placeholder v0.17.x wrote on its
+   * unitless counters. `extendObject` is a deep merge: a key the new common no longer
+   * carries stays as it is, and `null` would be stored as null, not removed (js-controller
+   * merges with `node.extend`, which copies null and skips only undefined). The one write
+   * that clears it needs the whole stored object, so the snapshot keeps exactly these.
+   */
+  private readonly staleUnitObjects = new Map<string, ioBroker.StateObject>();
 
   /**
    * v0.7.2: last-written device-object signature per sysId ({@link deviceSignature}).
@@ -224,6 +233,9 @@ export class StateManager {
       const id = this.stripNamespace(row.id);
       if (row.value?.type === "state") {
         this.knownStateIds.add(id);
+        if (row.value.common?.unit === "") {
+          this.staleUnitObjects.set(id, row.value);
+        }
       } else if (row.value?.type === "channel") {
         this.knownChannelIds.add(id);
       } else if (row.value?.type === "device") {
@@ -664,11 +676,14 @@ export class StateManager {
       // case too, and "every ioBroker adapter leaves the last values standing" is the
       // line krobi confirmed. The object still gets its refresh.
       //
-      // The record IS there but the field is one the machine may simply not have
-      // (`goneWhenAbsent`: sensors, battery, swap, ZFS ARC) — the datapoint is
-      // meaningless here, so it is REMOVED, debounced over two polls like the dynamic
-      // groups. Gating creation alone would leave every install that already ran an
-      // older version with a permanent-null state.
+      // The field is one the machine may simply not have (`goneWhenAbsent`: sensors,
+      // battery, swap, ZFS ARC, a load average from an old agent) — the datapoint is
+      // meaningless here, so it is REMOVED. Gating creation alone would leave every
+      // install that already ran an older version with a permanent-null state. A stats
+      // field is judged only when a record is there, and debounced over two polls like
+      // the dynamic groups; an `info.*` field lives in the `systems` row itself, which is
+      // there on every poll and is the Hub's own bookkeeping, not a sample that can drop
+      // a value — a system that is down is judged too, and at once.
       //
       // H2b: the record IS there but a transiently absent field went missing (`dios`/
       // `cpub` are omitzero/omitempty on the wire, so a fully idle disk drops them) —
@@ -679,8 +694,9 @@ export class StateManager {
       // The hardware/OS datapoints come from a different collection than the stats:
       // "no details" is unknown (fetch never succeeded → freeze) unless the collection
       // was read and simply has no row / no value for this system (→ null).
-      if (stats && d.goneWhenAbsent) {
-        if (this.absentLastPoll.get(id)) {
+      if (d.goneWhenAbsent === "system" || (stats && d.goneWhenAbsent === "stats")) {
+        const confirmed = d.goneWhenAbsent === "system" || this.absentLastPoll.get(id) === true;
+        if (confirmed) {
           this.absentLastPoll.delete(id);
           await this.deleteStateIfKnown(id);
           await this.deleteChannelIfEmpty(`${sysId}.${d.channel}`);
@@ -899,6 +915,7 @@ export class StateManager {
       this.deviceIcons,
       this.lastGroupEmpty,
       this.absentLastPoll,
+      this.staleUnitObjects,
     ];
     for (const cache of caches) {
       for (const id of StateManager.idsUnder(cache.keys(), prefix)) {
@@ -1861,7 +1878,23 @@ export class StateManager {
     // `down`/`paused` at that moment never has its pre-existing states touched, so its
     // old role would be frozen forever. The every-restart extendObject is idempotent,
     // self-healing and only a startup cost. Don't "optimize" it into that regression.
-    await this.adapter.extendObject(id, { type: "state", common, native });
+    const stale = this.staleUnitObjects.get(id);
+    if (stale && common.unit === undefined) {
+      // The stored object carries a `unit: ""` placeholder the current common does not
+      // — a merge cannot drop a key (see `staleUnitObjects`), so this one write replaces
+      // the object, keeping everything else the store holds (`custom`, `acl`, …).
+      this.staleUnitObjects.delete(id);
+      const kept = { ...stale.common };
+      delete kept.unit;
+      await this.adapter.setObjectAsync(id, {
+        ...stale,
+        type: "state",
+        common: { ...kept, ...common },
+        native: { ...stale.native, ...native },
+      });
+    } else {
+      await this.adapter.extendObject(id, { type: "state", common, native });
+    }
     this.createdIds.add(id);
     this.noteStateCreated(id);
   }

@@ -291,7 +291,8 @@ beszel.0.
 - Fixed: the adapter no longer writes states after being stopped when the shutdown lands while the detail collections are being read, and no longer tries to arm its timer during shutdown
 - Fixed: after the Hub briefly reported an empty system list, the offline markers written on errors and on shutdown reached no system
 - Fixed: a Hub without the ZFS, SMART or systemd collections (older release) or without read rights for them is asked once, not on every poll
-- Changed: temperature, battery, swap and ZFS ARC datapoints exist only on hosts that report that hardware; existing empty ones are removed
+- Changed: temperature, battery, swap and ZFS ARC datapoints exist only on hosts that report that hardware, and uptime, load average and agent version only once a system has connected; existing empty ones are removed
+- Changed: the five ZFS and SMART counters no longer carry an empty unit; an existing installation gets the field cleared once
 - Changed: the four "Peak values" options are gone — a Hub never delivers peak values in the minute records the adapter reads, so they never produced a datapoint
 - Changed: the messages of the connection test follow the system language, and the test runs with the configured request timeout
 - Changed: SMART and dataset text columns the Hub does not carry read as empty (null) instead of an empty string

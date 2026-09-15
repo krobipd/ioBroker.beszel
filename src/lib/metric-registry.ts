@@ -48,14 +48,20 @@ export interface MetricDef {
   /** Gate state creation on data shape; default is always-available. */
   available?: (stats: SystemStats | undefined, system: BeszelSystem) => boolean;
   /**
-   * The metric describes hardware the system may simply not have (sensors, a battery,
-   * swap, a ZFS ARC). When a record is there but `available` says no, the datapoint is
-   * not "unknown" — it is meaningless for this machine, so an existing state is
-   * REMOVED (after two consecutive polls, so a single odd sample cannot churn the tree)
-   * instead of being reset to null. Without the flag, an existing state is reset to null
-   * (the H2b rule for fields that are only transiently absent from a record).
+   * The metric describes something the system may simply not have (sensors, a battery,
+   * swap, a ZFS ARC — or a load average from an agent too old to report one). When
+   * `available` says no, the datapoint is not "unknown" — it is meaningless for this
+   * machine, so an existing state is REMOVED instead of being reset to null. Without the
+   * flag, an existing state is reset to null (the H2b rule for fields that are only
+   * transiently absent from a record).
+   *
+   * `"stats"`: the verdict needs a stats record — no record is "unknown" and the state
+   * freezes with everything else; and it takes two consecutive polls, so a single odd
+   * sample cannot churn the tree. `"system"`: the `systems` row itself carries the answer
+   * (`info.*`), so a system that is down is judged too, and at once — that row is the
+   * Hub's own bookkeeping, a field it lacks is not a dropped sample.
    */
-  goneWhenAbsent?: true;
+  goneWhenAbsent?: "stats" | "system";
   /** Pull the state value from a system and its stats. */
   extract: (system: BeszelSystem, stats: SystemStats | undefined) => ioBroker.StateValue;
 }
@@ -842,7 +848,9 @@ export function buildMetricDefs(): MetricDef[] {
   const hasSwap = (s: SystemStats | undefined): boolean => s?.s != null;
   // The `systems` record keeps `info` from the last contact, so these exist for a system
   // that is down; a system that never connected (`pending`, `info: {}`) gets none of them
-  // until its first sample instead of a row of empty datapoints.
+  // until its first sample instead of a row of empty datapoints — and a row an older
+  // version created for such a system goes (`goneWhenAbsent: "system"`), the same way a
+  // load average an old agent never reported does.
   const hasUptime = (_st: SystemStats | undefined, s: BeszelSystem): boolean => s.info.u != null;
   const hasLoad = (st: SystemStats | undefined, s: BeszelSystem): boolean => la(s, st) !== undefined;
   return [
@@ -855,6 +863,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "s",
       available: hasUptime,
+      goneWhenAbsent: "system",
       extract: s => s.info.u ?? null,
     },
     {
@@ -864,6 +873,7 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "uptimeFormatted",
       kind: "text",
       available: hasUptime,
+      goneWhenAbsent: "system",
       extract: s => (s.info.u != null ? formatUptime(s.info.u) : null),
     },
     {
@@ -873,6 +883,7 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "agentVersion",
       kind: "text",
       available: (_st, s) => s.info.v != null,
+      goneWhenAbsent: "system",
       extract: s => s.info.v ?? null,
     },
     // F2: static hardware/OS info from the system_details collection (attached
@@ -991,6 +1002,7 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descLoadAvg",
       kind: "num",
       available: hasLoad,
+      goneWhenAbsent: "system",
       extract: (s, st) => la(s, st)?.[0] ?? null,
     },
     {
@@ -1001,6 +1013,7 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descLoadAvg",
       kind: "num",
       available: hasLoad,
+      goneWhenAbsent: "system",
       extract: (s, st) => la(s, st)?.[1] ?? null,
     },
     {
@@ -1011,6 +1024,7 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descLoadAvg",
       kind: "num",
       available: hasLoad,
+      goneWhenAbsent: "system",
       extract: (s, st) => la(s, st)?.[2] ?? null,
     },
     // stats-gated scalar metrics
@@ -1109,7 +1123,7 @@ export function buildMetricDefs(): MetricDef[] {
       unit: "GB",
       // `mb` is omitempty and a Linux notion — a Windows or macOS agent never sends it.
       available: st => st?.mb != null,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (_s, st) => st?.mb ?? null,
     },
     {
@@ -1122,7 +1136,7 @@ export function buildMetricDefs(): MetricDef[] {
       unit: "GB",
       // `mz` is `omitempty`: a machine without ZFS never sends it → no datapoint.
       available: st => st?.mz != null,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (_s, st) => st?.mz ?? null,
     },
     {
@@ -1136,7 +1150,7 @@ export function buildMetricDefs(): MetricDef[] {
       // datapoint (like sensors and battery). Swap configured but unused → `s` present,
       // `su` absent → 0, the true reading.
       available: hasSwap,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (_s, st) => st?.su ?? 0,
     },
     {
@@ -1147,7 +1161,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       unit: "GB",
       available: hasSwap,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (_s, st) => st?.s ?? null,
     },
     {
@@ -1279,7 +1293,7 @@ export function buildMetricDefs(): MetricDef[] {
       // `t` is an omitempty map: a machine without sensors (VM, container host, most
       // Windows boxes) never sends it → no datapoint instead of a permanent null.
       available: hasSensors,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (_s, st) => computeTopAvgTemp(st?.t),
     },
     {
@@ -1292,7 +1306,7 @@ export function buildMetricDefs(): MetricDef[] {
       unit: "°C",
       role: "value.temperature",
       available: hasSensors,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (_s, st) => computeMaxTemp(st?.t),
     },
     {
@@ -1306,7 +1320,7 @@ export function buildMetricDefs(): MetricDef[] {
       // a fully drained battery in charge state 0 serialises as [0, 0], which the wire
       // cannot tell from "no battery" — it vanishes until a non-zero reading arrives.
       available: hasBattery,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (s, st) => (st?.bat ?? s.info.bat)?.[0] ?? null,
     },
     {
@@ -1317,7 +1331,7 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descBatteryCharging",
       kind: "bool",
       available: hasBattery,
-      goneWhenAbsent: true,
+      goneWhenAbsent: "stats",
       extract: (s, st) => {
         const b = st?.bat ?? s.info.bat;
         if (!b) {

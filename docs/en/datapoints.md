@@ -20,6 +20,9 @@ Only the System category has no such base switch; its three entries are independ
 `info.os` is the platform family (`Linux`, `macOS`, `Windows`, `FreeBSD`); `info.os_name` is the
 distribution or release the agent reports next to it, for example `Ubuntu 24.04.1 LTS`.
 
+Uptime and agent version appear once a system has connected for the first time — a system that
+is still `pending` has neither, and the Hub keeps both from the last contact while it is down.
+
 Always present, independent of any switch: `info.online` and `info.status`. `info.online` is what
 the device icon in the object tree reads: true only while the Hub reports `up`, and false again as
 soon as nothing is being read. `info.status` carries the Hub's four values
@@ -37,7 +40,9 @@ something nobody measured.
 | Per-core usage      | `cpu.cores.core0`, `core1`, …                                   |
 
 The three load averages have no unit: they count the processes using or waiting for the CPU, so
-read them against the core count — 4.0 is a busy quad-core and a quiet 32-core machine.
+read them against the core count — 4.0 is a busy quad-core and a quiet 32-core machine. They
+exist only for systems whose agent reports one: an agent too old to do so gets no `load_*`
+datapoints, and ones an older adapter version created for it are removed.
 
 `cpu.steal` is the share of time the hypervisor gave to other guests — on bare metal it stays at
 zero, on an oversubscribed VM it is the number that explains why everything feels slow.

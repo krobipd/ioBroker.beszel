@@ -106,9 +106,13 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     systemd-Units, Design 46). **Datensatz da, FELD fehlt** — zwei Fälle: ein nur vorübergehend
     fehlendes Feld (`dios`/`cpub` sind omitzero/omitempty) ⇒ auf `null` zurücksetzen, über
     `knownStateIds` statt nur `createdIds` (der Cache ist nach jedem Neustart leer); Hardware, die
-    der Rechner nicht hat (`goneWhenAbsent`: Sensoren, Batterie, Swap, ZFS-ARC) ⇒ den Datenpunkt
-    nach zwei Polls in Folge LÖSCHEN, samt leerem Elternkanal — sonst behielte jede Anlage, die eine
-    ältere Version lief, dauerhafte `null`-Datenpunkte (Design 45). Die Details-Datenpunkte
+    der Rechner nicht hat (`goneWhenAbsent: "stats"`: Sensoren, Batterie, Swap, ZFS-ARC, Buffers)
+    ⇒ den Datenpunkt nach zwei Polls in Folge LÖSCHEN, samt leerem Elternkanal — sonst behielte
+    jede Anlage, die eine ältere Version lief, dauerhafte `null`-Datenpunkte (Design 45). **Feld der
+    `systems`-Zeile fehlt** (`goneWhenAbsent: "system"`: `info.u`/`info.v`/`la` — Uptime, Agent-Version,
+    Load Average) ⇒ SOFORT löschen, auch ohne Stats: die Zeile ist die Buchhaltung des Hubs, kein
+    Sample, das einen Wert fallen lassen kann, und ein Down-System hat nie Stats (Design 49). Die
+    Details-Datenpunkte
     (`info.*`) frieren, solange `system_details` in diesem Prozess nie gelesen wurde
     (`detailsAvailable`), statt beim ersten langsamen Start alle neun auf `null` zu setzen.
 29. **`info.legacyMigrated` ist ersatzlos entfallen (v0.14.0)** — der Marker sparte nur den
@@ -328,14 +332,32 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     läuft mit dem konfigurierten `requestTimeout`. Die drei Extra-Fetcher rufen `ensureToken()`.
     `numCommon` setzt keine leere Einheit; abwesende SMART-/Dataset-Textspalten sind `null`.
     `dropCacheUnder` ist eine Schleife über alle Caches. Bericht: `Ressourcen/beszel/audit-2026-09-15.md`.
+49. **`info`-Datenpunkte eines nie/alt verbundenen Systems: sofort weg (v0.18.0, CI-Fund)** — die
+    Aufstiegs-Suite (Lauf 34987545500) fand `backup_nas.cpu.load_*` als Leichen: 0.17.1 legte
+    `cpu.load_*` für jedes System an, 0.18.0 gated sie auf `la` (`stats.la ?? info.la`), und das
+    Down-System des Fixtures hat weder Stats noch `info.la` — ein Erstellungs-Gate allein lässt den
+    Bestand stehen, und der `"stats"`-Pfad braucht einen Datensatz, den ein Down-System nie hat.
+    Darum zwei Modi: `"system"` urteilt an der `systems`-Zeile (immer da, Buchhaltung des Hubs, kein
+    Sample) und löscht ohne Entprellung — auch weil die Suite den Baum nach EINEM Poll misst
+    (`pollInterval: 60`, Settle 3 s); ein Zwei-Poll-Entprellen wäre dort unsichtbar geblieben.
+    Gilt für `info.uptime`/`uptime_text` (`info.u`), `info.agent_version` (`info.v`), `cpu.load_*`.
+50. **Ein Platzhalter im gespeicherten Objekt braucht EINE Vollschreibung (v0.18.0, CI-Fund)** — die
+    fünf ZFS-/SMART-Zähler trugen bis 0.17.1 `unit: ""`; 0.18.0 lässt das Feld weg (Q5). `extendObject`
+    ist ein Deep-Merge (js-controller 7.2.2: `node.extend`, kopiert `null`, überspringt nur
+    `undefined`) — der alte Schlüssel bleibt, `null` würde als `null` gespeichert, nicht entfernt, und
+    die Aufstiegs-Suite vergleicht `JSON.stringify(unit)` (absent ≠ null). Der Start-Schnappschuss
+    merkt sich genau die Objekte mit `unit: ""` (`staleUnitObjects`), `ensureStateObject` ersetzt
+    jedes davon einmal per `setObjectAsync` — ohne `unit`, mit allem anderen, das der Speicher hält
+    (`custom`, `acl`) — danach ist es der normale Merge. Trägt das aktuelle `common` selbst eine
+    Einheit, ist es ein normaler Merge (`°C` überschreibt `""`).
 
-## Tests (773 unit + 58 package + 1 integration + 2 inventory)
+## Tests (777 unit + 58 package + 1 integration + 2 inventory)
 
-Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit, `vitest run`): state-manager 359 ·
-coerce 160 · main 114 · beszel-client 75 · message-router 17 · repo-standards 18 (aus
-`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · device-icons 13 · inventory 9 · i18n 7.
-`vitest list` (das Maß des D10-Gates) zählt 736, weil die Prüfpaket-Tests erst zur Laufzeit entstehen.
-Deckung **99,0 % Stmts · 97,7 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt,
+Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit + den zwei CI-Funden, `vitest run`):
+state-manager 364 · coerce 160 · main 114 · beszel-client 75 · message-router 17 · repo-standards 19
+(aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · device-icons 12 · inventory 9 ·
+i18n 7. `vitest list` (das Maß des D10-Gates) zählt 740, weil die Prüfpaket-Tests erst zur Laufzeit
+entstehen. Deckung **99,0 % Stmts · 97,8 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt,
 ist unerreichbar (https-Transport ohne TLS-Server) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
