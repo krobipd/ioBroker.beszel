@@ -494,7 +494,8 @@ export function coerceSystemStats(value: unknown): SystemStats {
 
   // Single finite-number fields — one loop (each value through coerceFiniteNumber
   // so NaN/Infinity/wrong-type never reach a state; a field absent on an older
-  // Beszel version is simply skipped). Includes the v0.18.7 peak values.
+  // Beszel version is simply skipped). No peak fields: the `Max*` values are
+  // `cbor:"-"` and never travel in the 1m records the adapter reads (v0.18.0).
   const NUMBER_FIELDS: (keyof SystemStats)[] = [
     "cpu",
     "mu",
