@@ -1,5 +1,9 @@
 # Older Changes
 
+## 0.14.2 (2026-09-05)
+
+- Changed: Internal cleanup. No user-facing changes.
+
 ## 0.14.1 (2026-09-04)
 
 - Fixed: a system that is offline right now kept the old datapoint names and got no descriptions — the update reached only systems the Hub had a current reading for

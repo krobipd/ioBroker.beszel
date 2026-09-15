@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.17.1",
+    "version": "0.18.0",
     "news": {
+      "0.18.0": {
+        "en": "Network and disk throughput work again with Beszel Hub 0.19.0 and newer, every system shows a pictogram of its operating system, and datapoints a machine cannot fill are removed.",
+        "de": "Netz- und Plattendurchsatz funktionieren wieder mit Beszel Hub 0.19.0 und neuer, jedes System zeigt ein Piktogramm seines Betriebssystems, und Datenpunkte ohne Hardware werden entfernt.",
+        "ru": "Пропускная способность сети и диска снова работает с Beszel Hub 0.19.0 и новее, каждая система показывает пиктограмму своей ОС, а незаполняемые датапоинты удаляются.",
+        "pt": "O débito de rede e disco volta a funcionar com o Beszel Hub 0.19.0 e mais recente, cada sistema mostra um pictograma do seu SO e os pontos de dados sem hardware são removidos.",
+        "nl": "Netwerk- en schijfdoorvoer werken weer met Beszel Hub 0.19.0 en nieuwer, elk systeem toont een pictogram van zijn besturingssysteem en datapunten zonder hardware worden verwijderd.",
+        "fr": "Les débits réseau et disque fonctionnent de nouveau avec Beszel Hub 0.19.0 et plus récent, chaque système affiche le pictogramme de son OS et les points de données sans matériel sont supprimés.",
+        "it": "Il throughput di rete e disco funziona di nuovo con Beszel Hub 0.19.0 e successivi, ogni sistema mostra un pittogramma del suo SO e i datapoint senza hardware vengono rimossi.",
+        "es": "El caudal de red y disco vuelve a funcionar con Beszel Hub 0.19.0 y posteriores, cada sistema muestra un pictograma de su SO y los puntos de datos sin hardware se eliminan.",
+        "pl": "Przepustowość sieci i dysku znów działa z Hubem Beszel 0.19.0 i nowszym, każdy system pokazuje piktogram swojego systemu, a punkty danych bez sprzętu są usuwane.",
+        "uk": "Пропускна здатність мережі та диска знову працює з Beszel Hub 0.19.0 і новішими, кожна система показує піктограму своєї ОС, а незаповнювані точки даних видаляються.",
+        "zh-cn": "网络和磁盘吞吐量在 Beszel Hub 0.19.0 及更新版本上恢复正常，每个系统显示其操作系统图标，无法填充的数据点会被删除。"
+      },
       "0.17.1": {
         "en": "Sixteen datapoints now explain themselves in the object tree, and the datapoint carrying the distribution name is labelled \"OS Name\" instead of \"OS Version\".",
         "de": "Sechzehn Datenpunkte erklären sich jetzt im Objektbaum, und der Datenpunkt mit dem Distributionsnamen heißt „OS-Name“ statt „OS-Version“.",
@@ -80,19 +93,6 @@
         "pl": "Punkty danych systemu, który jest obecnie offline, otrzymują teraz również poprawione nazwy i opisy.",
         "uk": "Точки даних системи, яка зараз офлайн, тепер теж отримують виправлені назви та описи.",
         "zh-cn": "当前离线系统的数据点现在同样会收到更正后的名称和说明。"
-      },
-      "0.14.0": {
-        "en": "Corrected names and descriptions now reach installations that already have the datapoints.\nDatapoints whose meaning is not obvious carry a short explanation.\nA system the Hub has no reading for keeps its last values.\nUser documentation in English and German.",
-        "de": "Korrigierte Namen und Beschreibungen erreichen jetzt auch bestehende Anlagen.\nDatenpunkte, deren Bedeutung man nicht raten kann, tragen eine kurze Erklärung.\nEin System ohne Messwert behält seine letzten Werte.\nNutzerdoku auf Deutsch und Englisch.",
-        "ru": "Исправленные имена и описания теперь доходят и до существующих установок.\nНеочевидные датапоинты получили краткое пояснение.\nСистема без показаний сохраняет последние значения.\nДокументация на английском и немецком.",
-        "pt": "Nomes e descrições corrigidos chegam agora às instalações existentes.\nOs pontos de dados menos óbvios têm uma breve explicação.\nUm sistema sem leitura mantém os últimos valores.\nDocumentação em inglês e alemão.",
-        "nl": "Gecorrigeerde namen en beschrijvingen bereiken nu ook bestaande installaties.\nNiet vanzelfsprekende datapunten krijgen een korte uitleg.\nEen systeem zonder meting behoudt de laatste waarden.\nGebruikersdocumentatie in het Engels en Duits.",
-        "fr": "Les noms et descriptions corrigés atteignent désormais les installations existantes.\nLes points de données peu évidents portent une brève explication.\nUn système sans mesure conserve ses dernières valeurs.\nDocumentation en anglais et allemand.",
-        "it": "Nomi e descrizioni corretti raggiungono ora anche le installazioni esistenti.\nI datapoint meno ovvi hanno una breve spiegazione.\nUn sistema senza letture mantiene gli ultimi valori.\nDocumentazione in inglese e tedesco.",
-        "es": "Los nombres y descripciones corregidos llegan ahora a las instalaciones existentes.\nLos puntos de datos poco evidentes llevan una breve explicación.\nUn sistema sin lectura conserva sus últimos valores.\nDocumentación en inglés y alemán.",
-        "pl": "Poprawione nazwy i opisy docierają teraz także do istniejących instalacji.\nMniej oczywiste punkty danych mają krótkie wyjaśnienie.\nSystem bez odczytu zachowuje ostatnie wartości.\nDokumentacja po angielsku i niemiecku.",
-        "uk": "Виправлені назви та описи тепер доходять і до наявних інсталяцій.\nНеочевидні точки даних мають коротке пояснення.\nСистема без вимірювання зберігає останні значення.\nДокументація англійською та німецькою.",
-        "zh-cn": "更正后的名称和说明现在也会应用到已有安装。\n含义不直观的数据点带有简短说明。\n无读数的系统保留最后的数值。\n提供英文和德文用户文档。"
       }
     },
     "plugins": {
@@ -127,11 +127,27 @@
       "zh-cn": "连接到 Beszel Hub 并将服务器指标作为 ioBroker 状态公开"
     },
     "docs": {
-      "en": ["docs/en/README.md", "docs/en/datapoints.md", "docs/en/faq.md"],
-      "de": ["docs/de/README.md", "docs/de/datapoints.md", "docs/de/faq.md"]
+      "en": [
+        "docs/en/README.md",
+        "docs/en/datapoints.md",
+        "docs/en/faq.md"
+      ],
+      "de": [
+        "docs/de/README.md",
+        "docs/de/datapoints.md",
+        "docs/de/faq.md"
+      ]
     },
-    "authors": ["krobi <krobi@power-dreams.com>"],
-    "keywords": ["beszel", "monitoring", "server", "metrics", "hardware"],
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
+    ],
+    "keywords": [
+      "beszel",
+      "monitoring",
+      "server",
+      "metrics",
+      "hardware"
+    ],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -358,8 +374,15 @@
       "native": {}
     }
   ],
-  "encryptedNative": ["username", "password"],
-  "protectedNative": ["username", "password", "url"],
+  "encryptedNative": [
+    "username",
+    "password"
+  ],
+  "protectedNative": [
+    "username",
+    "password",
+    "url"
+  ],
   "native": {
     "url": "",
     "username": "",
