@@ -22,7 +22,7 @@ src/lib/beszel-client.ts        → HTTP Client (Auth, Systems, Stats, Container
 src/lib/coerce.ts               → Boundary-Validator (NaN/Infinity/Typ-Drift) + errText + validateHubUrl + coercePollInterval/coerceTimeoutMs (v0.5.0 S1)
 src/lib/state-manager.ts        → ioBroker States erstellen/updaten/cleanup, createdIds-Cache
 src/lib/i18n.ts                 → tName(key, ...args) + tDesc(key) über I18n.getTranslatedObject() (adapter-core I18n-Framework)
-admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations, Namen, Beschreibungen UND die Antworten des Verbindungstests (278 Keys × 11 Sprachen)
+admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations, Namen, Beschreibungen UND die Antworten des Verbindungstests (277 Keys × 11 Sprachen)
 src/lib/message-router.ts       → onMessage-Dispatcher (default-Branch-Contract, v0.4.5 testClient-Hooks)
 src/lib/types.ts                → TypeScript Interfaces (API + Config)
 ../scripts/sync-iopackage-from-i18n.py → regeneriert io-package.json:instanceObjects.common.name + .desc aus admin/i18n/ (zentral, source: admin-i18n)
