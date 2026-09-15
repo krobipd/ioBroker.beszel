@@ -8,7 +8,6 @@
   "systems.*.info.cores": "A plain count of what the name says; there is no unit to get wrong.",
   "systems.*.info.threads": "A plain count of what the name says; there is no unit to get wrong.",
   "systems.*.info.uptime": "The name and the second unit are the whole statement.",
-  "systems.*.info.uptime_text": "The same uptime written out for reading, and the name says so.",
   "systems.*.cpu.usage": "A reading whose name, role and unit say it all.",
   "systems.*.cpu.user": "Names its own half of the CPU split; only the odd members (iowait, steal) carry an explanation.",
   "systems.*.cpu.system": "Names its own half of the CPU split; only the odd members (iowait, steal) carry an explanation.",

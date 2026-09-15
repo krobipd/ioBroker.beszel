@@ -78,11 +78,11 @@ interface MockAdapter {
     endkey: string;
   }) => Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null>;
   delObjectAsync: (id: string, opts?: { recursive: boolean }) => Promise<void>;
-  /** Full replace, unlike the merge `extendObject` does. */
-  setObjectAsync: (id: string, obj: ObjectDef) => Promise<void>;
+  /** Full replace by FULL id, unlike the merge `extendObject` does. */
+  setForeignObjectAsync: (fullId: string, obj: ObjectDef) => Promise<void>;
   /** Every `delObjectAsync` call, in order — for tests that prove a sweep touched nothing. */
   delObjectCalls: string[];
-  /** Every `setObjectAsync` call, in order — the full write is the exception, not the rule. */
+  /** Every `setForeignObjectAsync` call (full ids), in order — the full write is the exception, not the rule. */
   setObjectCalls: string[];
 }
 
@@ -169,9 +169,14 @@ function createMockAdapter(): MockAdapter {
       }
       return Promise.resolve();
     },
-    setObjectAsync: (id: string, obj: ObjectDef): Promise<void> => {
-      setObjectCalls.push(id);
-      objects.set(id, { type: obj.type, common: { ...obj.common }, native: { ...obj.native } });
+    setForeignObjectAsync: (fullId: string, obj: ObjectDef): Promise<void> => {
+      setObjectCalls.push(fullId);
+      // The manager addresses the full id here (the fleet form for a state losing a key).
+      objects.set(fullId.replace("beszel.0.", ""), {
+        type: obj.type,
+        common: { ...obj.common },
+        native: { ...obj.native },
+      });
       return Promise.resolve();
     },
   };
@@ -502,26 +507,27 @@ describe("StateManager", () => {
   // -----------------------------------------------------------------------
 
   describe("updateSystem — uptime", () => {
-    it("should create uptime states when metrics_uptime is enabled", async () => {
+    it("should create the uptime state when metrics_uptime is enabled", async () => {
       await manager.updateSystem(testSystem, undefined, [], allMetricsConfig());
-      const uptime = adapter.states.get("systems.my_server.info.uptime");
-      expect(uptime?.val).to.equal(86400);
-
-      const uptimeText = adapter.states.get("systems.my_server.info.uptime_text");
-      expect(uptimeText?.val).to.equal("1d");
+      expect(adapter.states.get("systems.my_server.info.uptime")?.val).to.equal(86400);
     });
 
-    it("should NOT create uptime states when metrics_uptime is disabled", async () => {
+    it("writes no second, formatted uptime — info.uptime_text is retired (v0.18.0)", async () => {
+      // A text rendering of the same number was a second datapoint for nothing
+      // (krobi 2026-09-15); the sweep in removeRetiredStates takes it off existing installs.
+      await manager.updateSystem(testSystem, undefined, [], allMetricsConfig());
+      expect(adapter.objects.has("systems.my_server.info.uptime_text")).to.be.false;
+    });
+
+    it("should NOT create the uptime state when metrics_uptime is disabled", async () => {
       await manager.updateSystem(testSystem, undefined, [], allMetricsConfig({ metrics_uptime: false }));
       expect(adapter.states.has("systems.my_server.info.uptime")).to.be.false;
-      expect(adapter.states.has("systems.my_server.info.uptime_text")).to.be.false;
     });
 
-    it("creates no uptime datapoints for a system that never reported one (pending)", async () => {
+    it("creates no uptime datapoint for a system that never reported one (pending)", async () => {
       const sys = { ...testSystem, status: "pending" as const, info: {} };
       await manager.updateSystem(sys, undefined, [], allMetricsConfig());
       expect(adapter.objects.has("systems.my_server.info.uptime")).to.be.false;
-      expect(adapter.objects.has("systems.my_server.info.uptime_text")).to.be.false;
     });
 
     it("keeps the uptime of a system that is down — the Hub's record still carries it", async () => {
@@ -529,30 +535,10 @@ describe("StateManager", () => {
       expect(adapter.states.get("systems.my_server.info.uptime")?.val).to.equal(86400);
     });
 
-    it("should format uptime with days, hours and minutes", async () => {
-      // 2d 3h 45m = 2*86400 + 3*3600 + 45*60 = 186300
-      const sys = { ...testSystem, info: { u: 186300 } };
-      await manager.updateSystem(sys, undefined, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.info.uptime_text")?.val).to.equal("2d 3h 45m");
-    });
-
-    it("should format short uptime correctly", async () => {
-      const sys = { ...testSystem, info: { u: 300 } };
-      await manager.updateSystem(sys, undefined, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.info.uptime_text")?.val).to.equal("5m");
-    });
-
-    it("should format zero uptime as 0m", async () => {
+    it("passes an uptime of zero through as 0, not as absent", async () => {
       const sys = { ...testSystem, info: { u: 0 } };
       await manager.updateSystem(sys, undefined, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.info.uptime_text")?.val).to.equal("0m");
-    });
-
-    it("should format uptime with only hours", async () => {
-      // 2h = 7200s
-      const sys = { ...testSystem, info: { u: 7200 } };
-      await manager.updateSystem(sys, undefined, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.info.uptime_text")?.val).to.equal("2h");
+      expect(adapter.states.get("systems.my_server.info.uptime")?.val).to.equal(0);
     });
   });
 
@@ -2438,7 +2424,6 @@ describe("StateManager", () => {
 
       expect(adapter.objects.has("systems.my_server.cpu.usage")).to.be.false;
       expect(adapter.objects.has("systems.my_server.info.uptime")).to.be.false;
-      expect(adapter.objects.has("systems.my_server.info.uptime_text")).to.be.false;
       expect(adapter.objects.has("systems.my_server.info.agent_version")).to.be.false;
       expect(adapter.objects.has("systems.my_server.info.services_total")).to.be.false;
       expect(adapter.objects.has("systems.my_server.info.services_failed")).to.be.false;
@@ -2551,9 +2536,10 @@ describe("StateManager", () => {
       "disk.write_peak",
       "network.sent_peak",
       "network.recv_peak",
+      "info.uptime_text",
     ];
 
-    it("deletes the six retired peak datapoints of every existing system", async () => {
+    it("deletes the six retired peak datapoints and the formatted uptime of every existing system", async () => {
       adapter.objects.set("systems.my_server", { type: "device", common: { name: "My Server" }, native: {} });
       for (const id of RETIRED) {
         adapter.objects.set(`systems.my_server.${id}`, { type: "state", common: { name: id }, native: {} });
@@ -2570,7 +2556,7 @@ describe("StateManager", () => {
       expect(adapter.objects.has("systems.my_server.cpu.usage")).to.be.true;
       expect(adapter.objects.has("systems.my_server")).to.be.true;
       // The user-facing datapoint line reports the removals.
-      expect(manager.takeChangeCounts().removed).to.equal(6);
+      expect(manager.takeChangeCounts().removed).to.equal(7);
     });
 
     it("sweeps without probing: not a single object read for the retired ids", async () => {
@@ -2689,12 +2675,11 @@ describe("StateManager", () => {
       expect(systemStates).to.have.lengthOf(0);
     });
 
-    it("SM10: clamps a negative uptime instead of formatting '-1d -2h'", async () => {
-      // Clock skew or an agent bug can send a negative value; without the clamp
-      // the text state read "-1d -2h -3m" (audit 2026-08-22 — clamp unguarded).
+    it("passes a negative uptime through unchanged — the number is the Hub's, not the adapter's", async () => {
+      // Clock skew or an agent bug can send a negative value; the adapter reports what
+      // the Hub stores (the clamp lived in the retired text rendering).
       const sys = { ...testSystem, info: { u: -93780 } };
       await manager.updateSystem(sys, undefined, [], allMetricsConfig());
-      expect(adapter.states.get("systems.my_server.info.uptime_text")?.val).to.equal("0m");
       expect(adapter.states.get("systems.my_server.info.uptime")?.val).to.equal(-93780);
     });
 
@@ -2780,7 +2765,6 @@ describe("StateManager", () => {
       const pending: BeszelSystem = { ...testSystem, status: "pending", info: {} };
       await manager.updateSystem(pending, undefined, [], allMetricsConfig(), true, {}, true);
       expect(adapter.objects.has("systems.my_server.info.uptime")).to.be.false;
-      expect(adapter.objects.has("systems.my_server.info.uptime_text")).to.be.false;
       expect(adapter.objects.has("systems.my_server.info.agent_version")).to.be.false;
       // `info.online`/`info.status` keep the channel.
       expect(adapter.objects.has("systems.my_server.info")).to.be.true;
@@ -4306,10 +4290,10 @@ describe("StateManager", () => {
       manager.takeChangeCounts();
 
       const afterRestart = await restart();
-      // Uptime off: exactly the two scalar states info.uptime + info.uptime_text go,
-      // and the info channel itself is never deleted — no recursive removal involved.
+      // Uptime off: exactly the one scalar state info.uptime goes, and the info channel
+      // itself is never deleted — no recursive removal involved.
       await afterRestart.cleanupMetrics("my_server", allMetricsConfig({ metrics_uptime: false }));
-      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 2 });
+      expect(afterRestart.takeChangeCounts()).to.deep.equal({ created: 0, removed: 1 });
     });
 
     it("counts every datapoint lost with a system that disappeared from the Hub", async () => {
@@ -4498,7 +4482,7 @@ describe("detail collections (v0.17.0)", () => {
     });
     await manager.snapshotExistingStates();
     await manager.updateSystem(testSystem, richStats(), [], cfg(), true, extras());
-    expect(adapter.setObjectCalls).to.deep.equal(["systems.my_server.smart.dev_sda.power_cycles"]);
+    expect(adapter.setObjectCalls).to.deep.equal(["beszel.0.systems.my_server.smart.dev_sda.power_cycles"]);
     const repaired = adapter.objects.get("systems.my_server.smart.dev_sda.power_cycles");
     expect(repaired?.common).to.not.have.property("unit");
     expect(repaired?.common.custom).to.deep.equal({ "history.0": { enabled: true } });

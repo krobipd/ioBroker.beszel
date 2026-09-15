@@ -38,7 +38,7 @@ docs/<en|de>/                   → Nutzerdoku im Repo (README/datapoints/faq), 
 5. **Empty-Systems-Guard** — leere API-Antwort löscht NICHT alle Geräte
 6. **Metric-Cleanup** — deaktivierte Metriken werden beim Start gelöscht
 7. **Channel-basierter State-Tree** — States in Channels organisiert (info, cpu, memory, disk, network, temperature, battery)
-8. **Retired-State-Sweep (bis 0.17.1 Legacy-Migration)** — `removeRetiredStates()` löscht aus dem Start-Schnappschuss die Datenpunkte, die ein Release zurückgezogen hat (`RETIRED_STATE_IDS`; 0.18.0: die sechs Peaks — siehe Design 44), plus den alten `info.legacyMigrated`-Marker. Der pre-0.3.0-Sweep der flachen State-Pfade ist entfallen: öffentlich ist der Adapter seit 2026-06-06 mit ≥ 0.6, kein Nutzer hatte je die flachen States.
+8. **Retired-State-Sweep (bis 0.17.1 Legacy-Migration)** — `removeRetiredStates()` löscht aus dem Start-Schnappschuss die Datenpunkte, die ein Release zurückgezogen hat (`RETIRED_STATE_IDS`; 0.18.0: die sechs Peaks — siehe Design 44 — und `info.uptime_text`, eine zweite Darstellung von `info.uptime`, krobi 2026-09-15 „sinnlos"), plus den alten `info.legacyMigrated`-Marker. Der pre-0.3.0-Sweep der flachen State-Pfade ist entfallen: öffentlich ist der Adapter seit 2026-06-06 mit ≥ 0.6, kein Nutzer hatte je die flachen States.
 9. **State-Common Factories** — `percentCommon`, `numCommon`, `textCommon`, `boolCommon` eliminieren Boilerplate
 10. **Load-Avg Fallback** — `stats.la` bevorzugt, Fallback auf `system.info.la`
 11. **Temperatur** — Durchschnitt der 3 heißesten Sensoren + heißester Einzelsensor (`temperature.max`, F7)
@@ -340,25 +340,28 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     Darum zwei Modi: `"system"` urteilt an der `systems`-Zeile (immer da, Buchhaltung des Hubs, kein
     Sample) und löscht ohne Entprellung — auch weil die Suite den Baum nach EINEM Poll misst
     (`pollInterval: 60`, Settle 3 s); ein Zwei-Poll-Entprellen wäre dort unsichtbar geblieben.
-    Gilt für `info.uptime`/`uptime_text` (`info.u`), `info.agent_version` (`info.v`), `cpu.load_*`.
+    Gilt für `info.uptime` (`info.u`), `info.agent_version` (`info.v`), `cpu.load_*`.
 50. **Ein Platzhalter im gespeicherten Objekt braucht EINE Vollschreibung (v0.18.0, CI-Fund)** — die
     fünf ZFS-/SMART-Zähler trugen bis 0.17.1 `unit: ""`; 0.18.0 lässt das Feld weg (Q5). `extendObject`
     ist ein Deep-Merge (js-controller 7.2.2: `node.extend`, kopiert `null`, überspringt nur
     `undefined`) — der alte Schlüssel bleibt, `null` würde als `null` gespeichert, nicht entfernt, und
     die Aufstiegs-Suite vergleicht `JSON.stringify(unit)` (absent ≠ null). Der Start-Schnappschuss
     merkt sich genau die Objekte mit `unit: ""` (`staleUnitObjects`), `ensureStateObject` ersetzt
-    jedes davon einmal per `setObjectAsync` — ohne `unit`, mit allem anderen, das der Speicher hält
-    (`custom`, `acl`) — danach ist es der normale Merge. Trägt das aktuelle `common` selbst eine
+    jedes davon einmal per `setForeignObjectAsync(<volle Id>)` — ohne `unit`, mit allem anderen, das
+    der Speicher hält (`custom`, `acl`) — danach ist es der normale Merge. Die Form ist krobis
+    Flottenentscheidung vom 2026-09-12 für State-Objekte, die einen Schlüssel verlieren: kein
+    `delObject`+Neuanlage (streicht die Id aus jedem Enum), kein `setObject` (Prüfbot S5054 —
+    `setObjectAsync` wäre dieselbe Umgehung). Trägt das aktuelle `common` selbst eine
     Einheit, ist es ein normaler Merge (`°C` überschreibt `""`).
 
-## Tests (772 unit + 58 package + 1 integration + 2 inventory)
+## Tests (770 unit + 58 package + 1 integration + 2 inventory)
 
-Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit, den zwei CI-Funden und dem Wegfall
-der Klartext-Warnung, `vitest run`): state-manager 364 · coerce 156 · main 113 · beszel-client 75 ·
-message-router 17 · repo-standards 19 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen
-Version) · device-icons 12 · inventory 9 · i18n 7. `vitest list` (das Maß des D10-Gates) zählt 735, weil
-die Prüfpaket-Tests erst zur Laufzeit entstehen. Deckung **99,0 % Stmts · 97,8 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt,
-ist unerreichbar (https-Transport ohne TLS-Server) oder Test-Seam/Bootstrap in `main.ts`.
+Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit, den zwei CI-Funden, dem Wegfall
+der Klartext-Warnung und von `info.uptime_text`, `vitest run`): state-manager 362 · coerce 156 ·
+main 113 · beszel-client 75 · message-router 17 · repo-standards 19 (aus `iobroker-adapter-checks` —
+die Zahl steigt mit dessen Version) · device-icons 12 · inventory 9 · i18n 7. `vitest list` (das Maß
+des D10-Gates) zählt 733, weil die Prüfpaket-Tests erst zur Laufzeit entstehen. Deckung **99,0 % Stmts ·
+97,8 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 

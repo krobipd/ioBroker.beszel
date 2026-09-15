@@ -102,7 +102,6 @@
   "threads": "Wątki CPU",
   "podman": "Podman",
   "uptime": "Czas pracy",
-  "uptimeFormatted": "Czas pracy (formatowany)",
   "writeSpeed": "Prędkość zapisu",
   "channelCores": "Rdzenie CPU",
   "channelInterfaces": "Interfejsy sieciowe",

@@ -588,31 +588,6 @@ export function osLabel(os: number | undefined): string | null {
 }
 
 /**
- * Format a duration in seconds as a compact `Dd Hh Mm` string.
- *
- * @param seconds Uptime in seconds.
- */
-export function formatUptime(seconds: number): string {
-  // v0.4.3 (SM10): clamp >= 0 — clock-skew or agent bug could send a
-  // negative value, which used to produce strings like "-1d -2h -3m".
-  const s = Math.max(0, seconds);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const parts: string[] = [];
-  if (d > 0) {
-    parts.push(`${d}d`);
-  }
-  if (h > 0) {
-    parts.push(`${h}h`);
-  }
-  if (m > 0 || parts.length === 0) {
-    parts.push(`${m}m`);
-  }
-  return parts.join(" ");
-}
-
-/**
  * Build the StateCommon for a metric definition via the existing factories.
  *
  * @param def Metric definition (kind/unit/role/nameKey) to build the common from.
@@ -865,16 +840,6 @@ export function buildMetricDefs(): MetricDef[] {
       available: hasUptime,
       goneWhenAbsent: "system",
       extract: s => s.info.u ?? null,
-    },
-    {
-      toggle: "metrics_uptime",
-      channel: "info",
-      id: "info.uptime_text",
-      nameKey: "uptimeFormatted",
-      kind: "text",
-      available: hasUptime,
-      goneWhenAbsent: "system",
-      extract: s => (s.info.u != null ? formatUptime(s.info.u) : null),
     },
     {
       toggle: "metrics_agentVersion",

@@ -102,7 +102,6 @@
   "threads": "CPU 线程数",
   "podman": "Podman",
   "uptime": "运行时间",
-  "uptimeFormatted": "运行时间（格式化）",
   "writeSpeed": "写入速度",
   "channelCores": "CPU 核心",
   "channelInterfaces": "网络接口",

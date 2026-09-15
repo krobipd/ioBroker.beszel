@@ -14,7 +14,7 @@ Basis-Schalter; ihre drei Einträge sind unabhängig.
 
 | Schalter         | Datenpunkte                                                                                                                                                 | Hinweis                                                               |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Uptime _(an)_    | `info.uptime`, `info.uptime_text`                                                                                                                           | Sekunden, dazu lesbar als `3d 4h 12m`                                 |
+| Uptime _(an)_    | `info.uptime`                                                                                                                                               | Sekunden seit dem letzten Start                                       |
 | System info      | `info.hostname`, `info.os`, `info.os_name`, `info.kernel`, `info.cpu_model`, `info.arch`, `info.cores`, `info.threads`, `info.podman`, `info.agent_version` | statische Daten, einmal beim Start und bei einem neuen System gelesen |
 | Systemd Services | `info.services_total`, `info.services_failed`                                                                                                               | nur Linux mit systemd                                                 |
 

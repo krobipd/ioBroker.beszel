@@ -102,7 +102,6 @@
   "threads": "CPU Threads",
   "podman": "Podman",
   "uptime": "Uptime",
-  "uptimeFormatted": "Uptime (formatted)",
   "writeSpeed": "Write Speed",
   "channelCores": "CPU Cores",
   "channelInterfaces": "Network Interfaces",

@@ -102,7 +102,6 @@
   "threads": "Потоки ЦП",
   "podman": "Podman",
   "uptime": "Время работы",
-  "uptimeFormatted": "Время работы (форматированное)",
   "writeSpeed": "Скорость записи",
   "channelCores": "Ядра ЦП",
   "channelInterfaces": "Сетевые интерфейсы",

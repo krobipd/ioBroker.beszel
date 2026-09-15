@@ -68,12 +68,14 @@ export interface SystemExtras {
  * State ids (relative to the system device) that a release retired. Swept from the
  * startup snapshot: an id that exists gets deleted, an id that does not costs nothing.
  *
- * 0.18.0: the six peak datapoints. No real Hub ever delivered a peak value — the
- * `Max*` fields are `cbor:"-"` and exist only in the 10m+ aggregates the adapter never
- * reads — so on a real install this sweep is a no-op. It exists because the v0.17.1
- * inventory fixture fabricated the fields, the promotion suite seeds that inventory
- * before the upgrade and demands that removed objects are gone. Removable after the
- * 0.18.0 tag.
+ * 0.18.0: the six peak datapoints and `info.uptime_text`. No real Hub ever delivered a
+ * peak value — the `Max*` fields are `cbor:"-"` and exist only in the 10m+ aggregates
+ * the adapter never reads — so for those six the sweep is a no-op on a real install; they
+ * are listed because the v0.17.1 inventory fixture fabricated the fields, the promotion
+ * suite seeds that inventory before the upgrade and demands that removed objects are
+ * gone. `info.uptime_text` was a second rendering of `info.uptime` (krobi 2026-09-15:
+ * pointless) and exists on every install that ran 0.4.x–0.17.x. Removable after the
+ * 0.18.0 tag has been the last version with any of them for a while.
  */
 const RETIRED_STATE_IDS = [
   "cpu.peak",
@@ -82,6 +84,7 @@ const RETIRED_STATE_IDS = [
   "disk.write_peak",
   "network.sent_peak",
   "network.recv_peak",
+  "info.uptime_text",
 ] as const;
 
 /**
@@ -136,7 +139,9 @@ export class StateManager {
    * unitless counters. `extendObject` is a deep merge: a key the new common no longer
    * carries stays as it is, and `null` would be stored as null, not removed (js-controller
    * merges with `node.extend`, which copies null and skips only undefined). The one write
-   * that clears it needs the whole stored object, so the snapshot keeps exactly these.
+   * that clears it replaces the whole stored object, so the snapshot keeps exactly these.
+   * Replacing, not delete + recreate: `delObject` strips the id from every enum (the
+   * user's room/function assignment), a plain replace touches neither value nor enums.
    */
   private readonly staleUnitObjects = new Map<string, ioBroker.StateObject>();
 
@@ -1883,10 +1888,12 @@ export class StateManager {
       // The stored object carries a `unit: ""` placeholder the current common does not
       // — a merge cannot drop a key (see `staleUnitObjects`), so this one write replaces
       // the object, keeping everything else the store holds (`custom`, `acl`, …).
+      // `setForeignObject` with the full id is the form the fleet uses for exactly this
+      // (a state object losing a key); `setObject` is on the checker's deprecated list.
       this.staleUnitObjects.delete(id);
       const kept = { ...stale.common };
       delete kept.unit;
-      await this.adapter.setObjectAsync(id, {
+      await this.adapter.setForeignObjectAsync(`${this.adapter.namespace}.${id}`, {
         ...stale,
         type: "state",
         common: { ...kept, ...common },

@@ -102,7 +102,6 @@
   "threads": "Threads da CPU",
   "podman": "Podman",
   "uptime": "Tempo ativo",
-  "uptimeFormatted": "Tempo ativo (formatado)",
   "writeSpeed": "Velocidade de escrita",
   "channelCores": "Núcleos da CPU",
   "channelInterfaces": "Interfaces de rede",

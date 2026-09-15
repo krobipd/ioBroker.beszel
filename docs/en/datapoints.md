@@ -13,7 +13,7 @@ Only the System category has no such base switch; its three entries are independ
 
 | Switch           | Datapoints                                                                                                                                                  | Notes                                                         |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Uptime _(on)_    | `info.uptime`, `info.uptime_text`                                                                                                                           | seconds, plus a readable `3d 4h 12m`                          |
+| Uptime _(on)_    | `info.uptime`                                                                                                                                               | seconds since the last boot                                   |
 | System info      | `info.hostname`, `info.os`, `info.os_name`, `info.kernel`, `info.cpu_model`, `info.arch`, `info.cores`, `info.threads`, `info.podman`, `info.agent_version` | static data, read once at start and when a new system appears |
 | Systemd Services | `info.services_total`, `info.services_failed`                                                                                                               | Linux with systemd only                                       |
 

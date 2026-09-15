@@ -118,7 +118,6 @@ beszel.0.
         │   ├── online               — Is system up? (bool, used as device indicator)
         │   ├── status               — Status string (up/down/paused/pending, or unknown while the adapter is not reading)
         │   ├── uptime               — Uptime in seconds
-        │   ├── uptime_text          — Human-readable uptime (e.g. "14d 6h")
         │   ├── agent_version *      — Beszel agent version
         │   ├── hostname *           — Host name (System info)
         │   ├── os *                 — Operating system (Linux/macOS/Windows/FreeBSD)
@@ -297,6 +296,7 @@ beszel.0.
 - Changed: the messages of the connection test follow the system language, and the test runs with the configured request timeout
 - Changed: SMART and dataset text columns the Hub does not carry read as empty (null) instead of an empty string
 - Changed: the warning about a plain-http Hub URL is gone — http on the local network is how Beszel is normally deployed
+- Changed: `info.uptime_text` is gone — it was `info.uptime` a second time as text; existing installations lose it on the first start
 
 ### 0.17.1 (2026-09-07)
 
