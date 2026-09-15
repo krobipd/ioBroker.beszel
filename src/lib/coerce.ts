@@ -695,30 +695,6 @@ export function validateHubUrl(url: unknown): string | null {
 }
 
 /**
- * SEC-3b: true when the Hub URL uses plain http to a NON-loopback host — then
- * the login + bearer token travel the LAN in cleartext. Loopback (same machine)
- * and https are fine. Used only for a one-time advisory warning, never to block
- * startup (plain http on the LAN is the normal Beszel deployment).
- *
- * @param url The raw Hub URL (already validated as http(s) by validateHubUrl).
- */
-export function isPlaintextRemoteUrl(url: unknown): boolean {
-  if (typeof url !== "string") {
-    return false;
-  }
-  try {
-    const u = new URL(url.trim());
-    if (u.protocol !== "http:") {
-      return false;
-    }
-    const host = u.hostname.toLowerCase();
-    return host !== "localhost" && host !== "127.0.0.1" && host !== "::1" && host !== "[::1]";
-  } catch {
-    return false;
-  }
-}
-
-/**
  * N3: parse a numeric admin-config value (number or numeric string) to a finite
  * number, falling back to `fallback` when absent/unparseable. The finite/clamp
  * prolog was duplicated by coercePollInterval and coerceTimeoutMs.

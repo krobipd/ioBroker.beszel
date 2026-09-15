@@ -27,9 +27,7 @@ bereits angelegten Container-Datenpunkte.
    Instanz-Einstellungen öffnen.
 2. **Hub-Adresse eintragen** unter _Beszel Hub URL_ — dieselbe Adresse, mit der Sie die
    Beszel-Weboberfläche öffnen, zum Beispiel `http://192.168.1.100:8090`. Eine IPv6-Adresse steht
-   in eckigen Klammern: `http://[fd00::1]:8090`. `http` und `https` funktionieren beide; bei `http`
-   auf eine andere Maschine als den ioBroker-Host laufen Anmeldung und Sitzungsschlüssel
-   unverschlüsselt über das Netz, und der Adapter sagt das einmal im Protokoll.
+   in eckigen Klammern: `http://[fd00::1]:8090`. `http` und `https` funktionieren beide.
 3. **Benutzername und Passwort eintragen.** Der Benutzername ist die E-Mail-Adresse Ihrer
    Beszel-Anmeldung.
 4. **Auf _Test Connection_ drücken.** Es wird eine echte Anmeldung am Hub durchgeführt; bei einem

@@ -351,13 +351,13 @@ Konfigurierbare Metriken (global für alle Systeme), gruppiert in Kategorien (Sy
     (`custom`, `acl`) — danach ist es der normale Merge. Trägt das aktuelle `common` selbst eine
     Einheit, ist es ein normaler Merge (`°C` überschreibt `""`).
 
-## Tests (777 unit + 58 package + 1 integration + 2 inventory)
+## Tests (772 unit + 58 package + 1 integration + 2 inventory)
 
-Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit + den zwei CI-Funden, `vitest run`):
-state-manager 364 · coerce 160 · main 114 · beszel-client 75 · message-router 17 · repo-standards 19
-(aus `iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · device-icons 12 · inventory 9 ·
-i18n 7. `vitest list` (das Maß des D10-Gates) zählt 740, weil die Prüfpaket-Tests erst zur Laufzeit
-entstehen. Deckung **99,0 % Stmts · 97,8 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt,
+Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit, den zwei CI-Funden und dem Wegfall
+der Klartext-Warnung, `vitest run`): state-manager 364 · coerce 156 · main 113 · beszel-client 75 ·
+message-router 17 · repo-standards 19 (aus `iobroker-adapter-checks` — die Zahl steigt mit dessen
+Version) · device-icons 12 · inventory 9 · i18n 7. `vitest list` (das Maß des D10-Gates) zählt 735, weil
+die Prüfpaket-Tests erst zur Laufzeit entstehen. Deckung **99,0 % Stmts · 97,8 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt,
 ist unerreichbar (https-Transport ohne TLS-Server) oder Test-Seam/Bootstrap in `main.ts`.
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).

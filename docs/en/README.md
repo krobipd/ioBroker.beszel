@@ -24,9 +24,7 @@ datapoints it already created.
 1. **Install and create an instance.** In ioBroker, install `beszel` and open the instance settings.
 2. **Enter the Hub URL** under _Beszel Hub URL_ — the same address you open the Beszel web
    interface with, for example `http://192.168.1.100:8090`. An IPv6 address goes in brackets:
-   `http://[fd00::1]:8090`. Both `http` and `https` work; over `http` to a machine other than the
-   ioBroker host, login and token travel the network unencrypted and the adapter says so once in
-   the log.
+   `http://[fd00::1]:8090`. Both `http` and `https` work.
 3. **Enter username and password.** The username is the email address of your Beszel login.
 4. **Press _Test Connection_.** It performs a real login against the Hub and reports the actual
    error if something is wrong — a wrong password, an unreachable host, a typo in the URL.

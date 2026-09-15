@@ -296,6 +296,7 @@ beszel.0.
 - Changed: the four "Peak values" options are gone — a Hub never delivers peak values in the minute records the adapter reads, so they never produced a datapoint
 - Changed: the messages of the connection test follow the system language, and the test runs with the configured request timeout
 - Changed: SMART and dataset text columns the Hub does not carry read as empty (null) instead of an empty string
+- Changed: the warning about a plain-http Hub URL is gone — http on the local network is how Beszel is normally deployed
 
 ### 0.17.1 (2026-09-07)
 

@@ -359,16 +359,12 @@ describe("BeszelAdapter onReady", () => {
     expect(i.setInterval).not.toHaveBeenCalled();
   });
 
-  it("SEC-3b: warns when the Hub URL is plain http to a remote host", async () => {
+  it("says nothing about a plain-http Hub URL (v0.18.0)", async () => {
+    // Plain http on the LAN is the normal Beszel deployment; the cleartext warning of
+    // 0.5.x–0.17.x told every user what their own setup looks like (removed on request,
+    // 2026-09-15). The URL is still validated — only the lecture is gone.
     const { adapter } = await setupReady(); // default url = http://192.168.1.5:8090 (remote http)
-    expect(internalOf(adapter).log.warn).toHaveBeenCalledWith(expect.stringContaining("cleartext"));
-  });
-
-  it("SEC-3b: does NOT warn for https or loopback http", async () => {
-    const https = await setupReady({ url: "https://192.168.1.5:8090" });
-    expect(internalOf(https.adapter).log.warn).not.toHaveBeenCalledWith(expect.stringContaining("cleartext"));
-    const loopback = await setupReady({ url: "http://localhost:8090" });
-    expect(internalOf(loopback.adapter).log.warn).not.toHaveBeenCalledWith(expect.stringContaining("cleartext"));
+    expect(internalOf(adapter).log.warn).not.toHaveBeenCalledWith(expect.stringContaining("http"));
   });
 
   it("the scheduled callback really polls again — not just a timer that exists", async () => {

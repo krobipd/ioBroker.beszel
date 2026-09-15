@@ -6,7 +6,6 @@ import {
   coercePollInterval,
   coerceTimeoutMs,
   errText,
-  isPlaintextRemoteUrl,
   sanitizeForLog,
   shouldFetchSystemDetails,
   validateHubUrl,
@@ -307,14 +306,6 @@ export class BeszelAdapter extends utils.Adapter {
         this.log.error(`Beszel Hub URL is invalid — ${urlError}. Adapter will not start.`);
         return;
       }
-      // SEC-3b: warn (do not block) when the Hub is reached over plain http on a
-      // remote host — login + token then cross the network in cleartext.
-      if (isPlaintextRemoteUrl(config.url)) {
-        this.log.warn(
-          "Beszel Hub URL uses plain http to a remote host — credentials and token travel the network in cleartext. Use https if the Hub is reachable beyond this machine.",
-        );
-      }
-
       const timeoutMs = coerceTimeoutMs(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
       this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);

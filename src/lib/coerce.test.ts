@@ -16,7 +16,6 @@ import {
   coerceSystemStatsRecord,
   coerceTimeoutMs,
   errText,
-  isPlaintextRemoteUrl,
   sanitizeForLog,
   sanitizeDisplayName,
   shouldFetchSystemDetails,
@@ -1075,33 +1074,6 @@ describe("coerce", () => {
 
     it("leaves a normal display name unchanged", () => {
       expect(sanitizeDisplayName("NVIDIA RTX 4090")).to.equal("NVIDIA RTX 4090");
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // isPlaintextRemoteUrl (SEC-3b)
-  // -----------------------------------------------------------------------
-
-  describe("isPlaintextRemoteUrl (SEC-3b)", () => {
-    it("true for plain http to a remote host", () => {
-      expect(isPlaintextRemoteUrl("http://192.168.1.100:8090")).to.be.true;
-      expect(isPlaintextRemoteUrl("http://beszel.lan")).to.be.true;
-    });
-
-    it("false for https", () => {
-      expect(isPlaintextRemoteUrl("https://192.168.1.100:8090")).to.be.false;
-    });
-
-    it("false for http to a loopback host", () => {
-      expect(isPlaintextRemoteUrl("http://localhost:8090")).to.be.false;
-      expect(isPlaintextRemoteUrl("http://127.0.0.1:8090")).to.be.false;
-      expect(isPlaintextRemoteUrl("http://[::1]:8090")).to.be.false;
-    });
-
-    it("false for non-string / malformed input", () => {
-      expect(isPlaintextRemoteUrl(null)).to.be.false;
-      expect(isPlaintextRemoteUrl(undefined)).to.be.false;
-      expect(isPlaintextRemoteUrl("not a url")).to.be.false;
     });
   });
 });
