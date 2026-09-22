@@ -275,7 +275,7 @@ beszel.0.
     ### **WORK IN PROGRESS**
 -->
 
-### 0.18.0 (2026-09-15)
+### 0.18.0 (2026-09-15) — stable
 
 - New: every system carries a pictogram of its operating system in the object tree — the same icons the Beszel web UI uses, readable in the light and the dark theme
 - Fixed: network upload/download were always empty against a Beszel Hub 0.19.0 or newer; they carry values again, and older Hubs keep working
