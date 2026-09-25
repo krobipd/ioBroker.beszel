@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "beszel",
-    "version": "0.18.0",
+    "version": "0.19.0",
     "news": {
+      "0.19.0": {
+        "en": "Network monitors, container update flag and btrfs pools (Beszel 0.20.0); a dead login no longer keeps systems green, and refused logins say why.",
+        "de": "Netzwerk-Monitore, Container-Update-Hinweis und btrfs-Pools (Beszel 0.20.0); eine tote Anmeldung lässt Systeme nicht mehr grün, Ablehnungen nennen den Grund.",
+        "ru": "Сетевые мониторы, признак обновления контейнеров и пулы btrfs (Beszel 0.20.0); недействительный вход больше не оставляет системы зелёными, отказ объясняется.",
+        "pt": "Monitores de rede, aviso de atualização de contentores e pools btrfs (Beszel 0.20.0); um login inválido já não deixa sistemas a verde; recusas dizem porquê.",
+        "nl": "Netwerkmonitors, container-updatemelding en btrfs-pools (Beszel 0.20.0); een verlopen login laat systemen niet meer groen, weigeringen noemen de reden.",
+        "fr": "Moniteurs réseau, mise à jour des conteneurs et pools btrfs (Beszel 0.20.0) ; une connexion expirée ne laisse plus les systèmes au vert, un refus dit pourquoi.",
+        "it": "Monitor di rete, avviso aggiornamento container e pool btrfs (Beszel 0.20.0); un accesso scaduto non lascia più i sistemi verdi, i rifiuti dicono il motivo.",
+        "es": "Monitores de red, aviso de actualización de contenedores y pools btrfs (Beszel 0.20.0); un inicio caducado ya no deja sistemas en verde; los rechazos dicen por qué.",
+        "pl": "Monitory sieci, informacja o aktualizacji kontenerów i pule btrfs (Beszel 0.20.0); wygasłe logowanie nie zostawia systemów na zielono, odmowa podaje powód.",
+        "uk": "Мережеві монітори, ознака оновлення контейнерів і пули btrfs (Beszel 0.20.0); недійсний вхід більше не лишає системи зеленими, відмова пояснюється.",
+        "zh-cn": "来自 Beszel 0.20.0 的网络监视器、容器更新标记和 btrfs 存储池；失效的登录不再让系统保持绿色，登录被拒时会说明原因。"
+      },
       "0.18.0": {
         "en": "Network and disk throughput work again with Beszel Hub 0.19.0 and newer, every system shows a pictogram of its operating system, and datapoints a machine cannot fill are removed.",
         "de": "Netz- und Plattendurchsatz funktionieren wieder mit Beszel Hub 0.19.0 und neuer, jedes System zeigt ein Piktogramm seines Betriebssystems, und Datenpunkte ohne Hardware werden entfernt.",
@@ -80,19 +93,6 @@
         "pl": "Porządki wewnętrzne. Brak zmian dla użytkownika.",
         "uk": "Внутрішнє впорядкування. Змін для користувачів немає.",
         "zh-cn": "内部整理。用户无感知变化。"
-      },
-      "0.14.1": {
-        "en": "Datapoints of a system that is currently offline now receive the corrected names and descriptions too.",
-        "de": "Datenpunkte eines gerade nicht erreichbaren Systems bekommen jetzt ebenfalls die korrigierten Namen und Beschreibungen.",
-        "ru": "Датапоинты системы, недоступной в данный момент, теперь тоже получают исправленные имена и описания.",
-        "pt": "Os pontos de dados de um sistema atualmente offline recebem agora também os nomes e descrições corrigidos.",
-        "nl": "Datapunten van een systeem dat momenteel offline is, krijgen nu ook de gecorrigeerde namen en beschrijvingen.",
-        "fr": "Les points de données d'un système actuellement hors ligne reçoivent désormais aussi les noms et descriptions corrigés.",
-        "it": "Anche i datapoint di un sistema attualmente offline ricevono ora i nomi e le descrizioni corretti.",
-        "es": "Los puntos de datos de un sistema actualmente sin conexión reciben ahora también los nombres y descripciones corregidos.",
-        "pl": "Punkty danych systemu, który jest obecnie offline, otrzymują teraz również poprawione nazwy i opisy.",
-        "uk": "Точки даних системи, яка зараз офлайн, тепер теж отримують виправлені назви та описи.",
-        "zh-cn": "当前离线系统的数据点现在同样会收到更正后的名称和说明。"
       }
     },
     "plugins": {

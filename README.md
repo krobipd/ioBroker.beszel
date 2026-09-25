@@ -299,7 +299,7 @@ beszel.0.
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 0.19.0 (2026-09-25)
 
 - New: network monitors (Beszel 0.20.0) as an opt-in metric — response time, hourly average/fastest/slowest and loss for every ping, TCP, HTTP and DNS monitor set up on the Hub
 - New: containers show whether an image update is available (Beszel 0.20.0)
@@ -367,10 +367,6 @@ beszel.0.
 - Changed: a container's health is now a proper status datapoint with its list of possible values, like the system status next to it
 - Improved: starting up puts far less load on the ioBroker database, which shows most with many systems or many metrics switched off
 - Changed: user documentation now covers the ZFS pools, the root disk name and the read/write totals
-
-### 0.15.0 (2026-09-05)
-
-- New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

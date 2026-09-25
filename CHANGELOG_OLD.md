@@ -1,5 +1,9 @@
 # Older Changes
 
+## 0.15.0 (2026-09-05)
+
+- New: ZFS pools with usage, throughput and health as an opt-in metric, the root disk's custom name and cumulative read/write totals for disks and filesystems on Beszel 0.19.0.
+
 ## 0.14.2 (2026-09-05)
 
 - Changed: Internal cleanup. No user-facing changes.
