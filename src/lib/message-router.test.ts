@@ -36,7 +36,7 @@ interface TestHarness {
  * @param checkConnectionResult Canned answer of the connection check, omitted = success
  */
 function makeHarness(
-  checkConnectionResult?: { success: true; systems: number } | { success: false; reason: string },
+  checkConnectionResult?: { success: true; systems: number } | { success: false; reason: string; code?: string },
 ): TestHarness {
   const sends: SentMessage[] = [];
   const logs: { level: "debug" | "warn"; msg: string }[] = [];
@@ -214,6 +214,24 @@ describe("dispatchMessage", () => {
         error: "msgConnectionFailed:Authentication failed — check username and password",
       });
       expect(h.sends[0].response).to.not.have.property("success");
+    });
+
+    it("a 404 names the likely mistake instead of the raw answer", async () => {
+      const h = makeHarness({ success: false, reason: "HTTP 404: {}", code: "NOT_FOUND" });
+      await dispatchMessage(
+        buildMessage({ command: "checkConnection", message: { url: "http://h/wrong", username: "u", password: "p" } }),
+        h.deps,
+      );
+      expect(h.sends[0].response).to.deep.equal({ error: "msgHubNotFound" });
+    });
+
+    it("any other failure keeps the raw reason", async () => {
+      const h = makeHarness({ success: false, reason: "HTTP 500: boom", code: "HTTP_ERROR" });
+      await dispatchMessage(
+        buildMessage({ command: "checkConnection", message: { url: "http://h", username: "u", password: "p" } }),
+        h.deps,
+      );
+      expect(h.sends[0].response).to.deep.equal({ error: "msgConnectionFailed:HTTP 500: boom" });
     });
   });
 

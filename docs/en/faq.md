@@ -10,6 +10,9 @@ The button performs a real login and reports the Hub's own answer, so the messag
   `DISABLE_PASSWORD_AUTH=true`; the log names which of the three it is.
 - **Cannot reach the host** — check the URL by opening it in a browser from the ioBroker machine.
   The address must include the port, for example `http://192.168.1.100:8090`.
+- **API not found (404)** — the address answers, but not with the Beszel API: a Hub behind a
+  reverse proxy needs its path in the URL (`https://example.org/beszel`), and the port must be the
+  Hub's, not another service's.
 - **Certificate not trusted** — an https Hub with a self-signed certificate is refused. Use the
   Hub's http address on the local network, or a certificate the ioBroker host trusts.
 - **Connected, but no systems visible** — the login works, but the user is assigned to no system.

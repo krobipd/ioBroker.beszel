@@ -306,6 +306,7 @@
   "help_metric_servicesDetails": "State, sub-state, CPU, memory and their peaks per systemd unit — one channel per unit. Can be many datapoints on a busy host.",
   "msgConnected": "Connected — %s system(s) visible to this account",
   "msgConnectionFailed": "Connection failed: %s",
+  "msgHubNotFound": "Connection failed: the Beszel Hub API was not found at this address (404) — check the URL, including a reverse-proxy path.",
   "msgConnectedNoSystems": "Logged in, but this account sees no systems — assign the user to the systems on the Hub (or run the Hub with SHARE_ALL_SYSTEMS=true)",
   "msgUrlInvalid": "Hub URL is invalid: %s",
   "msgCredentialsRequired": "URL, e-mail and password are required",

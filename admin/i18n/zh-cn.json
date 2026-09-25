@@ -306,6 +306,7 @@
   "help_metric_servicesDetails": "每个 systemd 单元的状态、子状态、CPU、内存及其峰值——每个单元一个通道。在繁忙主机上可能产生大量数据点。",
   "msgConnected": "已连接 — 此账户可见 %s 个系统",
   "msgConnectionFailed": "连接失败：%s",
+  "msgHubNotFound": "连接失败：此地址上未找到 Beszel Hub API（404）——请检查 URL，包括反向代理路径。",
   "msgConnectedNoSystems": "已登录，但此账户看不到任何系统 — 请在 Hub 中将该用户分配给系统（或以 SHARE_ALL_SYSTEMS=true 运行 Hub）",
   "msgUrlInvalid": "Hub URL 无效：%s",
   "msgCredentialsRequired": "需要 URL、电子邮箱和密码",

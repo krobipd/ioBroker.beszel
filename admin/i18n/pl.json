@@ -306,6 +306,7 @@
   "help_metric_servicesDetails": "Stan, podstan, CPU, pamięć i ich wartości szczytowe dla każdej jednostki systemd — jeden kanał na jednostkę. Na obciążonym hoście może to być wiele punktów danych.",
   "msgConnected": "Połączono — systemy widoczne dla tego konta: %s",
   "msgConnectionFailed": "Połączenie nie powiodło się: %s",
+  "msgHubNotFound": "Połączenie nieudane: pod tym adresem nie ma API Beszel Hub (404) — sprawdź URL, także ścieżkę reverse proxy.",
   "msgConnectedNoSystems": "Zalogowano, ale to konto nie widzi żadnych systemów — przypisz użytkownika do systemów w hubie (lub uruchom hub z SHARE_ALL_SYSTEMS=true)",
   "msgUrlInvalid": "Nieprawidłowy adres URL huba: %s",
   "msgCredentialsRequired": "Wymagane są adres URL, e-mail i hasło",

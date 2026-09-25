@@ -306,6 +306,7 @@
   "help_metric_servicesDetails": "État, sous-état, processeur, mémoire et leurs pics par unité systemd — un canal par unité. Sur un hôte chargé, cela peut faire beaucoup de points de données.",
   "msgConnected": "Connecté — %s système(s) visible(s) pour ce compte",
   "msgConnectionFailed": "Échec de la connexion : %s",
+  "msgHubNotFound": "Échec de la connexion : l'API du Beszel Hub est introuvable à cette adresse (404) — vérifiez l'URL, y compris un chemin de proxy inverse.",
   "msgConnectedNoSystems": "Connecté, mais ce compte ne voit aucun système — attribuez l'utilisateur aux systèmes dans le Hub (ou lancez le Hub avec SHARE_ALL_SYSTEMS=true)",
   "msgUrlInvalid": "URL du Hub non valide : %s",
   "msgCredentialsRequired": "L'URL, l'e-mail et le mot de passe sont requis",

@@ -144,6 +144,13 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
           deps.log.debug(
             `checkConnection: result=${result.success ? `ok (${result.systems} system(s))` : `fail (${result.reason})`}`,
           );
+          // A 404 on the login means the address answers, but not with the Hub API — a
+          // reverse-proxy path left out, or another service at that port. The raw 404 body
+          // says nothing to the user; the hint names the likely mistake.
+          if (!result.success && result.code === "NOT_FOUND") {
+            deps.sendTo(obj.from, obj.command, { error: tText("msgHubNotFound") }, obj.callback);
+            return;
+          }
           // H1: the admin ConfigSendto component reads ONLY response.error/result —
           // never success/message. Map the outcome to that contract so a FAILED test
           // shows the real error instead of a false-positive "Ok" (fleet fix, see

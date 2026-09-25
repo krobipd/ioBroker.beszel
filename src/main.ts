@@ -1144,6 +1144,11 @@ export class BeszelAdapter extends utils.Adapter {
     } else if (errorCode === "INVALID_RESPONSE") {
       this.log.warn("The answer is not the Beszel Hub API — does the URL point at the Hub?");
       this.log.debug(`Poll failed: ${errMsg}`);
+    } else if (errorCode === "NOT_FOUND") {
+      this.log.warn(
+        "The Beszel Hub API was not found at this URL (404) — does it point at the Hub, including a reverse-proxy path?",
+      );
+      this.log.debug(`Poll failed: ${errMsg}`);
     } else if (errorCode === "TRUNCATED") {
       this.log.warn("The Hub holds more records than the adapter reads in one go — no update this time");
       this.log.debug(`Poll failed: ${errMsg}`);

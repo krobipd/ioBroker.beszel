@@ -568,8 +568,13 @@ describe("BeszelAdapter shutdown while a poll is in flight", () => {
     expect(stateMgr.updateSystem).not.toHaveBeenCalled();
   });
 
-  it("a stop while the hardware details are read writes no system", async () => {
-    const { adapter, client, stateMgr } = setup();
+  it("a stop while the hardware details are read writes no system and asks the Hub nothing more", async () => {
+    const { adapter, client, stateMgr } = setup({
+      metrics_smart: true,
+      metrics_services: true,
+      metrics_servicesDetails: true,
+      metrics_networkMonitors: true,
+    });
     const i = internalOf(adapter);
     let release: (v: Map<string, SystemDetails>) => void = () => {};
     client.getSystemDetails.mockImplementation(
@@ -581,6 +586,10 @@ describe("BeszelAdapter shutdown while a poll is in flight", () => {
     release(new Map());
     await starting;
     expect(stateMgr.updateSystem).not.toHaveBeenCalled();
+    // The details request was the one cancelAll aborted; the collections after it must not go out.
+    expect(client.getSmartDevices).not.toHaveBeenCalled();
+    expect(client.getSystemdServices).not.toHaveBeenCalled();
+    expect(client.getNetworkMonitors).not.toHaveBeenCalled();
   });
 
   it("does not log the aborted poll as an error and writes nothing after onUnload", async () => {
@@ -1111,6 +1120,7 @@ describe("BeszelAdapter poll — error classification routing", () => {
       ["DEPTH_ZERO_SELF_SIGNED_CERT", "certificate is not trusted"],
       ["INVALID_RESPONSE", "does the URL point at the Hub"],
       ["TRUNCATED", "more records than the adapter reads"],
+      ["NOT_FOUND", "not found at this URL"],
     ];
     for (const [code, text] of cases) {
       const { adapter, client } = await setupReady();

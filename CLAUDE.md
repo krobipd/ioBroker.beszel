@@ -112,14 +112,16 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 62. **Netzwerk-Monitore (0.19.0, Beszel 0.20.0)** — eigener Schalter, Standard aus; `network_monitors` jeder Poll plus der jüngste 1m-Datensatz je Monitor aus `network_monitor_stats`; Kanal-Id aus Protokoll + Ziel (+ Port bei tcp), Antwortzeiten µs → ms, 0 ⇒ leer, leeres `updated` ⇒ nie gemessen.
 63. **`containers.updatable` wird `update_available` (0.19.0, Beszel 0.20.0)** — nur angelegt, wenn der Hub die Spalte liefert; `false` heißt „kein Update bekannt“.
 64. **Kurze Ausfälle sind ein Zustand, keine Warnung (0.19.0, Flottenregel 2026-09-22)** — `NETWORK`/`TIMEOUT` loggen auf debug unter einem gemeinsamen Dedup-Schlüssel, „Connection restored“ danach ebenfalls; warn bleibt für Anmelde-, HTTP-, TLS-, Antwort- und Kürzungsfehler.
+65. **Eine 404 der Hub-URL heißt „falsche Adresse“ (0.19.0, Sonde am echten Hub)** — antwortet die Adresse ohne Beszel-API (Reverse-Proxy-Pfad vergessen, anderer Dienst am Port), nennt das Log den URL-Hinweis auf warn und der Verbindungstest `msgHubNotFound` statt des rohen 404-JSON.
 
-## Tests (883 unit + 60 package + 1 integration + 3 inventory)
+## Tests (886 unit + 61 package + 1 integration + 3 inventory)
 
 Zusammensetzung (gemessen 2026-09-25 nach der Umsetzung des Audits 2026-09-25, `vitest run`):
-state-manager 391 · coerce 161 · main 141 · beszel-client 95 · repo-standards 29 (aus
-`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · message-router 19 · err-text 15 ·
+state-manager 391 · coerce 161 · main 141 · beszel-client 96 · repo-standards 29 (aus
+`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · message-router 21 · err-text 15 ·
 inventory 13 · device-icons 12 · i18n 7. Das D10-Maß `vitest list --json --staticParse=false` zählt
-ebenfalls 883. Deckung **99,4 % Stmts · 97,9 % Branch · 97,8 % Funcs**; offen bleiben nur die
+ebenfalls 886. Mutationstabelle der Welle: `mutations_beszel_2026-09-25.py` (W1–W83, 82 gefangen, W32 begründet
+äquivalent); D09-Nadeldeckung seit v0.18.0 vollständig. Deckung **99,4 % Stmts · 97,9 % Branch · 97,8 % Funcs**; offen bleiben nur die
 Bootstrap-/Test-Nähte in `main.ts` (Client-/Manager-Fabriken, `require.main`, `setStateSafe`-Catch)
 und der dokumentiert unerreichbare Hostname-Wächter in `validateHubUrl`. Der https-Transport ist
 über ein eingebettetes, selbst signiertes Testzertifikat (gültig bis 2126) geprüft. Das Inventar

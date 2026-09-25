@@ -271,6 +271,7 @@ beszel.0.
 ### Connection failed
 
 - Verify the Hub URL is reachable from the ioBroker host — without `?`, `#` or a user name and password in it
+- "API was not found at this URL (404)": the address answers, but not with the Beszel API — a Hub behind a reverse proxy needs its path in the URL
 - Check e-mail and password (use the Test Connection button); the log says whether the login was refused, needs multi-factor authentication or is switched off on the Hub
 - An https Hub needs a certificate the ioBroker host trusts — a self-signed one is refused
 - Check that no firewall blocks access to the Beszel Hub port
@@ -316,6 +317,7 @@ beszel.0.
 - Fixed: spaces and a trailing slash around the Hub URL are removed; a URL with `?`, `#` or a user name and password in it is rejected with a clear message, also in the connection test
 - Fixed: on a very large Hub, a list longer than the adapter reads deleted the datapoints of the systems at its end — the adapter now reads bigger pages, and a cut-off list keeps the tree as it is and is reported once
 - Fixed: a request that trickled in slowly could run far past the configured timeout
+- Changed: a Hub URL that answers without the Beszel API (404, e.g. a missing reverse-proxy path) is named as such in the log and in the connection test
 - Changed: short network outages and timeouts are logged at debug level; the adapter marks the systems offline as before
 - Changed: a renamed or removed system on the Hub is reported in the log
 - Changed: the login field is called E-mail — Beszel does not accept a username

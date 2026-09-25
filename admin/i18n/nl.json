@@ -306,6 +306,7 @@
   "help_metric_servicesDetails": "Status, substatus, CPU, geheugen en hun pieken per systemd-unit — één kanaal per unit. Op een drukke host kunnen dat veel datapunten zijn.",
   "msgConnected": "Verbonden — %s systeem/systemen zichtbaar voor dit account",
   "msgConnectionFailed": "Verbinding mislukt: %s",
+  "msgHubNotFound": "Verbinding mislukt: op dit adres is geen Beszel Hub-API gevonden (404) — controleer de URL, ook een reverse-proxy-pad.",
   "msgConnectedNoSystems": "Ingelogd, maar dit account ziet geen systemen — wijs de gebruiker in de hub toe aan de systemen (of draai de hub met SHARE_ALL_SYSTEMS=true)",
   "msgUrlInvalid": "Hub-URL is ongeldig: %s",
   "msgCredentialsRequired": "URL, e-mailadres en wachtwoord zijn vereist",

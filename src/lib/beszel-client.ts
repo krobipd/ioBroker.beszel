@@ -230,7 +230,9 @@ export class BeszelClient {
    * Hub without `SHARE_ALL_SYSTEMS`) logs in fine and then reads an empty list forever.
    * Returns the count, or the raw error text; the caller turns it into the user's language.
    */
-  public async checkConnection(): Promise<{ success: true; systems: number } | { success: false; reason: string }> {
+  public async checkConnection(): Promise<
+    { success: true; systems: number } | { success: false; reason: string; code?: string }
+  > {
     try {
       this.invalidateToken();
       await this.authenticate();
@@ -241,7 +243,8 @@ export class BeszelClient {
       }
       return { success: true, systems: list.totalItems };
     } catch (err) {
-      return { success: false, reason: errText(err) };
+      const code = (err as NodeJS.ErrnoException | undefined)?.code;
+      return { success: false, reason: errText(err), ...(typeof code === "string" ? { code } : {}) };
     }
   }
 

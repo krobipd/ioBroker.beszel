@@ -518,6 +518,19 @@ describe("BeszelClient", () => {
       expect(await client.checkConnection()).to.deep.equal({ success: true, systems: 0 });
     });
 
+    it("hands the error code along when the address has no Hub API (404 on the login)", async () => {
+      mock = createMockServer({
+        authHandler: () => ({
+          status: 404,
+          body: '{"data":{},"message":"The requested resource wasn\'t found.","status":404}',
+        }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}/wrong`, "admin", "secret");
+      const result = await client.checkConnection();
+      expect(result).to.include({ success: false, code: "NOT_FOUND" });
+    });
+
     it("fails the test when the address answers, but not with a record list", async () => {
       mock = createMockServer({
         systemsHandler: () => ({ status: 200, body: JSON.stringify({ hello: "not a Hub" }) }),
@@ -2133,6 +2146,10 @@ describe("BeszelClient — PocketBase behaviour (v0.19.0)", () => {
     expect(tokenExpiryMs("a.b.c")).to.equal(null);
     const noExp = `${Buffer.from("{}").toString("base64url")}.${Buffer.from('{"id":"x"}').toString("base64url")}.s`;
     expect(tokenExpiryMs(noExp)).to.equal(null);
+    // A readable payload in the wrong shape of token is still no JWT: two or four segments.
+    const payload = Buffer.from('{"exp":1700000000}').toString("base64url");
+    expect(tokenExpiryMs(`h.${payload}`), "two segments").to.equal(null);
+    expect(tokenExpiryMs(`h.${payload}.s.x`), "four segments").to.equal(null);
   });
 
   it("renews the token five minutes before its own exp — not only after 23 h", async () => {

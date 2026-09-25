@@ -11,6 +11,9 @@ Meldung ist also der Hinweis:
   der Hub mit `DISABLE_PASSWORD_AUTH=true` läuft; das Protokoll nennt, welcher der drei Fälle es ist.
 - **Host nicht erreichbar** — die Adresse vom ioBroker-Rechner aus im Browser öffnen. Sie muss den
   Port enthalten, zum Beispiel `http://192.168.1.100:8090`.
+- **API nicht gefunden (404)** — die Adresse antwortet, aber nicht mit der Beszel-API: ein Hub
+  hinter einem Reverse-Proxy braucht seinen Pfad in der URL (`https://example.org/beszel`), und der
+  Port muss der des Hubs sein, nicht der eines anderen Dienstes.
 - **Zertifikat nicht vertrauenswürdig** — ein https-Hub mit selbst signiertem Zertifikat wird
   abgelehnt. Die http-Adresse des Hubs im lokalen Netz nehmen oder ein Zertifikat, dem der
   ioBroker-Rechner vertraut.
