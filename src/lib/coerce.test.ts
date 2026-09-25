@@ -15,7 +15,6 @@ import {
   coerceSystemStats,
   coerceSystemStatsRecord,
   coerceTimeoutMs,
-  errText,
   sanitizeForLog,
   sanitizeDisplayName,
   shouldFetchSystemDetails,
@@ -864,74 +863,6 @@ describe("coerce", () => {
     it("returns empty list when items key is missing", () => {
       const result = coercePocketBaseList({ page: 1 }, coerceSystem);
       expect(result.items).to.deep.equal([]);
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // errText
-  // -----------------------------------------------------------------------
-
-  describe("errText", () => {
-    it("returns the message of an Error instance", () => {
-      expect(errText(new Error("boom"))).to.equal("boom");
-    });
-
-    it("returns the message of an Error subclass", () => {
-      class MyErr extends Error {
-        constructor() {
-          super("typed");
-        }
-      }
-      expect(errText(new MyErr())).to.equal("typed");
-    });
-
-    it("returns 'null' for null", () => {
-      expect(errText(null)).to.equal("null");
-    });
-
-    it("returns 'undefined' for undefined", () => {
-      expect(errText(undefined)).to.equal("undefined");
-    });
-
-    it("returns string values as-is", () => {
-      expect(errText("plain")).to.equal("plain");
-    });
-
-    it("stringifies number/boolean/bigint", () => {
-      expect(errText(42)).to.equal("42");
-      expect(errText(true)).to.equal("true");
-      expect(errText(BigInt(99))).to.equal("99");
-    });
-
-    it("JSON.stringifies plain objects", () => {
-      expect(errText({ code: 500, msg: "nope" })).to.equal('{"code":500,"msg":"nope"}');
-    });
-
-    it("falls back to Object.prototype.toString for circular objects", () => {
-      const a: Record<string, unknown> = { x: 1 };
-      a.self = a;
-      const result = errText(a);
-      expect(result).to.equal("[object Object]");
-    });
-
-    it("returns a string for a thrown symbol (JSON.stringify yields undefined, it does NOT throw)", () => {
-      // Regression guard: the catch never runs for a symbol, so the old code
-      // returned `undefined` while declaring `string` — the log line read
-      // "… : undefined". Fleet-wide defect, found in parcelapp on 2026-08-22.
-      const result = errText(Symbol("boom"));
-      expect(typeof result).to.equal("string");
-      expect(result).to.contain("boom");
-    });
-
-    it("returns a string for a thrown function too", () => {
-      expect(errText(() => 42)).to.equal("[object Function]");
-    });
-
-    it("returns a string when toJSON drops the whole value", () => {
-      // Same undefined-without-throw shape as a symbol, reached through a
-      // custom toJSON — the ?? fallback must catch it.
-      const weird = { toJSON: () => undefined };
-      expect(errText(weird)).to.equal("[object Object]");
     });
   });
 

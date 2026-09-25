@@ -602,7 +602,7 @@ export class BeszelClient {
         // v0.4.4 (A7): trace network / abort / TLS / DNS errors with elapsed.
         // Also catches the abort case (req.destroy(Error("Request aborted")))
         // — A6 deliberately not emitted to avoid double-log.
-        this.log?.debug(`HTTP error ${method} ${path} (${Date.now() - startedAt}ms): ${err.message}`);
+        this.log?.debug(`HTTP error ${method} ${path} (${Date.now() - startedAt}ms): ${errText(err)}`);
         reject(err);
       });
 

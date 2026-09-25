@@ -49,7 +49,7 @@
     "@types/iobroker": "npm:@iobroker/types@^7.2.2",
     "@types/node": "^22.10.7",
     "@vitest/coverage-v8": "^5.0.0",
-    "iobroker-adapter-checks": "^0.7.0",
+    "iobroker-adapter-checks": "^0.18.0",
     "rimraf": "^6.1.3",
     "typescript": "~6.0.3",
     "vitest": "^5.0.0"
@@ -82,10 +82,6 @@
     "url": "https://github.com/krobipd/ioBroker.beszel/issues"
   },
   "overrides": {
-    "mocha": {
-      "diff": "^8.0.3",
-      "serialize-javascript": "^7.0.5"
-    },
     "esbuild": ">=0.25.0"
   }
 }

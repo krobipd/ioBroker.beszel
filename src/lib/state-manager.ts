@@ -1888,12 +1888,13 @@ export class StateManager {
       // The stored object carries a `unit: ""` placeholder the current common does not
       // — a merge cannot drop a key (see `staleUnitObjects`), so this one write replaces
       // the object, keeping everything else the store holds (`custom`, `acl`, …).
-      // `setForeignObject` with the full id is the form the fleet uses for exactly this
-      // (a state object losing a key); `setObject` is on the checker's deprecated list.
+      // `setForeignObject` with the full id and without a callback (it returns the promise)
+      // is the fleet form for exactly this (a state object losing a key); `setObject` and the
+      // `…Async` twins are on the checker's deprecated list.
       this.staleUnitObjects.delete(id);
       const kept = { ...stale.common };
       delete kept.unit;
-      await this.adapter.setForeignObjectAsync(`${this.adapter.namespace}.${id}`, {
+      await this.adapter.setForeignObject(`${this.adapter.namespace}.${id}`, {
         ...stale,
         type: "state",
         common: { ...kept, ...common },

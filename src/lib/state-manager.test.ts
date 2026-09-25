@@ -67,22 +67,17 @@ interface MockAdapter {
   };
   extendObject: (id: string, obj: Partial<ObjectDef>) => Promise<void>;
   setStateChangedAsync: (id: string, state: StateValue) => Promise<void>;
-  getObjectAsync: (id: string) => Promise<ObjectDef | null>;
-  getObjectViewAsync: (
-    design: string,
-    search: string,
-    params: { startkey: string; endkey: string },
-  ) => Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null>;
+  /** The only object read the manager makes (the startup snapshot). */
   getObjectListAsync: (params: {
     startkey: string;
     endkey: string;
   }) => Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null>;
   delObjectAsync: (id: string, opts?: { recursive: boolean }) => Promise<void>;
   /** Full replace by FULL id, unlike the merge `extendObject` does. */
-  setForeignObjectAsync: (fullId: string, obj: ObjectDef) => Promise<void>;
+  setForeignObject: (fullId: string, obj: ObjectDef) => Promise<void>;
   /** Every `delObjectAsync` call, in order — for tests that prove a sweep touched nothing. */
   delObjectCalls: string[];
-  /** Every `setForeignObjectAsync` call (full ids), in order — the full write is the exception, not the rule. */
+  /** Every `setForeignObject` call (full ids), in order — the full write is the exception, not the rule. */
   setObjectCalls: string[];
 }
 
@@ -117,26 +112,8 @@ function createMockAdapter(): MockAdapter {
       states.set(id, state);
       return Promise.resolve();
     },
-    getObjectAsync: (id: string): Promise<ObjectDef | null> => {
-      return Promise.resolve(objects.get(id) || null);
-    },
-    getObjectViewAsync: (
-      _design: string,
-      search: string,
-      params: { startkey: string; endkey: string },
-    ): Promise<{ rows: Array<{ id: string; value: ObjectDef }> }> => {
-      const rows: Array<{ id: string; value: ObjectDef }> = [];
-      const prefix = params.startkey.replace("beszel.0.", "");
-      // Faithfully filter by the requested object type (`search`): "device" for
-      // getExistingSystemNames, "channel" for cleanupStaleContainers.
-      for (const [key, value] of objects.entries()) {
-        if (key.startsWith(prefix) && value.type === search) {
-          rows.push({ id: `beszel.0.${key}`, value });
-        }
-      }
-      return Promise.resolve({ rows });
-    },
-    // Object LIST: every type in one call, unlike the per-type view above.
+    // Object LIST: every type in one call. A read hands out a COPY — the store never
+    // gives a caller its own object to mutate.
     getObjectListAsync: (params: {
       startkey: string;
       endkey: string;
@@ -145,7 +122,7 @@ function createMockAdapter(): MockAdapter {
       const prefix = params.startkey.replace("beszel.0.", "");
       for (const [key, value] of objects.entries()) {
         if (key.startsWith(prefix)) {
-          rows.push({ id: `beszel.0.${key}`, value });
+          rows.push({ id: `beszel.0.${key}`, value: structuredClone(value) });
         }
       }
       return Promise.resolve({ rows });
@@ -169,7 +146,7 @@ function createMockAdapter(): MockAdapter {
       }
       return Promise.resolve();
     },
-    setForeignObjectAsync: (fullId: string, obj: ObjectDef): Promise<void> => {
+    setForeignObject: (fullId: string, obj: ObjectDef): Promise<void> => {
       setObjectCalls.push(fullId);
       // The manager addresses the full id here (the fleet form for a state losing a key).
       objects.set(fullId.replace("beszel.0.", ""), {
@@ -2561,15 +2538,18 @@ describe("StateManager", () => {
 
     it("sweeps without probing: not a single object read for the retired ids", async () => {
       // The sweep decides from the startup snapshot — an install that never had the
-      // objects costs nothing.
+      // objects costs nothing. The object list is the only read the manager has.
       adapter.objects.set("systems.my_server", { type: "device", common: { name: "My Server" }, native: {} });
       adapter.objects.set("systems.my_server.cpu.peak", { type: "state", common: {}, native: {} });
       await manager.snapshotExistingStates();
       let objectReads = 0;
-      const origGet = adapter.getObjectAsync;
-      adapter.getObjectAsync = (id: string): Promise<ObjectDef | null> => {
+      const origList = adapter.getObjectListAsync;
+      adapter.getObjectListAsync = (params: {
+        startkey: string;
+        endkey: string;
+      }): Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null> => {
         objectReads++;
-        return origGet(id);
+        return origList(params);
       };
       await manager.removeRetiredStates();
       expect(adapter.objects.has("systems.my_server.cpu.peak")).to.be.false;
@@ -3761,13 +3741,13 @@ describe("StateManager", () => {
         .be.true;
       expect(adapter.objects.has("systems.my_server.containers"), "fixture must create removable channels").to.be.true;
       let reads = 0;
-      adapter.getObjectAsync = (id: string): Promise<ObjectDef | null> => {
+      const origList = adapter.getObjectListAsync;
+      adapter.getObjectListAsync = (params: {
+        startkey: string;
+        endkey: string;
+      }): Promise<{ rows: Array<{ id: string; value: ObjectDef }> } | null> => {
         reads++;
-        return Promise.resolve(adapter.objects.get(id) ?? null);
-      };
-      adapter.getObjectViewAsync = (): Promise<{ rows: Array<{ id: string; value: ObjectDef }> }> => {
-        reads++;
-        return Promise.resolve({ rows: [] });
+        return origList(params);
       };
       await manager.cleanupMetrics(
         "my_server",
