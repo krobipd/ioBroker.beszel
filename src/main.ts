@@ -13,6 +13,7 @@ import {
   validateHubUrl,
 } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
+import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName } from "./lib/i18n";
 import { SYSTEM_STATUS_UNKNOWN } from "./lib/metric-registry";
 import { StateManager } from "./lib/state-manager";
@@ -32,6 +33,14 @@ import type {
  * SMART data even more rarely, so a per-poll read would be load without new data.
  */
 const DETAIL_REFRESH_MS = 15 * 60 * 1000;
+
+/** Native keys earlier versions declared and this one dropped (fleet helper `native-key-migration`). */
+const NATIVE_KEY_MIGRATIONS: NativeKeyMigration[] = [
+  { drop: "metrics_cpuPeak" },
+  { drop: "metrics_memoryPeak" },
+  { drop: "metrics_diskPeak" },
+  { drop: "metrics_networkPeak" },
+];
 
 /** Longest pause between two login attempts once the login keeps failing. */
 const AUTH_BACKOFF_MAX_MS = 15 * 60 * 1000;
@@ -318,6 +327,12 @@ export class BeszelAdapter extends utils.Adapter {
       // First: without this the whole shutdown path stays dead on an updated install.
       // A correction means the host is restarting us — no point setting anything up.
       if (await this.clearStopInstanceFlag()) {
+        return;
+      }
+      // Settings an earlier version declared and this one no longer reads — the four peak
+      // switches that went with 0.18.0: js-controller never deletes a native key, so the
+      // user's value would stay in every installation. A write restarts the instance.
+      if (await migrateNativeKeys(this, NATIVE_KEY_MIGRATIONS, errText)) {
         return;
       }
       // The one hard precondition of the whole adapter: without the translations every

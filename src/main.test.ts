@@ -1664,6 +1664,34 @@ describe("BeszelAdapter stale online indicators", () => {
   });
 });
 
+describe("BeszelAdapter drops the settings keys an earlier version declared", () => {
+  it("nulls the four peak switches of 0.17.x and ends the start — the write restarts the instance", async () => {
+    const { adapter, client } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({
+      common: {},
+      native: { metrics_cpuPeak: true, metrics_memoryPeak: false, metrics_diskPeak: true, metrics_networkPeak: false },
+    });
+    await i.onReady();
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.beszel.0", {
+      native: { metrics_cpuPeak: null, metrics_memoryPeak: null, metrics_diskPeak: null, metrics_networkPeak: null },
+    });
+    expect(client.getSystems).not.toHaveBeenCalled();
+  });
+
+  it("an installation without them starts normally", async () => {
+    const { adapter, client } = setup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({ common: {}, native: { metrics_cpu: true, metrics_cpuPeak: null } });
+    await i.onReady();
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(
+      "system.adapter.beszel.0",
+      expect.objectContaining({ native: expect.anything() }),
+    );
+    expect(client.getSystems).toHaveBeenCalled();
+  });
+});
+
 describe("BeszelAdapter clears the stopInstance flag it used to ship with", () => {
   // Measured on the live server 2026-08-27: dropping the entry from the manifest only
   // helps FRESH installs. An upgrade merges the manifest into the existing instance

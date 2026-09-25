@@ -31,6 +31,19 @@ const INVENTORY = path.join(__dirname, "objects.inventory.json");
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "inventory", "hub.json"), "utf8"));
 const VOLATILE = ["ts", "from", "user", "acl"];
 const COMPARED = ["name", "desc", "role", "type", "unit"];
+// Key order carries no meaning in an ioBroker object: extendObject keeps the key order an existing
+// object already has, while adapter-core's I18n.getTranslatedObject builds its own — the same eleven
+// texts in another order are the same name. Arrays keep their order.
+const canonical = v =>
+  JSON.stringify(v, (_k, x) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.keys(x)
+            .sort()
+            .map(k => [k, x[k]]),
+        )
+      : x,
+  );
 
 /** The filters the adapter sends; anything else is a 400, so a new query cannot pass unseen. */
 const FILTERS = { "type='1m'": item => item.type === "1m" };
@@ -231,9 +244,17 @@ tests.integration(ADAPTER_DIR, {
               continue;
             }
             for (const f of COMPARED) {
-              if (JSON.stringify(got.common?.[f]) !== JSON.stringify(obj.common?.[f])) {
+              if (canonical(got.common?.[f]) !== canonical(obj.common?.[f])) {
                 stale.push(`${id}: ${f} still ${JSON.stringify(got.common?.[f])}`);
               }
+            }
+            // The KIND of the object (state/channel/device/folder/meta) lives one level
+            // ABOVE `common`; the `type` in COMPARED is the VALUE type (string/number/
+            // boolean) — something entirely different that merely shares the name. Without
+            // this comparison a type migration that never reaches an existing installation
+            // stays green.
+            if (got.type !== obj.type) {
+              stale.push(`${id}: type still ${JSON.stringify(got.type)}, want ${JSON.stringify(obj.type)}`);
             }
           }
           assert.deepStrictEqual(stale, [], `objects an update did not reach:\n${stale.join("\n")}`);
