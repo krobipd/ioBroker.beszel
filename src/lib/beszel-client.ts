@@ -4,6 +4,8 @@ import { URL } from "node:url";
 import {
   coerceAuthResponse,
   coerceContainer,
+  coerceMonitorProbeStat,
+  coerceNetworkMonitor,
   coerceSmartDevice,
   coerceSystemdService,
   coerceZfsPoolDetail,
@@ -19,6 +21,8 @@ import type {
   BeszelContainer,
   BeszelErrorCode,
   BeszelSystem,
+  MonitorProbeStat,
+  NetworkMonitor,
   SmartDevice,
   SystemDetails,
   SystemdService,
@@ -363,6 +367,42 @@ export class BeszelClient {
     await this.ensureToken();
     this.log?.debug("HTTP getSystemdServices");
     return this.fetchAllPages("/api/collections/systemd_services/records?sort=system%2Cname", coerceSystemdService);
+  }
+
+  /**
+   * Network monitors (`network_monitors`, Beszel 0.20.0) — the Hub rewrites the measured
+   * columns on every agent update, so they are read on every poll. An older Hub answers
+   * 404 (the caller stops asking).
+   */
+  public async getNetworkMonitors(): Promise<NetworkMonitor[]> {
+    await this.ensureToken();
+    return this.fetchAllPages("/api/collections/network_monitors/records?sort=system%2Ctarget", coerceNetworkMonitor);
+  }
+
+  /**
+   * The newest 1-minute record per monitor from `network_monitor_stats` (list rule only).
+   * Walked newest first like the system stats and stopped as soon as a page brings no
+   * monitor that has not been seen — the table holds an hour of minute records per monitor.
+   */
+  public async getLatestMonitorProbes(): Promise<Map<string, MonitorProbeStat>> {
+    await this.ensureToken();
+    const result = new Map<string, MonitorProbeStat>();
+    await this.fetchAllPages(
+      "/api/collections/network_monitor_stats/records?sort=-created&filter=type%3D'1m'",
+      coerceMonitorProbeStat,
+      WALK_PAGE_SIZE,
+      pageItems => {
+        let addedNew = false;
+        for (const rec of pageItems) {
+          if (!result.has(rec.monitor)) {
+            result.set(rec.monitor, rec);
+            addedNew = true;
+          }
+        }
+        return addedNew;
+      },
+    );
+    return result;
   }
 
   /** Fetch all containers (paginated, B2 v0.4.3) */

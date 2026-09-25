@@ -48,6 +48,8 @@ interface FakeClient {
   getSystemdServices: ReturnType<typeof vi.fn>;
   getLatestStats: ReturnType<typeof vi.fn>;
   getSystemDetails: ReturnType<typeof vi.fn>;
+  getNetworkMonitors: ReturnType<typeof vi.fn>;
+  getLatestMonitorProbes: ReturnType<typeof vi.fn>;
   invalidateToken: ReturnType<typeof vi.fn>;
   cancelAll: ReturnType<typeof vi.fn>;
 }
@@ -151,6 +153,8 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     getSystemdServices: vi.fn(() => Promise.resolve([])),
     getLatestStats: vi.fn(() => Promise.resolve(new Map<string, SystemStats>([["sys001", { cpu: 10 }]]))),
     getSystemDetails: vi.fn(() => Promise.resolve(new Map<string, SystemDetails>())),
+    getNetworkMonitors: vi.fn(() => Promise.resolve([])),
+    getLatestMonitorProbes: vi.fn(() => Promise.resolve(new Map())),
     invalidateToken: vi.fn(),
     cancelAll: vi.fn(),
   };
@@ -1837,5 +1841,61 @@ describe("BeszelAdapter — what each system gets from the detail collections (v
     expect(extrasFor(stateMgr, "sys002")?.zfsPools, "first poll reads").to.deep.equal([]);
     await i.poll();
     expect(extrasFor(stateMgr, "sys002")?.zfsPools, "second poll: not read → not handed over").to.be.undefined;
+  });
+});
+
+describe("BeszelAdapter — network monitors (v0.19.0)", () => {
+  const monitor = {
+    id: "m1",
+    system: "sys001",
+    target: "1.1.1.1",
+    protocol: "icmp",
+    port: 0,
+    interval: 60,
+    res: 900,
+    resAvg1h: 900,
+    resMin1h: 800,
+    resMax1h: 1000,
+    loss1h: 0,
+    enabled: true,
+    updated: 1,
+  };
+
+  it("hands every system its monitors with the newest probe minute, every poll", async () => {
+    const { adapter, client, stateMgr } = setup({ metrics_networkMonitors: true });
+    const probe = { monitor: "m1", total: 1, success: 1, created: 2 };
+    client.getNetworkMonitors.mockResolvedValue([monitor]);
+    client.getLatestMonitorProbes.mockResolvedValue(new Map([["m1", probe]]));
+    await internalOf(adapter).onReady();
+    await internalOf(adapter).poll();
+    expect(client.getNetworkMonitors).toHaveBeenCalledTimes(2);
+    const extras = stateMgr.updateSystem.mock.calls.at(-1)?.[5] as { networkMonitors?: unknown[] };
+    expect(extras.networkMonitors).toEqual([{ monitor, probe }]);
+  });
+
+  it("a Hub without the collection (404, < 0.20) is asked once and told once", async () => {
+    const { adapter, client } = setup({ metrics_networkMonitors: true });
+    client.getNetworkMonitors.mockRejectedValue(errnoError("404", "NOT_FOUND"));
+    const i = internalOf(adapter);
+    await i.onReady();
+    await i.poll();
+    expect(client.getNetworkMonitors).toHaveBeenCalledTimes(1);
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("network_monitors"));
+    expect(i.extrasUnsupported.has("monitors")).toBe(true);
+  });
+
+  it("a failed probe-minute read keeps the monitors (without the probe)", async () => {
+    const { adapter, client, stateMgr } = setup({ metrics_networkMonitors: true });
+    client.getNetworkMonitors.mockResolvedValue([monitor]);
+    client.getLatestMonitorProbes.mockRejectedValue(errnoError("slow", "ETIMEDOUT"));
+    await internalOf(adapter).onReady();
+    const extras = stateMgr.updateSystem.mock.calls.at(-1)?.[5] as { networkMonitors?: unknown[] };
+    expect(extras.networkMonitors).toEqual([{ monitor, probe: undefined }]);
+  });
+
+  it("the toggle off asks nothing", async () => {
+    const { adapter, client } = setup({ metrics_networkMonitors: false });
+    await internalOf(adapter).onReady();
+    expect(client.getNetworkMonitors).not.toHaveBeenCalled();
   });
 });

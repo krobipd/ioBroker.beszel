@@ -88,6 +88,8 @@ export interface AdapterConfig {
   metrics_smart: boolean;
   /** v0.17.0: per-unit systemd detail from the `systemd_services` collection. */
   metrics_servicesDetails: boolean;
+  /** v0.19.0: network monitors from the `network_monitors` collection (Beszel 0.20.0). */
+  metrics_networkMonitors: boolean;
 }
 
 /**
@@ -181,9 +183,12 @@ export interface FsStats {
   d?: number;
   /** disk used GB */
   du?: number;
-  /** read MB/s */
+  /**
+   * read MB/s. Beszel marks `r`/`w` "TODO: remove" (`system.go`, 0.20.0) in favour of the
+   * byte rates `rb`/`wb`, which it already sends; the agent still fills both today.
+   */
   r?: number;
-  /** write MB/s */
+  /** write MB/s (see `r`) */
   w?: number;
   /** cumulative device read bytes (Beszel 0.19.0+, `omitzero`) */
   tr?: number;
@@ -192,10 +197,11 @@ export interface FsStats {
 }
 
 /**
- * Per-pool ZFS metrics of one collection interval (Beszel 0.19.0+, `system_stats.stats.z`).
- * Verified against beszel v0.19.0 `internal/entities/system/system.go` (`ZfsPool`): capacities in
+ * Per-pool storage metrics of one collection interval (Beszel 0.19.0+, `system_stats.stats.z`).
+ * Verified against beszel v0.20.0 `internal/entities/system/system.go` (`ZfsPool`): capacities in
  * GiB like the root disk, throughput in bytes/s (`omitzero` — absent when idle), health as the
- * zpool word (ONLINE, DEGRADED, FAULTED, …).
+ * pool word (ONLINE, DEGRADED, FAULTED, …). Since 0.20.0 the map also carries btrfs
+ * filesystems under `b:<UUID>`, with a display name and a raw-capacity flag.
  */
 export interface ZfsPoolStats {
   /** total capacity GiB */
@@ -340,7 +346,8 @@ export interface SystemStats {
 // are deliberately NOT in this interface. They are `cbor:"-"` in Beszel's Stats struct —
 // the agent never transmits them; the Hub computes them only while aggregating 1m records
 // into the 10m/20m/120m/480m resolutions (`internal/records/records.go`). The adapter reads
-// the 1m records, where they never exist (verified against Beszel 0.19.0).
+// the 1m records. A Hub from 0.19.0 on (encoding/json v2) does write them into the 1m record
+// as 0 — measured on a 0.20.0 Hub —, which carries no information either.
 
 /**
  * A system_stats record from /api/collections/system_stats/records
@@ -362,7 +369,7 @@ export interface BeszelContainer {
   system: string;
   /** Container name */
   name: string;
-  /** running / exited / etc. */
+  /** Docker's status text as the agent reads it ("Up 3 hours", "Exited (0) 2 days ago") */
   status: string;
   /** 0=none 1=starting 2=healthy 3=unhealthy */
   health: number;
@@ -378,6 +385,12 @@ export interface BeszelContainer {
    * absent on an older Hub → no container network state.
    */
   net?: number;
+  /**
+   * Beszel 0.20.0: an image update is available (the agent checks the registry once an
+   * hour per image). `false` means "no update known" — also a digest-pinned or excluded
+   * image, a failed or not-yet-run check, an agent < 0.20. Absent on an older Hub.
+   */
+  updatable?: boolean;
 }
 
 /**
@@ -452,7 +465,8 @@ export type BeszelErrorCode =
  * One row of the Hub's `zfs_pools` collection — the DETAIL record the agent refreshes
  * hourly, next to the summary the adapter already reads from `stats.z`.
  *
- * Verified against the bundled Beszel 0.19.0 source: the hub writes `name`, `health`,
+ * Verified against the bundled Beszel 0.20.0 source: the hub writes `name`, `health`,
+ * `display_name`, `raw`,
  * `size`/`alloc`/`free` (bytes) plus the three JSON columns from
  * `internal/hub/systems/system_zfs.go:upsertZfsPoolRecord`. Read access is the same
  * `systemScopedReadRule` as `system_stats` (`internal/hub/collections.go`), so the
@@ -514,8 +528,8 @@ export interface ZfsDataset {
 }
 
 /**
- * One row of the Hub's `smart_devices` collection. Verified against the bundled 0.19.0
- * schema (`internal/migrations/0_collections_snapshot_0_19_0.go`): `name`, `model`,
+ * One row of the Hub's `smart_devices` collection. Verified against the bundled 0.20.0
+ * schema (`internal/migrations/0_collections_snapshot_0_20_0.go`, unchanged since 0.19.0): `name`, `model`,
  * `state`, `capacity`, `temp`, `firmware`, `serial`, `type`, `hours`, `cycles`.
  * `attributes` (the raw SMART attribute table) is deliberately NOT read — it is a
  * vendor-specific blob whose keys differ per device, and an adapter cannot name
@@ -528,7 +542,7 @@ export interface SmartDevice {
   system: string;
   /** Device node as smartctl names it (`/dev/sda`, `nvme0`) */
   name: string;
-  /** PASSED | FAILED — the overall SMART verdict */
+  /** PASSED | WARNING | FAILED | UNKNOWN — the overall SMART verdict */
   state?: string;
   /** Device model as smartctl reports it */
   model?: string;
@@ -550,7 +564,8 @@ export interface SmartDevice {
 
 /**
  * One row of the Hub's `systemd_services` collection. The hub INSERTs all columns of a
- * batch in one statement (`internal/hub/systems/system.go:337`), so a row never carries
+ * batch in one statement (`internal/hub/systems/system.go` `createSystemdServiceRecords`,
+ * 0.20.0), so a row never carries
  * a missing `state`/`cpu`/`memory`. Only the `list` rule is granted for this collection
  * — the adapter never fetches a single record, it pages the list like every other one.
  */
@@ -567,10 +582,65 @@ export interface SystemdService {
   sub: number;
   /** CPU usage in percent */
   cpu: number;
-  /** Peak CPU usage in percent within the sample window */
+  /** Highest CPU usage in percent since the agent started watching the unit */
   cpuPeak: number;
   /** Resident memory in bytes */
   memory: number;
   /** Peak resident memory in bytes */
   memPeak: number;
+}
+
+/**
+ * One row of the Hub's `network_monitors` collection (Beszel 0.20.0): a probe the agent
+ * runs against a target — ICMP ping, TCP connect, HTTP request or DNS lookup. Read access
+ * is `systemScopedReadRule` (list and view). The Hub rewrites the measured columns on every
+ * agent update (`internal/hub/systems/system.go`); response times are in MICROSECONDS, the
+ * loss is a percentage 0–100 (`internal/entities/monitor/monitor.go`).
+ *
+ * The record id is a hash of system + target + protocol (+ port for TCP): changing any of
+ * them makes the Hub create a new record and delete the old one — there is no name field.
+ */
+export interface NetworkMonitor {
+  /** PocketBase record ID */
+  id: string;
+  /** Reference to systems.id */
+  system: string;
+  /** Host, IP address or URL */
+  target: string;
+  /** icmp · tcp · http · dns */
+  protocol: string;
+  /** Port — only meaningful for TCP (0 otherwise) */
+  port: number;
+  /** Probe interval in seconds */
+  interval: number;
+  /** Mean response of the successful probes in the last window, µs (0 = no success) */
+  res: number;
+  /** Mean response over the last hour, µs */
+  resAvg1h: number;
+  /** Fastest response in the last hour, µs */
+  resMin1h: number;
+  /** Slowest response in the last hour, µs */
+  resMax1h: number;
+  /** Packet/probe loss over the last hour, % */
+  loss1h: number;
+  /** Whether the monitor is switched on (a disabled one keeps its last values) */
+  enabled: boolean;
+  /** When the Hub last wrote a measurement (epoch ms); absent = never */
+  updated?: number;
+}
+
+/**
+ * The newest 1-minute record of one monitor from `network_monitor_stats` (list rule only):
+ * how many probes ran and succeeded. A 1m record is only written when a new probe came in,
+ * so its age follows the monitor's interval (up to an hour).
+ */
+export interface MonitorProbeStat {
+  /** Reference to network_monitors.id */
+  monitor: string;
+  /** Probes run in the minute */
+  total: number;
+  /** Probes that succeeded */
+  success: number;
+  /** When the record was written (epoch ms — the column is a number, not a date) */
+  created: number;
 }

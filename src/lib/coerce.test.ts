@@ -21,6 +21,8 @@ import {
   urlForLog,
   shouldFetchSystemDetails,
   validateHubUrl,
+  coerceMonitorProbeStat,
+  coerceNetworkMonitor,
   coerceSmartDevice,
   coerceSystemdService,
   coerceZfsPoolDetail,
@@ -1212,6 +1214,51 @@ describe("detail collections (v0.17.0)", () => {
       expect(d?.hours, "a count stays a count").to.equal(0);
       expect(d?.cycles).to.equal(0);
       expect(d?.model).to.equal(undefined);
+    });
+  });
+
+  describe("coerceNetworkMonitor / coerceMonitorProbeStat (Beszel 0.20.0)", () => {
+    it("reads a measured row and turns the date column into epoch ms", () => {
+      const m = coerceNetworkMonitor({
+        id: "6f7021fd",
+        system: "s1",
+        target: "127.0.0.1",
+        protocol: "tcp",
+        port: 18090,
+        interval: 10,
+        res: 360,
+        resAvg1h: 333,
+        resMin1h: 156,
+        resMax1h: 469,
+        loss1h: 0,
+        enabled: true,
+        updated: "2026-09-25 06:33:36.012Z",
+      });
+      expect(m?.updated).to.equal(Date.parse("2026-09-25T06:33:36.012Z"));
+      expect(m?.res).to.equal(360);
+      expect(m?.enabled).to.equal(true);
+    });
+
+    it("a never-measured row has no updated, and a row without target or protocol is dropped", () => {
+      const m = coerceNetworkMonitor({
+        id: "x",
+        system: "s",
+        target: "h",
+        protocol: "dns",
+        updated: "",
+        enabled: false,
+      });
+      expect(m?.updated).to.equal(undefined);
+      expect(m?.loss1h).to.equal(0);
+      expect(coerceNetworkMonitor({ id: "x", system: "s", target: "", protocol: "icmp" })).to.equal(null);
+      expect(coerceNetworkMonitor({ id: "x", system: "s", target: "h" })).to.equal(null);
+    });
+
+    it("reads a probe minute — `created` is a number there", () => {
+      expect(
+        coerceMonitorProbeStat({ monitor: "m", total_count: 6, success_count: 5, created: 1790318016012 }),
+      ).to.deep.equal({ monitor: "m", total: 6, success: 5, created: 1790318016012 });
+      expect(coerceMonitorProbeStat({ monitor: "m", created: "2026-09-25" })).to.equal(null);
     });
   });
 

@@ -37,6 +37,8 @@ import type {
   ZfsDataset,
   ZfsPoolDetail,
   ZfsVdev,
+  MonitorProbeStat,
+  NetworkMonitor,
 } from "./types";
 
 /**
@@ -62,6 +64,8 @@ export interface SystemExtras {
   smartDevices?: SmartDevice[];
   /** `systemd_services` records of this system */
   systemdServices?: SystemdService[];
+  /** `network_monitors` records of this system, each with its newest probe minute if any */
+  networkMonitors?: { monitor: NetworkMonitor; probe?: MonitorProbeStat }[];
 }
 
 /**
@@ -925,6 +929,83 @@ export class StateManager {
     if (config.metrics_services && config.metrics_servicesDetails && extras.systemdServices && live) {
       await this.updateSystemdServices(sysId, extras.systemdServices);
     }
+    // Network monitors live in their own table that the Hub does not sweep — a row goes
+    // only with its system or when the user deletes the monitor — so, like ZFS and SMART,
+    // an empty successful list means "none" regardless of the system's status.
+    if (config.metrics_networkMonitors && extras.networkMonitors) {
+      await this.updateNetworkMonitors(sysId, extras.networkMonitors);
+    }
+  }
+
+  /**
+   * How the Hub UI names a monitor (`internal/site/src/lib/network-monitor-utils.ts`): the
+   * target, for TCP with the port — an IPv6 address then gets its brackets.
+   *
+   * @param m The monitor.
+   */
+  private static monitorTarget(m: NetworkMonitor): string {
+    if (m.protocol !== "tcp") {
+      return m.target;
+    }
+    const host = m.target.includes(":") && !m.target.startsWith("[") ? `[${m.target}]` : m.target;
+    return `${host}:${m.port}`;
+  }
+
+  /**
+   * v0.19.0 — network monitors from `network_monitors` (Beszel 0.20.0). There is no name
+   * field; a monitor is what it probes: protocol + target (+ port for TCP). That is also
+   * the Hub's own identity — changing any of it makes the Hub create a new record — so the
+   * channel follows it, and the old channel is pruned like any vanished member.
+   *
+   * Response times arrive in µs and are written in ms. A 0 means "no successful probe in
+   * the window" (`agent/network_monitor_history.go`), not 0 ms: it is written as `null`,
+   * and so are the loss and times of a monitor that has never measured (empty `updated` —
+   * an agent older than 0.20 does not probe).
+   *
+   * @param sysId State prefix (`systems.<safeName>`).
+   * @param monitors Monitor records of THIS system, each with its newest probe minute.
+   */
+  private async updateNetworkMonitors(
+    sysId: string,
+    monitors: { monitor: NetworkMonitor; probe?: MonitorProbeStat }[],
+  ): Promise<void> {
+    const ms = (us: number): number | null => (us > 0 ? Math.round(us) / 1000 : null);
+    await this.syncDynamicGroup(
+      `${sysId}.monitors`,
+      monitors.map(
+        e => [`${e.monitor.protocol}_${StateManager.monitorTarget(e.monitor)}`, e] as [string, (typeof monitors)[0]],
+      ),
+      "channel",
+      async () => {
+        await this.ensureChannel(`${sysId}.monitors`, channelName("monitors"));
+      },
+      async (safeId, _key, { monitor: m, probe }) => {
+        const b = `${sysId}.monitors.${safeId}`;
+        await this.ensureChannel(
+          b,
+          sanitizeDisplayName(`${StateManager.monitorTarget(m)} (${m.protocol.toUpperCase()})`),
+          API_NAMED,
+        );
+        const measured = m.updated !== undefined;
+        await this.createAndSetState(`${b}.protocol`, leafCommon("monitorProtocol"), m.protocol);
+        await this.createAndSetState(`${b}.target`, leafCommon("monitorTarget"), m.target);
+        if (m.protocol === "tcp") {
+          await this.createAndSetState(`${b}.port`, leafCommon("monitorPort"), m.port);
+        }
+        await this.createAndSetState(`${b}.interval`, leafCommon("monitorInterval"), m.interval);
+        await this.createAndSetState(`${b}.enabled`, leafCommon("monitorEnabled"), m.enabled);
+        await this.createAndSetState(`${b}.response`, leafCommon("monitorResponse"), ms(m.res));
+        await this.createAndSetState(`${b}.response_avg_1h`, leafCommon("monitorResponseAvg"), ms(m.resAvg1h));
+        await this.createAndSetState(`${b}.response_min_1h`, leafCommon("monitorResponseMin"), ms(m.resMin1h));
+        await this.createAndSetState(`${b}.response_max_1h`, leafCommon("monitorResponseMax"), ms(m.resMax1h));
+        await this.createAndSetState(`${b}.loss_1h`, leafCommon("monitorLoss"), measured ? m.loss1h : null);
+        await this.createAndSetState(`${b}.last_update`, leafCommon("monitorLastUpdate"), m.updated ?? null);
+        const probeLoss =
+          probe && probe.total > 0 ? Math.round(((probe.total - probe.success) / probe.total) * 10000) / 100 : null;
+        await this.setOptionalState(`${b}.last_probe_loss`, leafCommon("monitorLastProbeLoss"), probeLoss);
+        await this.setOptionalState(`${b}.last_probe`, leafCommon("monitorLastProbe"), probe?.created ?? null);
+      },
+    );
   }
 
   /**
@@ -1834,6 +1915,13 @@ export class StateManager {
           `${sysId}.containers.${cId}.network`,
           leafCommon("containerNetwork"),
           container.net,
+        );
+      }
+      if (container.updatable !== undefined) {
+        await this.createAndSetState(
+          `${sysId}.containers.${cId}.update_available`,
+          leafCommon("containerUpdate"),
+          container.updatable,
         );
       }
     }

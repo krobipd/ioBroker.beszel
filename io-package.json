@@ -415,6 +415,7 @@
     "metrics_zfs": false,
     "metrics_zfsDetails": false,
     "metrics_smart": false,
+    "metrics_networkMonitors": false,
     "metrics_servicesDetails": false
   }
 }

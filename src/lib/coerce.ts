@@ -1,6 +1,8 @@
 import type {
   AuthResponse,
   BeszelContainer,
+  MonitorProbeStat,
+  NetworkMonitor,
   SmartDevice,
   SystemdService,
   ZfsDataset,
@@ -442,7 +444,8 @@ function coerceFsStats(value: unknown): FsStats {
 }
 
 /**
- * v0.19.0: one ZFS pool of the `z` map — four finite numbers plus the health word.
+ * v0.19.0: one storage pool of the `z` map — four finite numbers plus the health word, and
+ * (Beszel 0.20.0, btrfs) the display name and the raw-capacity flag.
  * Total like coerceFsStats: garbage yields `{}`, never a dropped pool (the pool's
  * channel still exists on the Hub; the adapter shows what it can read).
  *
@@ -678,6 +681,10 @@ export function coerceContainer(value: unknown): BeszelContainer | null {
   const net = coerceFiniteNumber(obj.net);
   if (net !== null) {
     container.net = net;
+  }
+  // Beszel 0.20.0 column — absent on an older Hub, so no datapoint there.
+  if (typeof obj.updatable === "boolean") {
+    container.updatable = obj.updatable;
   }
   return container;
 }
@@ -1030,7 +1037,7 @@ export function coerceSmartDevice(value: unknown): SmartDevice | null {
 /**
  * One `systemd_services` row → {@link SystemdService}. The hub writes every column of a
  * batch in ONE insert, so `?? 0` here is the shape of the table, not a guess: a row
- * without `cpu` cannot exist (`internal/hub/systems/system.go:337`).
+ * without `cpu` cannot exist (`internal/hub/systems/system.go` `createSystemdServiceRecords`, 0.20.0).
  *
  * @param value Raw record from the collection
  */
@@ -1055,5 +1062,82 @@ export function coerceSystemdService(value: unknown): SystemdService | null {
     cpuPeak: coerceFiniteNumber(obj.cpuPeak) ?? 0,
     memory: coerceFiniteNumber(obj.memory) ?? 0,
     memPeak: coerceFiniteNumber(obj.memPeak) ?? 0,
+  };
+}
+
+/**
+ * A PocketBase date string ("2026-09-25 06:33:36.012Z") → epoch ms; `null` for the empty
+ * string of a never-written date column or anything unparseable.
+ *
+ * @param value Raw column value.
+ */
+function coerceHubDate(value: unknown): number | null {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+  const ms = Date.parse(value.replace(" ", "T"));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * One `network_monitors` row → {@link NetworkMonitor}. PocketBase returns every column of
+ * the row; a monitor that has not measured yet carries zeros and an empty `updated`.
+ *
+ * @param value Raw record from the collection.
+ */
+export function coerceNetworkMonitor(value: unknown): NetworkMonitor | null {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const id = coerceString(obj.id);
+  const system = coerceString(obj.system);
+  const target = coerceString(obj.target, 500);
+  const protocol = coerceString(obj.protocol, 16);
+  if (id === null || system === null || target === null || protocol === null) {
+    return null;
+  }
+  const monitor: NetworkMonitor = {
+    id,
+    system,
+    target,
+    protocol,
+    port: coerceFiniteNumber(obj.port) ?? 0,
+    interval: coerceFiniteNumber(obj.interval) ?? 0,
+    res: coerceFiniteNumber(obj.res) ?? 0,
+    resAvg1h: coerceFiniteNumber(obj.resAvg1h) ?? 0,
+    resMin1h: coerceFiniteNumber(obj.resMin1h) ?? 0,
+    resMax1h: coerceFiniteNumber(obj.resMax1h) ?? 0,
+    loss1h: coerceFiniteNumber(obj.loss1h) ?? 0,
+    enabled: obj.enabled === true,
+  };
+  const updated = coerceHubDate(obj.updated);
+  if (updated !== null) {
+    monitor.updated = updated;
+  }
+  return monitor;
+}
+
+/**
+ * One `network_monitor_stats` row → {@link MonitorProbeStat}. `created` is a NUMBER
+ * (epoch ms) in this collection, unlike every other one.
+ *
+ * @param value Raw record from the collection.
+ */
+export function coerceMonitorProbeStat(value: unknown): MonitorProbeStat | null {
+  const obj = coerceObject(value);
+  if (!obj) {
+    return null;
+  }
+  const monitor = coerceString(obj.monitor);
+  const created = coerceFiniteNumber(obj.created);
+  if (monitor === null || created === null) {
+    return null;
+  }
+  return {
+    monitor,
+    total: coerceFiniteNumber(obj.total_count) ?? 0,
+    success: coerceFiniteNumber(obj.success_count) ?? 0,
+    created,
   };
 }

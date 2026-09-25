@@ -17,7 +17,14 @@ import { tDesc, tName } from "./lib/i18n";
 import { SYSTEM_STATUS_UNKNOWN } from "./lib/metric-registry";
 import { StateManager } from "./lib/state-manager";
 import type { SystemExtras } from "./lib/state-manager";
-import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails, SystemStats } from "./lib/types";
+import type {
+  AdapterConfig,
+  BeszelContainer,
+  BeszelSystem,
+  MonitorProbeStat,
+  SystemDetails,
+  SystemStats,
+} from "./lib/types";
 
 /**
  * How often the two SLOW detail collections (`zfs_pools`, `smart_devices`) are read.
@@ -123,7 +130,7 @@ export class BeszelAdapter extends utils.Adapter {
    * requests a minute for the life of the process; they are asked once more after a
    * restart. Transient failures (network, timeout, 5xx) are NOT recorded here.
    */
-  private extrasUnsupported = new Set<"zfs" | "smart" | "services">();
+  private extrasUnsupported = new Set<"zfs" | "smart" | "services" | "monitors">();
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   private containersUnavailable = false;
   private authFailCount = 0;
@@ -909,8 +916,30 @@ export class BeszelAdapter extends utils.Adapter {
     const wantServices = config.metrics_services && config.metrics_servicesDetails;
     const wantZfs = config.metrics_zfs && config.metrics_zfsDetails;
     const wantSmart = config.metrics_smart;
-    if (!wantServices && !wantZfs && !wantSmart) {
+    const wantMonitors = config.metrics_networkMonitors;
+    if (!wantServices && !wantZfs && !wantSmart && !wantMonitors) {
       return out;
+    }
+
+    // Network monitors (Beszel 0.20.0): the Hub rewrites their measured columns on every
+    // agent update, so they are read every poll. The newest probe minute per monitor is an
+    // addition — its failure leaves the monitors without it, not without data.
+    if (wantMonitors && !this.extrasUnsupported.has("monitors")) {
+      try {
+        const monitors = await this.client!.getNetworkMonitors();
+        let probes = new Map<string, MonitorProbeStat>();
+        try {
+          probes = await this.client!.getLatestMonitorProbes();
+        } catch (err) {
+          this.log.debug(`network_monitor_stats fetch failed (non-fatal, ${this.classifyError(err)}): ${errText(err)}`);
+        }
+        for (const monitor of monitors) {
+          put(monitor.system, "networkMonitors", { monitor, probe: probes.get(monitor.id) });
+        }
+        seed("networkMonitors");
+      } catch (err) {
+        this.noteExtrasFailure("monitors", "network_monitors", err);
+      }
     }
 
     if (wantServices && !this.extrasUnsupported.has("services")) {
@@ -964,7 +993,7 @@ export class BeszelAdapter extends utils.Adapter {
    * @param collection The Hub's collection name, for the log line.
    * @param err The rejection.
    */
-  private noteExtrasFailure(key: "zfs" | "smart" | "services", collection: string, err: unknown): void {
+  private noteExtrasFailure(key: "zfs" | "smart" | "services" | "monitors", collection: string, err: unknown): void {
     const code = this.classifyError(err);
     if (code === "TRUNCATED" && !this.truncatedWarned.has(key)) {
       this.truncatedWarned.add(key);

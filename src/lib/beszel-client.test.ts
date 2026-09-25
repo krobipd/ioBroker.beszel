@@ -2262,6 +2262,81 @@ describe("BeszelClient — PocketBase behaviour (v0.19.0)", () => {
     expect(Date.now() - started, "ends near the budget, not after the whole trickle").to.be.lessThan(3000);
   }, 10000);
 
+  it("reads the network monitors and the newest probe minute per monitor (Beszel 0.20.0)", async () => {
+    const monitorRow = {
+      collectionId: "nm_monitors_001",
+      id: "6f7021fd",
+      system: "s1",
+      target: "127.0.0.1",
+      protocol: "tcp",
+      port: 18090,
+      interval: 10,
+      res: 360,
+      resAvg1h: 333,
+      resMin1h: 156,
+      resMax1h: 469,
+      loss1h: 0,
+      enabled: true,
+      updated: "2026-09-25 06:33:36.012Z",
+      created: "2026-09-25 06:31:36.369Z",
+    };
+    const stat = (monitor: string, created: number, success: number): object => ({
+      id: `st${created}`,
+      system: "s1",
+      monitor,
+      type: "1m",
+      total_count: 6,
+      success_count: success,
+      res_sum: 0,
+      res_min: 0,
+      res_max: 0,
+      created,
+    });
+    let statPages = 0;
+    hub = await startHub(path => {
+      if (path.includes("auth-with-password")) {
+        return { status: 200, body: JSON.stringify({ token: "t" }) };
+      }
+      if (path.includes("/network_monitors/records")) {
+        return { status: 200, body: list([monitorRow]) };
+      }
+      if (path.includes("/network_monitor_stats/records")) {
+        statPages++;
+        // Page 1: the newest minute of the monitor; page 2: only older minutes → walk ends.
+        const items = statPages === 1 ? [stat("6f7021fd", 1790318076012, 5)] : [stat("6f7021fd", 1790318016012, 6)];
+        return {
+          status: 200,
+          body: JSON.stringify({ page: statPages, perPage: 200, totalItems: 400, totalPages: 2, items }),
+        };
+      }
+      return { status: 404, body: "{}" };
+    });
+    const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+    const monitors = await client.getNetworkMonitors();
+    expect(monitors).to.have.lengthOf(1);
+    expect(monitors[0].updated).to.equal(Date.parse("2026-09-25T06:33:36.012Z"));
+    const probes = await client.getLatestMonitorProbes();
+    expect(probes.get("6f7021fd")).to.deep.equal({ monitor: "6f7021fd", total: 6, success: 5, created: 1790318076012 });
+    expect(statPages, "a page with nothing new ends the walk").to.equal(2);
+    const statsPath = decodeURIComponent(hub.log.find(r => r.path.includes("/network_monitor_stats/"))?.path ?? "");
+    expect(statsPath).to.include("sort=-created");
+    expect(statsPath).to.include("filter=type='1m'");
+  });
+
+  it("an older Hub answers the monitor collection with 404 (NOT_FOUND)", async () => {
+    hub = await startHub(path =>
+      path.includes("auth-with-password")
+        ? { status: 200, body: JSON.stringify({ token: "t" }) }
+        : { status: 404, body: JSON.stringify({ data: {}, message: "Missing collection context.", status: 404 }) },
+    );
+    const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+    const err = await client.getNetworkMonitors().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as NodeJS.ErrnoException).code).to.equal("NOT_FOUND");
+  });
+
   it("tags a URL that cannot be built as INVALID_URL", async () => {
     const client = new BeszelClient("http://exa mple", "a@b.c", "pw");
     const err = await client.getSystems().then(

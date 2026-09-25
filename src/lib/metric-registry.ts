@@ -133,6 +133,11 @@ export function vdevStates(): Record<string, string> {
   return { ...zfsHealthStates(), MISSING: tState("vdevMissing") };
 }
 
+/** `common.states` hint of a network monitor's protocol — the four probes Beszel 0.20.0 runs. */
+export function monitorProtocolStates(): Record<string, string> {
+  return { icmp: "ICMP (ping)", tcp: "TCP", http: "HTTP", dns: "DNS" };
+}
+
 /** `common.states` hint of `zfs.<pool>.pool_type` — the storage stack behind the pool. */
 export function poolTypeStates(): Record<string, string> {
   return { zfs: "ZFS", btrfs: "btrfs" };
@@ -317,6 +322,8 @@ export const CHANNEL_NAME_KEY = {
   datasets: "zfsDatasets",
   smart: "smart",
   services: "services",
+  // v0.19.0: network monitors (Beszel 0.20.0)
+  monitors: "channelMonitors",
 } as const satisfies Record<string, I18nKey>;
 
 /** Last path segment of a channel the ADAPTER names (i.e. a key of {@link CHANNEL_NAME_KEY}). */
@@ -348,6 +355,8 @@ export const DYNAMIC_CHANNEL_TOGGLES: Record<string, (keyof AdapterConfig)[]> = 
   // v0.17.0: two more channels that hold nothing but their dynamic children.
   smart: ["metrics_smart"],
   services: ["metrics_servicesDetails"],
+  // v0.19.0: network monitors — a channel of nothing but its dynamic children again.
+  monitors: ["metrics_networkMonitors"],
 };
 
 /**
@@ -700,6 +709,7 @@ export const LEAF_COMMONS = {
   containerMemory: () => numCommon(tName("containerMemory"), "MB"),
   containerImage: () => textCommon(tName("containerImage")),
   containerNetwork: () => numCommon(tName("containerNetwork"), "B/s", "value", tDesc("descContainerNetwork")),
+  containerUpdate: () => boolCommon(tName("containerUpdate"), "indicator", tDesc("descContainerUpdate")),
   // v0.17.0 — ZFS pool details (`zfs_pools`)
   scrubState: () => ({
     ...textCommon(tName("scrubState"), "info.status", tDesc("descScrubState")),
@@ -737,6 +747,20 @@ export const LEAF_COMMONS = {
   serviceCpuPeak: () => percentCommon(tName("serviceCpuPeak"), "value", tDesc("descServicePeak")),
   serviceMem: () => numCommon(tName("serviceMem"), "MB"),
   serviceMemPeak: () => numCommon(tName("serviceMemPeak"), "MB", "value", tDesc("descServicePeak")),
+  // v0.19.0 — network monitors (`network_monitors`, Beszel 0.20.0)
+  monitorProtocol: () => ({ ...textCommon(tName("monitorProtocol"), "text"), states: monitorProtocolStates() }),
+  monitorTarget: () => textCommon(tName("monitorTarget"), "text"),
+  monitorPort: () => numCommon(tName("monitorPort")),
+  monitorInterval: () => numCommon(tName("monitorInterval"), "s", "value.interval"),
+  monitorEnabled: () => boolCommon(tName("monitorEnabled"), "indicator", tDesc("descMonitorEnabled")),
+  monitorResponse: () => numCommon(tName("monitorResponse"), "ms", "value", tDesc("descMonitorResponse")),
+  monitorResponseAvg: () => numCommon(tName("monitorResponseAvg"), "ms"),
+  monitorResponseMin: () => numCommon(tName("monitorResponseMin"), "ms"),
+  monitorResponseMax: () => numCommon(tName("monitorResponseMax"), "ms"),
+  monitorLoss: () => percentCommon(tName("monitorLoss"), "value", tDesc("descMonitorLoss")),
+  monitorLastProbeLoss: () => percentCommon(tName("monitorLastProbeLoss"), "value", tDesc("descMonitorLastProbeLoss")),
+  monitorLastProbe: () => numCommon(tName("monitorLastProbe"), undefined, "date", tDesc("descMonitorLastProbe")),
+  monitorLastUpdate: () => numCommon(tName("monitorLastUpdate"), undefined, "date", tDesc("descMonitorLastUpdate")),
 } satisfies Record<string, (arg?: string) => ioBroker.StateCommon>;
 
 /** Id of a leaf in {@link LEAF_COMMONS} — a typo is a compile error at both call sites. */
@@ -765,6 +789,7 @@ export const DYNAMIC_CHANNEL_PATTERNS: { key: ChannelKey; match: RegExp }[] = [
   { key: "containers", match: /^containers$/ },
   { key: "smart", match: /^smart$/ },
   { key: "services", match: /^services$/ },
+  { key: "monitors", match: /^monitors$/ },
 ];
 
 /**
@@ -804,6 +829,7 @@ export const DYNAMIC_LEAF_PATTERNS: { id: DynamicLeafId; match: RegExp }[] = [
   { id: "containerMemory", match: /^containers\.[^.]+\.memory$/ },
   { id: "containerImage", match: /^containers\.[^.]+\.image$/ },
   { id: "containerNetwork", match: /^containers\.[^.]+\.network$/ },
+  { id: "containerUpdate", match: /^containers\.[^.]+\.update_available$/ },
   // v0.17.0 — details of the three extra collections
   { id: "scrubState", match: /^zfs\.[^.]+\.scrub_state$/ },
   { id: "scrubProgress", match: /^zfs\.[^.]+\.scrub_progress$/ },
@@ -830,6 +856,19 @@ export const DYNAMIC_LEAF_PATTERNS: { id: DynamicLeafId; match: RegExp }[] = [
   { id: "serviceCpuPeak", match: /^services\.[^.]+\.cpu_peak$/ },
   { id: "serviceMem", match: /^services\.[^.]+\.memory$/ },
   { id: "serviceMemPeak", match: /^services\.[^.]+\.memory_peak$/ },
+  { id: "monitorProtocol", match: /^monitors\.[^.]+\.protocol$/ },
+  { id: "monitorTarget", match: /^monitors\.[^.]+\.target$/ },
+  { id: "monitorPort", match: /^monitors\.[^.]+\.port$/ },
+  { id: "monitorInterval", match: /^monitors\.[^.]+\.interval$/ },
+  { id: "monitorEnabled", match: /^monitors\.[^.]+\.enabled$/ },
+  { id: "monitorResponse", match: /^monitors\.[^.]+\.response$/ },
+  { id: "monitorResponseAvg", match: /^monitors\.[^.]+\.response_avg_1h$/ },
+  { id: "monitorResponseMin", match: /^monitors\.[^.]+\.response_min_1h$/ },
+  { id: "monitorResponseMax", match: /^monitors\.[^.]+\.response_max_1h$/ },
+  { id: "monitorLoss", match: /^monitors\.[^.]+\.loss_1h$/ },
+  { id: "monitorLastProbeLoss", match: /^monitors\.[^.]+\.last_probe_loss$/ },
+  { id: "monitorLastProbe", match: /^monitors\.[^.]+\.last_probe$/ },
+  { id: "monitorLastUpdate", match: /^monitors\.[^.]+\.last_update$/ },
 ];
 
 /**

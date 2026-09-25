@@ -38,7 +38,14 @@ import {
 import { deviceIcon } from "./device-icons";
 import { StateManager } from "./state-manager";
 import type { SystemExtras } from "./state-manager";
-import type { AdapterConfig, BeszelSystem, BeszelContainer, SystemStats } from "./types";
+import type {
+  AdapterConfig,
+  BeszelSystem,
+  BeszelContainer,
+  MonitorProbeStat,
+  NetworkMonitor,
+  SystemStats,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Mock adapter
@@ -5182,5 +5189,128 @@ describe("StateManager — v0.19.0 wire and tree rules", () => {
     manager.stop();
     await manager.updateSystem(testSystem, testStats, [], allMetricsConfig());
     expect(adapter.states.has("systems.my_server.info.online")).to.be.false;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.19.0 — network monitors (Beszel 0.20.0), rows as a real Hub returns them
+// ---------------------------------------------------------------------------
+
+describe("StateManager — network monitors", () => {
+  let adapter: MockAdapter;
+  let manager: StateManager;
+  const cfg = allMetricsConfig({ metrics_networkMonitors: true });
+
+  beforeEach(async () => {
+    adapter = createMockAdapter();
+    manager = new StateManager(adapter as never);
+    await manager.snapshotExistingStates();
+  });
+
+  const val = (id: string): unknown => adapter.states.get(`systems.my_server.monitors.${id}`)?.val;
+  const has = (id: string): boolean => adapter.objects.has(`systems.my_server.monitors.${id}`);
+
+  // Measured on a 0.20.0 Hub (wire capture 2026-09-25), after the coercer.
+  const tcp: NetworkMonitor = {
+    id: "6f7021fd",
+    system: "sys001",
+    target: "127.0.0.1",
+    protocol: "tcp",
+    port: 18090,
+    interval: 10,
+    res: 360,
+    resAvg1h: 333,
+    resMin1h: 156,
+    resMax1h: 469,
+    loss1h: 0,
+    enabled: true,
+    updated: 1790318016012,
+  };
+  const unreachable: NetworkMonitor = {
+    ...tcp,
+    id: "8e65c174",
+    port: 1,
+    res: 0,
+    resAvg1h: 0,
+    resMin1h: 0,
+    resMax1h: 0,
+    loss1h: 100,
+  };
+  const neverMeasured: NetworkMonitor = {
+    ...tcp,
+    id: "b9c449bf",
+    protocol: "dns",
+    target: "example.invalid",
+    port: 0,
+    interval: 3600,
+    res: 0,
+    resAvg1h: 0,
+    resMin1h: 0,
+    resMax1h: 0,
+    loss1h: 0,
+    enabled: false,
+    updated: undefined,
+  };
+  const run = (list: { monitor: NetworkMonitor; probe?: MonitorProbeStat }[]): Promise<void> =>
+    manager.updateSystem(testSystem, testStats, [], cfg, true, { networkMonitors: list });
+
+  it("writes response times in ms, the loss in %, and the TCP port", async () => {
+    await run([{ monitor: tcp, probe: { monitor: tcp.id, total: 6, success: 6, created: 1790318016012 } }]);
+    expect(adapter.objects.get("systems.my_server.monitors.tcp_127_0_0_1_18090")?.common.name).to.equal(
+      "127.0.0.1:18090 (TCP)",
+    );
+    expect(val("tcp_127_0_0_1_18090.response")).to.equal(0.36);
+    expect(val("tcp_127_0_0_1_18090.response_min_1h")).to.equal(0.156);
+    expect(val("tcp_127_0_0_1_18090.loss_1h")).to.equal(0);
+    expect(val("tcp_127_0_0_1_18090.port")).to.equal(18090);
+    expect(val("tcp_127_0_0_1_18090.last_probe_loss")).to.equal(0);
+    expect(val("tcp_127_0_0_1_18090.last_probe")).to.equal(1790318016012);
+  });
+
+  it("res = 0 with loss 100 is 'nothing answered' — no response time, 100 % loss", async () => {
+    await run([{ monitor: unreachable, probe: { monitor: unreachable.id, total: 6, success: 0, created: 1 } }]);
+    expect(val("tcp_127_0_0_1_1.response")).to.equal(null);
+    expect(val("tcp_127_0_0_1_1.response_max_1h")).to.equal(null);
+    expect(val("tcp_127_0_0_1_1.loss_1h")).to.equal(100);
+    expect(val("tcp_127_0_0_1_1.last_probe_loss")).to.equal(100);
+  });
+
+  it("a monitor that never measured reads null everywhere and has no probe datapoints; no port for DNS", async () => {
+    await run([{ monitor: neverMeasured }]);
+    expect(val("dns_example_invalid.loss_1h")).to.equal(null);
+    expect(val("dns_example_invalid.response")).to.equal(null);
+    expect(val("dns_example_invalid.last_update")).to.equal(null);
+    expect(val("dns_example_invalid.enabled")).to.equal(false);
+    expect(has("dns_example_invalid.last_probe")).to.be.false;
+    expect(has("dns_example_invalid.port")).to.be.false;
+  });
+
+  it("a disabled monitor keeps the last values the Hub stored", async () => {
+    await run([{ monitor: { ...tcp, enabled: false } }]);
+    expect(val("tcp_127_0_0_1_18090.enabled")).to.equal(false);
+    expect(val("tcp_127_0_0_1_18090.response")).to.equal(0.36);
+  });
+
+  it("a changed target is a new monitor on the Hub — the old channel goes after two polls", async () => {
+    await run([{ monitor: tcp }]);
+    const moved = { ...tcp, id: "11111111", target: "10.0.0.2" };
+    await run([{ monitor: moved }]);
+    expect(has("tcp_127_0_0_1_18090")).to.be.true;
+    await run([{ monitor: moved }]);
+    expect(has("tcp_127_0_0_1_18090")).to.be.false;
+    expect(has("tcp_10_0_0_2_18090")).to.be.true;
+  });
+
+  it("an IPv6 TCP target shows with brackets, like the Hub UI", async () => {
+    await run([{ monitor: { ...tcp, target: "fd00::1", port: 443 } }]);
+    const ch = [...adapter.objects.entries()].find(([k]) => /monitors\.tcp_fd00_1_443$/.test(k));
+    expect(ch?.[1].common.name).to.equal("[fd00::1]:443 (TCP)");
+  });
+
+  it("the toggle off creates nothing", async () => {
+    await manager.updateSystem(testSystem, testStats, [], allMetricsConfig({ metrics_networkMonitors: false }), true, {
+      networkMonitors: [{ monitor: tcp }],
+    });
+    expect([...adapter.objects.keys()].some(k => k.includes(".monitors"))).to.be.false;
   });
 });
