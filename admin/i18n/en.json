@@ -232,6 +232,7 @@
   "monitorLastUpdate": "Last update",
   "descMonitorEnabled": "A switched-off monitor keeps its last values.",
   "descMonitorResponse": "Mean response of the successful probes in the latest window; empty when no probe succeeded.",
+  "descMonitorResponseHour": "Over the successful probes of the last hour; empty when none succeeded.",
   "descMonitorLoss": "Share of probes that failed over the last hour.",
   "descMonitorLastProbeLoss": "Share of failed probes in the newest minute that had a probe — with a long interval that minute can be up to an hour old (see last probe).",
   "descMonitorLastProbe": "When the newest probe minute was recorded.",

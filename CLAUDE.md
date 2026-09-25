@@ -76,7 +76,7 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 30. **Objekt-Auffrischung ≠ Wert-Schreiben (v0.14.1, LIVE-Fund)** — `applyMetrics` beantwortet zwei getrennte Fragen: gehört das OBJEKT in den Baum, und gibt es JETZT einen WERT.
 
 31. **Hub-benannte Objekte tragen `native.nameSource: "api"` (v0.14.2)** — Sensoren, Lüfter, Akkus, GPU-Engines und die Kanäle von Interfaces, GPUs, Dateisystemen und Containern heißen, wie Hub, Agent oder Betriebssystem sie nennen: einsprachig, oft gleich ihrer Kennung (`acpitz`, `eth0`).
-32. **Objekt-Inventar aus Fixtures (v0.14.2)** — `npm run test:inventory` startet den Adapter im Wegwerf-Controller gegen einen Fake-Hub (`test/fixtures/inventory/hub.json`: ein voll bestücktes Linux-System mit jeder Metrikgruppe von Beszel 0.19.0 in der …
+32. **Objekt-Inventar aus Fixtures (v0.14.2, Drahtform 0.20.0 seit 0.19.0)** — `npm run test:inventory` startet den Adapter im Wegwerf-Controller gegen einen Fake-Hub (`test/fixtures/inventory/hub.json` in der Drahtform eines Beszel-0.20.0-Hubs — json/v2-Nullen, `Info{}` bei pending/paused — mit elf Systemen über alle Geräteklassen; die vier ältesten behalten ihre Hub-Ids für die Aufstiegs-Suite); der Fake-Hub wertet `filter`/`sort`/`page`/`perPage` aus und antwortet auf einen unbekannten Filter mit 400; Poll-Intervall 10 s und Warten über zwei Polls, weil Mitglieder erst nach zwei Polls gehen.
 33. **Beszel 0.19.0 (v0.15.0) + `upstream.json`** — Struct-Diff 0.18.8→0.19.0 (Snapshot `Ressourcen/beszel/beszel-0.19.0/`, `VERIFIED-v0.19.0.md`): vier REST-sichtbare Neuerungen, alle `available`-gated (älterer Hub erzeugt nichts).
 
 34. **Der Start-Schnappschuss ist der EINZIGE Objekt-Lesevorgang (v0.16.0)** — `knownStateIds`, `knownChannelIds` und (neu) `knownDeviceIds` kommen aus dem einen `getObjectListAsync` in `snapshotExistingStates()` und werden ab da mitgeführt: `ensureChannel` und `updateSystem` tragen ein, …
@@ -92,7 +92,7 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 43. **Die drei Detail-Collections (v0.17.0)** — `zfs_pools`, `smart_devices` und `systemd_services` waren die letzten Sammlungen des Hubs, die der Adapter nicht las.
 
 44. **`b`/`dio` sind die Draht-Wahrheit, die Peaks liest der Adapter nicht (v0.18.0, korrigiert 0.19.0)** — der Agent setzt `ns/nr` auf Systemebene nicht mehr (`agent/network.go`); der Hub-Migrator `migrateDeprecatedFields` rechnet alte Werte nach `b`/`dio` um, nullt `ns/nr` und `dr/dw` (Letzteres seit 0.19.0 nur bei `dio == 0`); die Peak-Felder (`cpum`, `mm`, `drm`, `dwm`, `nsm`, `nrm`) stehen ab Hub 0.19.0 als 0 im REST-JSON des 1m-Datensatzes — der Adapter liest sie nicht.
-45. **Hardware, die der Rechner nicht hat, bekommt keinen Datenpunkt (v0.18.0)** — `t` (Sensoren) ist eine omitempty-Map, `bat`, `s`/`su` und `mz` sind omitzero/omitempty: eine VM ohne Sensoren trug zwei dauerhafte Temperatur-Nulls (default-on), dazu Batterie-, Swap- und ARC-Nulls je Schalter. Seit Hub 0.19.0 (go1.27.1, `encoding/json/v2`) stehen `omitempty`-Zahlen und -Bools als 0/`false` auf dem Draht, nur `omitzero`-Felder fehlen — deshalb Wert-Gates statt Präsenz-Gates (`s > 0`, `mz > 0`, `mb > 0`, `u > 0`, GPU-Speicher `mt > 0`), die für Hubs vor 0.19.0 (Feld fehlt) genauso greifen.
+45. **Hardware, die der Rechner nicht hat, bekommt keinen Datenpunkt (v0.18.0)** — `t` (Sensoren) ist eine omitempty-Map, `bat`, `s`/`su` und `mz` sind omitzero/omitempty: eine VM ohne Sensoren trug zwei dauerhafte Temperatur-Nulls (default-on), dazu Batterie-, Swap- und ARC-Nulls je Schalter. Seit Hub 0.19.0 (go1.27.1, `encoding/json/v2`) stehen `omitempty`-Zahlen und -Bools als 0/`false` auf dem Draht, nur `omitzero`-Felder fehlen — deshalb Wert-Gates statt Präsenz-Gates (`s > 0`, `mz > 0`, `mb > 0`, `u > 0`, GPU-Speicher `mt > 0`, GPU-Paketleistung `pp > 0`), die für Hubs vor 0.19.0 (Feld fehlt) genauso greifen.
 46. **Lebende Sammlungen werden nur bei `up` abgeglichen; jedes gepollte System bekommt seine Liste (v0.18.0)** — der Hub sweept `containers` 10 min und `systemd_services` 20 min nach dem letzten Sample, ein Down-System antwortet danach mit einer ERFOLGREICHEN leeren Liste: nach zwei Polls waren alle Container-Kanäle weg, während …
 47. **Geräte-Objekt: OS-Piktogramm, geprimte Signatur, kein `preserve` (v0.18.0)** — `common.icon` am Gerät `systems.<name>` nach dem Flotten-Rezept (`../CLAUDE_PATTERNS.md` § Geräte-Piktogramme): Inline `data:image/svg+xml;base64`-URI, `currentColor`/`none`, nur `path`/`circle`, 64er viewBox, …
 48. **Zwei Lebenszyklus-Löcher und der Rest des Audits (v0.18.0)** — `onReady` bricht nach dem ersten Poll ab, wenn der Stop währenddessen kam (js-controller verweigert `setInterval` mit WARN, „started" wäre gelogen); `poll()` prüft `unloaded` auch nach den Detail-Fetches und vor dem …
@@ -113,14 +113,18 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 63. **`containers.updatable` wird `update_available` (0.19.0, Beszel 0.20.0)** — nur angelegt, wenn der Hub die Spalte liefert; `false` heißt „kein Update bekannt“.
 64. **Kurze Ausfälle sind ein Zustand, keine Warnung (0.19.0, Flottenregel 2026-09-22)** — `NETWORK`/`TIMEOUT` loggen auf debug unter einem gemeinsamen Dedup-Schlüssel, „Connection restored“ danach ebenfalls; warn bleibt für Anmelde-, HTTP-, TLS-, Antwort- und Kürzungsfehler.
 
-## Tests (770 unit + 58 package + 1 integration + 2 inventory)
+## Tests (883 unit + 60 package + 1 integration + 3 inventory)
 
-Zusammensetzung (gemessen 2026-09-15 nach dem forensischen Audit, den zwei CI-Funden, dem Wegfall
-der Klartext-Warnung und von `info.uptime_text`, `vitest run`): state-manager 362 · coerce 156 ·
-main 113 · beszel-client 75 · message-router 17 · repo-standards 19 (aus `iobroker-adapter-checks` —
-die Zahl steigt mit dessen Version) · device-icons 12 · inventory 9 · i18n 7. `vitest list` (das Maß
-des D10-Gates) zählt 733, weil die Prüfpaket-Tests erst zur Laufzeit entstehen. Deckung **99,0 % Stmts ·
-97,8 % Branch · 97,6 % Funcs**; `state-manager.ts` 99,8 % Zeilen. Was offen bleibt, ist unerreichbar (https-Transport ohne TLS-Server) oder Test-Seam/Bootstrap in `main.ts`.
+Zusammensetzung (gemessen 2026-09-25 nach der Umsetzung des Audits 2026-09-25, `vitest run`):
+state-manager 391 · coerce 161 · main 141 · beszel-client 95 · repo-standards 29 (aus
+`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · message-router 19 · err-text 15 ·
+inventory 13 · device-icons 12 · i18n 7. Das D10-Maß `vitest list --json --staticParse=false` zählt
+ebenfalls 883. Deckung **99,4 % Stmts · 97,9 % Branch · 97,8 % Funcs**; offen bleiben nur die
+Bootstrap-/Test-Nähte in `main.ts` (Client-/Manager-Fabriken, `require.main`, `setStateSafe`-Catch)
+und der dokumentiert unerreichbare Hostname-Wächter in `validateHubUrl`. Der https-Transport ist
+über ein eingebettetes, selbst signiertes Testzertifikat (gültig bis 2126) geprüft. Das Inventar
+hat drei Suiten: Inventar, Aufstiegs-Suite (mit `INVENTORY_PREVIOUS`) und älterer Hub (404 auf
+`zfs_pools` und die Monitor-Sammlungen).
 
 Tests leben neben dem Source als `src/**/*.test.ts` und laufen direkt via **vitest** (seit v0.5.0; vorher mocha+ts-node). Assertions im chai-Stil über vitests EINGEBAUTES chai-basiertes `expect` (globals) — kein chai-Import/devDep (v0.7.2: Phantom-Dependency entfernt).
 

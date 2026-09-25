@@ -232,6 +232,7 @@
   "monitorLastUpdate": "Ultimo aggiornamento",
   "descMonitorEnabled": "Un monitor disattivato mantiene gli ultimi valori.",
   "descMonitorResponse": "Risposta media dei sondaggi riusciti nell'ultima finestra; vuoto se nessuno è riuscito.",
+  "descMonitorResponseHour": "Sulle verifiche riuscite dell'ultima ora; vuoto se nessuna è riuscita.",
   "descMonitorLoss": "Quota di sondaggi falliti nell'ultima ora.",
   "descMonitorLastProbeLoss": "Quota di sondaggi falliti nell'ultimo minuto con un sondaggio — con un intervallo lungo quel minuto può risalire fino a un'ora fa (vedi ultimo sondaggio).",
   "descMonitorLastProbe": "Quando è stato registrato l'ultimo minuto di sondaggio.",

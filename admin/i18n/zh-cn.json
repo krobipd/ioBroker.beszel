@@ -232,6 +232,7 @@
   "monitorLastUpdate": "最近更新",
   "descMonitorEnabled": "已关闭的监控会保留其最后的值。",
   "descMonitorResponse": "最近窗口内成功探测的平均响应；若没有探测成功则为空。",
+  "descMonitorResponseHour": "基于最近一小时内成功的探测；若均未成功则为空。",
   "descMonitorLoss": "过去一小时内失败探测的比例。",
   "descMonitorLastProbeLoss": "最近一个有探测的分钟内失败探测的比例——间隔较长时该分钟最多可能是一小时前（见最近探测）。",
   "descMonitorLastProbe": "最近一个探测分钟的记录时间。",

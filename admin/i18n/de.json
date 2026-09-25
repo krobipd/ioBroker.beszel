@@ -232,6 +232,7 @@
   "monitorLastUpdate": "Letzte Aktualisierung",
   "descMonitorEnabled": "Ein ausgeschalteter Monitor behält seine letzten Werte.",
   "descMonitorResponse": "Mittlere Antwort der erfolgreichen Messungen im jüngsten Fenster; leer, wenn keine Messung gelang.",
+  "descMonitorResponseHour": "Über die erfolgreichen Prüfungen der letzten Stunde; leer, wenn keine gelang.",
   "descMonitorLoss": "Anteil der fehlgeschlagenen Messungen in der letzten Stunde.",
   "descMonitorLastProbeLoss": "Anteil fehlgeschlagener Messungen in der jüngsten Minute mit einer Messung — bei langem Intervall kann diese Minute bis zu einer Stunde alt sein (siehe letzte Messung).",
   "descMonitorLastProbe": "Wann die jüngste Messminute erfasst wurde.",

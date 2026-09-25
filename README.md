@@ -182,7 +182,7 @@ beszel.0.
         │       ├── memory_used      — VRAM used (MB, only on GPUs that report memory)
         │       ├── memory_total     — VRAM total (MB, only on GPUs that report memory)
         │       ├── power            — Power draw (W)
-        │       ├── power_package *  — Package power (W) (GPU details)
+        │       ├── power_package *  — Package power (W) (GPU details, only on GPUs with a package sensor)
         │       └── engines/ *       — Per-engine usage (render, video, …) (%)
         ├── filesystems/ *            — Extra filesystems (named after the device or the custom name set on the agent)
         │   └── {fs_name}/
@@ -307,7 +307,7 @@ beszel.0.
 - Fixed: after a password change, a deleted user or a restored Hub database the adapter kept every system green without new values for up to a day — it now logs in again right away
 - Fixed: a refused login says why — wrong e-mail or password, multi-factor authentication, or password login switched off on the Hub — and the adapter stops retrying every poll
 - Fixed: a paused or never-connected system no longer shows uptime 0 or empty system details; its last values stay
-- Fixed: on current Hubs, swap and ZFS cache datapoints appeared on hosts without swap or ZFS, and GPU memory on GPUs that report none — they are removed
+- Fixed: on current Hubs, swap and ZFS cache datapoints appeared on hosts without swap or ZFS, GPU memory on GPUs that report none and GPU package power at 0 W on GPUs without a package sensor — they are removed
 - Fixed: drives without a temperature or capacity reading showed 0; they now get no such datapoint
 - Fixed: a storage pool that was removed came back with the next detail refresh and stayed until the next restart
 - Fixed: a system whose name has no Latin letters or digits (e.g. Cyrillic or Chinese) got no object tree; it now gets a stable fallback id

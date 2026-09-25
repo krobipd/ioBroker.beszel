@@ -1509,10 +1509,13 @@ export class StateManager {
           // GPU details (v0.6.0): package power + per-engine usage. Engines the
           // driver stopped reporting get pruned (debounced) — nested group.
           if (config.metrics_gpuDetails) {
-            await this.createAndSetState(
+            // `pp` is `omitempty`: a Hub from 0.19.0 on (json/v2) sends it as 0 for every GPU
+            // without a package sensor (NVIDIA), an older Hub leaves it out. A package that
+            // draws exactly 0 W is no reading, so the datapoint exists only above 0.
+            await this.setOrRetire(
               `${sysId}.gpu.${safeId}.power_package`,
               leafCommon("gpuPowerPackage"),
-              gpuData.pp ?? null,
+              (gpuData.pp ?? 0) > 0 ? (gpuData.pp ?? null) : null,
             );
             await this.syncDynamicGroup(
               `${sysId}.gpu.${safeId}.engines`,

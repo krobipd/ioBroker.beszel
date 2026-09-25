@@ -551,6 +551,38 @@ describe("BeszelAdapter shutdown while a poll is in flight", () => {
     expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.systemsTotal", expect.anything());
   });
 
+  it("a stop during the fresh login after an empty list writes no system", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    let release: (v: BeszelSystem[]) => void = () => {};
+    client.getSystems.mockReset();
+    client.getSystems
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => new Promise<BeszelSystem[]>(resolve => (release = resolve)));
+    stateMgr.updateSystem.mockClear();
+    const polling = i.poll();
+    await vi.waitFor(() => expect(client.getSystems).toHaveBeenCalledTimes(2));
+    i.onUnload(vi.fn());
+    release([makeSystem()]);
+    await polling;
+    expect(stateMgr.updateSystem).not.toHaveBeenCalled();
+  });
+
+  it("a stop while the hardware details are read writes no system", async () => {
+    const { adapter, client, stateMgr } = setup();
+    const i = internalOf(adapter);
+    let release: (v: Map<string, SystemDetails>) => void = () => {};
+    client.getSystemDetails.mockImplementation(
+      () => new Promise<Map<string, SystemDetails>>(resolve => (release = resolve)),
+    );
+    const starting = i.onReady();
+    await vi.waitFor(() => expect(client.getSystemDetails).toHaveBeenCalled());
+    i.onUnload(vi.fn());
+    release(new Map());
+    await starting;
+    expect(stateMgr.updateSystem).not.toHaveBeenCalled();
+  });
+
   it("does not log the aborted poll as an error and writes nothing after onUnload", async () => {
     // onUnload → cancelAll() aborts the request in flight; the poll's Promise.all
     // rejects with a code-less "Request aborted". That used to reach handlePollError
@@ -1088,6 +1120,31 @@ describe("BeszelAdapter poll — error classification routing", () => {
       expect(i.log.warn, code).toHaveBeenCalledWith(expect.stringContaining(text));
       expect(i.setStateChangedAsync, code).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
     }
+  });
+
+  it("a cut-off detail collection warns once and then keeps quiet", async () => {
+    const { adapter, client } = setup({ metrics_smart: true });
+    const i = internalOf(adapter);
+    client.getSmartDevices.mockRejectedValue(errnoError("pages", "TRUNCATED"));
+    await i.onReady();
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("more smart_devices records"));
+    i.log.warn.mockClear();
+    i.lastDetailFetch = 0; // the next detail read is due
+    await i.poll();
+    expect(client.getSmartDevices).toHaveBeenCalledTimes(2);
+    expect(i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("more smart_devices records"));
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("smart_devices fetch failed"));
+  });
+
+  it("the same poll failure a second time goes to debug as ongoing", async () => {
+    const { adapter, client } = await setupReady();
+    const i = internalOf(adapter);
+    client.getSystems.mockRejectedValue(errnoError("HTTP 500: x", "HTTP_ERROR"));
+    await i.poll();
+    i.log.error.mockClear();
+    await i.poll();
+    expect(i.log.error).not.toHaveBeenCalled();
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Poll failed (ongoing)"));
   });
 
   it("RATE_LIMITED suggests increasing the poll interval (warn)", async () => {
@@ -1811,6 +1868,16 @@ describe("BeszelAdapter — what each system gets from the detail collections (v
     await internalOf(adapter).onReady();
     expect(extrasFor(stateMgr, "sys001")?.smartDevices).to.have.lengthOf(1);
     expect(extrasFor(stateMgr, "sys002")?.smartDevices, "no record → explicit empty list").to.deep.equal([]);
+  });
+
+  it("hands each system its own storage pool details from the zfs_pools read", async () => {
+    const { adapter, client, stateMgr } = setup({ metrics_zfs: true, metrics_zfsDetails: true });
+    client.getSystems.mockImplementation(() => Promise.resolve(twoSystems));
+    const pool = { id: "z1", system: "sys002", name: "tank", health: "ONLINE" };
+    client.getZfsPoolDetails.mockImplementation(() => Promise.resolve([pool]));
+    await internalOf(adapter).onReady();
+    expect(extrasFor(stateMgr, "sys002")?.zfsPools).to.deep.equal([pool]);
+    expect(extrasFor(stateMgr, "sys001")?.zfsPools, "no pool → explicit empty list").to.deep.equal([]);
   });
 
   it("hands nobody a list for a collection whose read failed — not even a system with rows elsewhere", async () => {

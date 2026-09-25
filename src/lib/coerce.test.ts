@@ -790,6 +790,13 @@ describe("coerce", () => {
       expect(c!.net).to.equal(123456);
     });
 
+    it("carries the 0.20.0 update flag only when the Hub sends a boolean", () => {
+      expect(coerceContainer({ id: "c1", system: "s", name: "nginx", updatable: true })!.updatable).to.equal(true);
+      expect(coerceContainer({ id: "c1", system: "s", name: "nginx", updatable: false })!.updatable).to.equal(false);
+      expect(coerceContainer({ id: "c1", system: "s", name: "nginx" })!.updatable, "older Hub").to.be.undefined;
+      expect(coerceContainer({ id: "c1", system: "s", name: "nginx", updatable: 1 })!.updatable).to.be.undefined;
+    });
+
     it("omits net entirely on an older Hub (absent or unusable)", () => {
       // Absent → no state at all, rather than a permanently-zero one.
       expect(coerceContainer({ id: "c1", system: "s", name: "nginx" })!.net).to.be.undefined;
@@ -1306,5 +1313,22 @@ describe("detail collections (v0.17.0)", () => {
     it("rejects a row without identity", () => {
       expect(coerceSystemdService({ system: "s" })).to.equal(null);
     });
+  });
+});
+
+describe("record coercers refuse anything that is not an object", () => {
+  it("returns null for null, a string, a number and an array", () => {
+    for (const bad of [null, undefined, "x", 1, [1]]) {
+      expect(coerceSmartDevice(bad), `smart ${String(bad)}`).to.be.null;
+      expect(coerceSystemdService(bad), `unit ${String(bad)}`).to.be.null;
+      expect(coerceNetworkMonitor(bad), `monitor ${String(bad)}`).to.be.null;
+      expect(coerceMonitorProbeStat(bad), `probe ${String(bad)}`).to.be.null;
+    }
+  });
+
+  it("a SMART row without id, system or name is dropped", () => {
+    expect(coerceSmartDevice({ system: "s", name: "/dev/sda" })).to.be.null;
+    expect(coerceSmartDevice({ id: "d", name: "/dev/sda" })).to.be.null;
+    expect(coerceSmartDevice({ id: "d", system: "s" })).to.be.null;
   });
 });

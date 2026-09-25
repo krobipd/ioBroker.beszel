@@ -151,7 +151,9 @@ the Hub — switch on **Pool details** for it (see below).
 | Details     | `gpu.<id>.power_package`, `gpu.<id>.engines.<name>`         |
 
 GPU memory is reported in MB and only exists on GPUs that report it — an integrated GPU usually
-does not, and gets no memory datapoints.
+does not, and gets no memory datapoints. `power_package` (GPU details) likewise only exists on
+GPUs with a package power sensor, such as Intel GPUs read through `intel_gpu_top`; an NVIDIA card
+has none.
 
 ## Containers
 

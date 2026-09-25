@@ -232,6 +232,7 @@
   "monitorLastUpdate": "Laatste update",
   "descMonitorEnabled": "Een uitgeschakelde monitor behoudt zijn laatste waarden.",
   "descMonitorResponse": "Gemiddelde respons van de geslaagde metingen in het laatste venster; leeg als geen meting slaagde.",
+  "descMonitorResponseHour": "Over de geslaagde probes van het afgelopen uur; leeg als er geen slaagde.",
   "descMonitorLoss": "Aandeel mislukte metingen in het laatste uur.",
   "descMonitorLastProbeLoss": "Aandeel mislukte metingen in de laatste minuut met een meting — bij een lang interval kan die minuut tot een uur oud zijn (zie laatste meting).",
   "descMonitorLastProbe": "Wanneer de laatste meetminuut is vastgelegd.",

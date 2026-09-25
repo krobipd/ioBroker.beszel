@@ -1,4 +1,6 @@
 import * as http from "node:http";
+import * as https from "node:https";
+import type { AddressInfo } from "node:net";
 import { BeszelClient, hostnameForRequest, portForRequest, tokenExpiryMs } from "./beszel-client";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +17,8 @@ interface MockReply {
 interface MockServerConfig {
   authHandler?: (body: string) => MockReply;
   systemsHandler?: () => MockReply;
-  statsHandler?: () => MockReply;
+  /** Receives the request path, so a reply can honour its `sort`/`filter` like PocketBase. */
+  statsHandler?: (path: string) => MockReply;
   containersHandler?: () => MockReply;
   detailsHandler?: () => MockReply;
   /** The three extra collections (v0.17.0); omitted = the default one-row reply. */
@@ -58,7 +61,7 @@ function createMockServer(config: MockServerConfig = {}): {
         res.end(result.body);
       } else if (path.includes("/api/collections/system_stats/records")) {
         const handler = config.statsHandler || defaultStatsHandler;
-        const result = handler();
+        const result = handler(path);
         res.writeHead(result.status, { "Content-Type": "application/json", ...(result.headers ?? {}) });
         res.end(result.body);
       } else if (path.includes("/api/collections/containers/records")) {
@@ -515,6 +518,36 @@ describe("BeszelClient", () => {
       expect(await client.checkConnection()).to.deep.equal({ success: true, systems: 0 });
     });
 
+    it("fails the test when the address answers, but not with a record list", async () => {
+      mock = createMockServer({
+        systemsHandler: () => ({ status: 200, body: JSON.stringify({ hello: "not a Hub" }) }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const result = await client.checkConnection();
+      expect(result.success).to.equal(false);
+      expect((result as { reason: string }).reason).to.include("not a record list");
+    });
+
+    it("never repeats a 401 request without a token — a guest request reads an empty list", async () => {
+      mock = createMockServer({ systemsHandler: () => ({ status: 401, body: '{"message":"expired"}' }) });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const internal = client as unknown as { ensureToken: () => Promise<void> };
+      const real = internal.ensureToken.bind(client);
+      let calls = 0;
+      // The first call logs in; the one after the 401 finds the token cleared by a
+      // concurrent invalidation and returns without a new one.
+      vi.spyOn(internal, "ensureToken").mockImplementation(() => (calls++ === 0 ? real() : Promise.resolve()));
+      const err = await client.getSystems().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as NodeJS.ErrnoException).code).to.equal("UNAUTHORIZED");
+      const systemsRequests = mock.requestLog.filter(r => r.path.includes("/systems/records"));
+      expect(systemsRequests, "no tokenless retry").to.have.lengthOf(1);
+    });
+
     it("should return failure on invalid credentials", async () => {
       mock = createMockServer();
       const port = await mock.start();
@@ -697,22 +730,22 @@ describe("BeszelClient", () => {
     });
 
     it("should deduplicate and keep newest per system", async () => {
+      // Stored oldest first, like the Hub's table; only the client's `sort=-updated` puts the
+      // newest record of each system first — without it this test reads the stale value.
+      const stored = [
+        { id: "s2", system: "sys001", type: "1m", stats: { cpu: 30 }, updated: "2026-01-01T11:59:00Z" },
+        { id: "s1", system: "sys001", type: "1m", stats: { cpu: 50 }, updated: "2026-01-01T12:00:00Z" },
+        { id: "s3", system: "sys002", type: "1m", stats: { cpu: 10 }, updated: "2026-01-01T12:00:00Z" },
+      ];
       mock = createMockServer({
-        statsHandler: () => ({
-          status: 200,
-          body: JSON.stringify({
-            page: 1,
-            perPage: 200,
-            totalItems: 3,
-            totalPages: 1,
-            items: [
-              // Sorted by -updated, so first is newest
-              { id: "s1", system: "sys001", type: "1m", stats: { cpu: 50 }, updated: "2026-01-01T12:00:00Z" },
-              { id: "s2", system: "sys001", type: "1m", stats: { cpu: 30 }, updated: "2026-01-01T11:59:00Z" },
-              { id: "s3", system: "sys002", type: "1m", stats: { cpu: 10 }, updated: "2026-01-01T12:00:00Z" },
-            ],
-          }),
-        }),
+        statsHandler: path => {
+          const newestFirst = decodeURIComponent(path).includes("sort=-updated");
+          const items = newestFirst ? [...stored].sort((a, b) => b.updated.localeCompare(a.updated)) : stored;
+          return {
+            status: 200,
+            body: JSON.stringify({ page: 1, perPage: 200, totalItems: items.length, totalPages: 1, items }),
+          };
+        },
       });
       const port = await mock.start();
 
@@ -2344,5 +2377,91 @@ describe("BeszelClient — PocketBase behaviour (v0.19.0)", () => {
       (e: unknown) => e,
     );
     expect((err as NodeJS.ErrnoException).code).to.equal("INVALID_URL");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// https transport — a TEST-ONLY self-signed certificate for 127.0.0.1 (valid until 2126),
+// generated for this suite with `openssl req -x509 -newkey ec`. It protects nothing.
+// ---------------------------------------------------------------------------
+
+const TEST_TLS_KEY = [
+  "-----BEGIN PRIVATE KEY-----",
+  "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg4QHDcmIc7BEeVZzQ",
+  "/MUY3unyRHY+i57LH805HZ/zspOhRANCAASfd29uHOYRjFSkqovltyuGFfRUzQhl",
+  "kvvopXRrOznIyq60IS2Ly2HWqCOZeBfd/BFOkwgtjkLHrbJbJ4Eue3Xy",
+  "-----END PRIVATE KEY-----",
+].join("\n");
+const TEST_TLS_CERT = [
+  "-----BEGIN CERTIFICATE-----",
+  "MIIBpDCCAUqgAwIBAgIUe2mFU6Y3lzar/p87DduwOBDjzOMwCgYIKoZIzj0EAwIw",
+  "HjEcMBoGA1UEAwwTYmVzemVsLWFkYXB0ZXItdGVzdDAgFw0yNjA5MjUwODEwNDFa",
+  "GA8yMTI2MDkwMTA4MTA0MVowHjEcMBoGA1UEAwwTYmVzemVsLWFkYXB0ZXItdGVz",
+  "dDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJ93b24c5hGMVKSqi+W3K4YV9FTN",
+  "CGWS++ildGs7OcjKrrQhLYvLYdaoI5l4F938EU6TCC2OQsetslsngS57dfKjZDBi",
+  "MB0GA1UdDgQWBBQ6h1Qv/JsoxKrfd2rETotJQ8BItjAfBgNVHSMEGDAWgBQ6h1Qv",
+  "/JsoxKrfd2rETotJQ8BItjAPBgNVHRMBAf8EBTADAQH/MA8GA1UdEQQIMAaHBH8A",
+  "AAEwCgYIKoZIzj0EAwIDSAAwRQIhAKzR2Egr3ZoQei9pU+GVG35nO73AXIVGi+uh",
+  "FD/mALoaAiASZc4oUULr++a8hCdKD+ZDHG4XuqokkWdAHGjn3+qkhw==",
+  "-----END CERTIFICATE-----",
+].join("\n");
+
+describe("BeszelClient — https transport", () => {
+  let server: https.Server | undefined;
+
+  /** An https Hub on 127.0.0.1 that answers the login and the systems list. */
+  async function startHttpsHub(): Promise<number> {
+    const hub = https.createServer({ key: TEST_TLS_KEY, cert: TEST_TLS_CERT }, (req, res) => {
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        if ((req.url ?? "").includes("auth-with-password")) {
+          res.end(JSON.stringify({ token: "tls-token" }));
+        } else {
+          res.end(
+            JSON.stringify({
+              page: 1,
+              perPage: 1000,
+              totalItems: 1,
+              totalPages: 1,
+              items: [{ id: "sys001", name: "TLS Server", status: "up", host: "10.0.0.1", info: {} }],
+            }),
+          );
+        }
+      });
+    });
+    server = hub;
+    await new Promise<void>(resolve => hub.listen(0, "127.0.0.1", () => resolve()));
+    return (hub.address() as AddressInfo).port;
+  }
+
+  afterEach(async () => {
+    delete https.globalAgent.options.ca;
+    if (server) {
+      await new Promise<void>(resolve => server!.close(() => resolve()));
+      server = undefined;
+    }
+  });
+
+  it("reads the Hub over https when the certificate is trusted", async () => {
+    const port = await startHttpsHub();
+    // Trust the test certificate the way NODE_EXTRA_CA_CERTS would: the client uses the
+    // global https agent and adds no trust of its own.
+    https.globalAgent.options.ca = TEST_TLS_CERT;
+    const client = new BeszelClient(`https://127.0.0.1:${port}`, "admin", "secret");
+    const systems = await client.getSystems();
+    expect(systems.map(s => s.name)).toEqual(["TLS Server"]);
+    client.cancelAll();
+  });
+
+  it("refuses a self-signed certificate it does not trust, with Node's TLS code", async () => {
+    const port = await startHttpsHub();
+    const client = new BeszelClient(`https://127.0.0.1:${port}`, "admin", "secret");
+    const err = await client.getSystems().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as NodeJS.ErrnoException).code).to.equal("DEPTH_ZERO_SELF_SIGNED_CERT");
+    client.cancelAll();
   });
 });

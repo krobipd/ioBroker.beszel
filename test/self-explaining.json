@@ -56,5 +56,9 @@
   "systems.*.smart.*.firmware": "Plain identification smartctl hands over verbatim — the string IS the whole content.",
   "systems.*.smart.*.interface": "The bus the drive sits on, as smartctl names it (sat, nvme, scsi).",
   "systems.*.smart.*.capacity": "A reading whose name, role and unit say it all.",
-  "systems.*.smart.*.temperature": "A reading whose name, role and unit say it all."
+  "systems.*.smart.*.temperature": "A reading whose name, role and unit say it all.",
+  "systems.*.monitors.*.protocol": "Carries its own value list: icmp, tcp, http or dns.",
+  "systems.*.monitors.*.target": "Plain identification of the probed host or URL, as set up on the Hub — the string IS the whole content.",
+  "systems.*.monitors.*.port": "A plain port number, present only for tcp monitors.",
+  "systems.*.monitors.*.interval": "The name and the second unit are the whole statement."
 }

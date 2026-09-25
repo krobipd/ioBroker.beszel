@@ -1938,6 +1938,31 @@ describe("StateManager", () => {
   // H2 — drop-to-zero prune debounce (dynamic groups)
   // -----------------------------------------------------------------------
 
+  describe("updateSystem — the container update flag (Beszel 0.20.0)", () => {
+    it("writes update_available with its role and description when the Hub carries the column", async () => {
+      const cfg = allMetricsConfig({ metrics_containers: true });
+      const withFlag: BeszelContainer[] = [
+        { ...testContainers[0], updatable: true },
+        { ...testContainers[0], id: "c2", name: "postgres", image: "postgres:16", updatable: false },
+      ];
+      await manager.updateSystem(testSystem, testStats, withFlag, cfg);
+      const base = "systems.my_server.containers";
+      expect(adapter.states.get(`${base}.nginx.update_available`)?.val).to.equal(true);
+      expect(adapter.states.get(`${base}.postgres.update_available`)?.val).to.equal(false);
+      const obj = adapter.objects.get(`${base}.nginx.update_available`);
+      expect(obj?.common.role).to.equal("indicator");
+      expect(obj?.common.type).to.equal("boolean");
+      expect(obj?.common.desc).to.not.equal(undefined);
+    });
+
+    it("creates no update flag on a Hub before 0.20.0", async () => {
+      const cfg = allMetricsConfig({ metrics_containers: true });
+      await manager.updateSystem(testSystem, testStats, testContainers, cfg);
+      const ids = [...adapter.objects.keys()].filter(id => id.endsWith(".update_available"));
+      expect(ids).to.deep.equal([]);
+    });
+  });
+
   describe("updateSystem — a DOWN system keeps its containers (v0.18.0)", () => {
     it("does not prune the containers of a system without a reading, even from a successful empty list", async () => {
       // The Hub deletes container rows 10 minutes after the last agent sample, so a
@@ -2476,8 +2501,12 @@ describe("StateManager", () => {
     });
 
     it("should handle cleanup when states do not exist", async () => {
-      // Should not throw when cleaning up states that were never created
-      await manager.cleanupMetrics("nonexistent_system", noMetricsConfig());
+      // Cleaning up a system that was never created neither throws nor touches anything.
+      const objectsBefore = adapter.objects.size;
+      const deletesBefore = adapter.delObjectCalls.length;
+      await expect(manager.cleanupMetrics("nonexistent_system", noMetricsConfig())).resolves.toBeUndefined();
+      expect(adapter.objects.size).to.equal(objectsBefore);
+      expect(adapter.delObjectCalls.length).to.equal(deletesBefore);
     });
   });
 
@@ -2625,7 +2654,10 @@ describe("StateManager", () => {
     });
 
     it("handles an empty adapter with no systems", async () => {
-      await manager.removeRetiredStates();
+      const deletesBefore = adapter.delObjectCalls.length;
+      await expect(manager.removeRetiredStates()).resolves.toBeUndefined();
+      expect(adapter.delObjectCalls.length, "nothing to sweep, nothing deleted").to.equal(deletesBefore);
+      expect(adapter.objects.size).to.equal(0);
     });
   });
 
@@ -5124,6 +5156,36 @@ describe("StateManager — v0.19.0 wire and tree rules", () => {
     expect(has("gpu.gpu0.memory_total")).to.be.false;
     expect(has("gpu.gpu0.memory_used")).to.be.false;
     expect(val("gpu.gpu0.power")).to.equal(3);
+  });
+
+  it("package power exists only above 0 W: json/v2 sends pp 0 for every GPU without a package sensor", async () => {
+    // Hub >= 0.19.0: `pp` is omitempty and arrives as 0 (NVIDIA); a Hub before 0.19.0 leaves it out.
+    const nvidiaV2: SystemStats = {
+      ...testStats,
+      g: { gpu0: { n: "NVIDIA", u: 40, mu: 1024, mt: 8192, p: 120, pp: 0 } },
+    };
+    await manager.updateSystem(testSystem, nvidiaV2, [], allMetricsConfig());
+    expect(has("gpu.gpu0.power_package"), "v2 zero").to.be.false;
+    const nvidiaV1: SystemStats = { ...testStats, g: { gpu0: { n: "NVIDIA", u: 40, mu: 1024, mt: 8192, p: 120 } } };
+    await manager.updateSystem(testSystem, nvidiaV1, [], allMetricsConfig());
+    expect(has("gpu.gpu0.power_package"), "v1 absent").to.be.false;
+    const intel: SystemStats = { ...testStats, g: { gpu0: { n: "Intel Arc", u: 30, p: 12, pp: 18.5 } } };
+    await manager.updateSystem(testSystem, intel, [], allMetricsConfig());
+    expect(val("gpu.gpu0.power_package")).to.equal(18.5);
+    await manager.updateSystem(
+      testSystem,
+      { ...intel, g: { gpu0: { ...intel.g!.gpu0, pp: 0 } } },
+      [],
+      allMetricsConfig(),
+    );
+    expect(has("gpu.gpu0.power_package"), "one sample keeps it").to.be.true;
+    await manager.updateSystem(
+      testSystem,
+      { ...intel, g: { gpu0: { ...intel.g!.gpu0, pp: 0 } } },
+      [],
+      allMetricsConfig(),
+    );
+    expect(has("gpu.gpu0.power_package")).to.be.false;
   });
 
   it("a member missing for ONE sample is kept — no delete-and-recreate that loses its history settings", async () => {

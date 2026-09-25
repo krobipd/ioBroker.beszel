@@ -159,7 +159,9 @@ liegen in einer eigenen Sammlung auf dem Hub — dafür den Schalter **Pool-Deta
 | Details     | `gpu.<id>.power_package`, `gpu.<id>.engines.<name>`         |
 
 Der GPU-Speicher wird in MB gemeldet und existiert nur bei GPUs, die ihn melden — eine
-integrierte GPU tut das meist nicht und bekommt keine Speicher-Datenpunkte.
+integrierte GPU tut das meist nicht und bekommt keine Speicher-Datenpunkte. `power_package`
+(GPU-Details) gibt es ebenso nur bei GPUs mit Paketleistungs-Sensor, etwa Intel-GPUs über
+`intel_gpu_top`; eine NVIDIA-Karte hat keinen.
 
 ## Container
 
