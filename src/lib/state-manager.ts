@@ -635,7 +635,7 @@ export class StateManager {
   // -------------------------------------------------------------------------
 
   /**
-   * Return a config copy where every detail/peak toggle whose category base is
+   * Return a config copy where every detail toggle whose category base is
    * disabled is forced to `false` (see `METRIC_DEPENDENCIES`). Applied at the
    * top of `updateSystem` and `cleanupMetrics` so both create- and cleanup-path
    * see the same effective values — a disabled category's sub-states are never
@@ -1536,7 +1536,8 @@ export class StateManager {
       );
     }
 
-    // Extra filesystems — fsName is the raw mount path, kept as plain string.
+    // Extra filesystems — the key is the agent's name for the filesystem (the device, or
+    // the custom name from `EXTRA_FILESYSTEMS=device__name`), kept as plain string.
     // v0.7.2 + H2: an unmounted/renamed extra filesystem used to keep its
     // channel with frozen values forever. Debounced for the drop-to-zero case.
     if (config.metrics_extraFs) {
@@ -1850,7 +1851,7 @@ export class StateManager {
    * @param sysContainers Container records for this system (already filtered).
    */
   private async updateContainers(sysId: string, sysContainers: BeszelContainer[]): Promise<void> {
-    // SEC-6: resolve each container's id segment once (keyed by record id),
+    // SEC-6: resolve each container's id segment once (keyed by container name),
     // disambiguating any collision so the prune set and the create loop use the
     // SAME id and two same-sanitizing names never overwrite each other.
     // Keyed by NAME: Docker's container id changes on every re-create (`compose up`), so

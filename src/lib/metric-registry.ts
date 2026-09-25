@@ -373,7 +373,7 @@ export const DYNAMIC_SUBCHANNEL_TOGGLES: Record<string, keyof AdapterConfig> = {
 };
 
 /**
- * v0.6.0: each detail/peak toggle depends on its category's base toggle — when
+ * v0.6.0: each detail toggle depends on its category's base toggle — when
  * the category is off, the detail is off too. This mirrors the admin grey-out
  * (`disabled` in jsonConfig) in the DATA logic, so a sub-metric never creates
  * states while its category is disabled (krobi: "Kategorie aus → Unterkategorie
@@ -381,8 +381,10 @@ export const DYNAMIC_SUBCHANNEL_TOGGLES: Record<string, keyof AdapterConfig> = {
  * admin/jsonConfig.json. Every non-base metric in a category gates on the
  * category's base/usage metric — including the default-on co-metrics `loadAvg`
  * (→ CPU) and `diskSpeed` (→ Disk): krobi wants a category to switch off
- * completely, with no odd one out. Only the System category (uptime /
- * system-info / services) has no single base, so its three are not gated.
+ * completely, with no odd one out. The System category has no single base: uptime,
+ * system info and services stand alone, only the systemd unit details hang on the
+ * services metric. Groups without a detail level (fans, battery, containers, SMART,
+ * network monitors) are single switches.
  */
 export const METRIC_DEPENDENCIES = {
   metrics_loadAvg: "metrics_cpu",
@@ -642,9 +644,9 @@ export function commonFor(def: MetricDef): ioBroker.StateCommon {
     case "percent":
       return percentCommon(name, def.role, desc);
     case "text":
-      return textCommon(name, "text", desc);
+      return textCommon(name, def.role ?? "text", desc);
     case "bool":
-      return boolCommon(name, "indicator", desc);
+      return boolCommon(name, def.role ?? "indicator", desc);
     default:
       return numCommon(name, def.unit, def.role ?? "value", desc);
   }
@@ -729,9 +731,9 @@ export const LEAF_COMMONS = {
     ...textCommon(tName("smartState"), "info.status", tDesc("descSmartState")),
     states: smartStates(),
   }),
-  smartModel: () => textCommon(tName("smartModel"), "text"),
-  smartSerial: () => textCommon(tName("smartSerial"), "text"),
-  smartFirmware: () => textCommon(tName("smartFirmware"), "text"),
+  smartModel: () => textCommon(tName("smartModel"), "info.model"),
+  smartSerial: () => textCommon(tName("smartSerial"), "info.serial"),
+  smartFirmware: () => textCommon(tName("smartFirmware"), "info.firmware"),
   smartType: () => textCommon(tName("smartType"), "text"),
   smartTemp: () => numCommon(tName("smartTemp"), "°C", "value.temperature"),
   smartCapacity: () => numCommon(tName("smartCapacity"), "GB"),
@@ -743,7 +745,7 @@ export const LEAF_COMMONS = {
     ...textCommon(tName("serviceSub"), "info.status", tDesc("descServiceSub")),
     states: serviceSubStates(),
   }),
-  serviceCpu: () => percentCommon(tName("serviceCpu"), "value", tDesc("descCpuShareOfHost")),
+  serviceCpu: () => percentCommon(tName("serviceCpu"), "value", tDesc("descServiceCpu")),
   serviceCpuPeak: () => percentCommon(tName("serviceCpuPeak"), "value", tDesc("descServicePeak")),
   serviceMem: () => numCommon(tName("serviceMem"), "MB"),
   serviceMemPeak: () => numCommon(tName("serviceMemPeak"), "MB", "value", tDesc("descServicePeak")),
@@ -945,6 +947,7 @@ export function buildMetricDefs(): MetricDef[] {
       id: "info.hostname",
       nameKey: "hostname",
       kind: "text",
+      role: "info.name",
       available: (_st, s) => s.details?.hostname != null,
       extract: s => s.details?.hostname ?? null,
     },

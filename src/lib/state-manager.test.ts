@@ -12,6 +12,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 import {
   buildMetricDefs,
   bytesToGib,
+  commonFor,
   bytesToMib,
   containerHealthLabel,
   containerHealthStates,
@@ -3925,6 +3926,16 @@ describe("StateManager", () => {
       // The refresh path passes the index from the id; a caller without one must get a
       // usable common instead of `Core NaN`.
       expect(leafCommon("cpuCore")).to.have.property("type", "number");
+    });
+
+    it("identity datapoints carry the specific info roles, text and flags keep their defaults", () => {
+      expect(leafCommon("smartModel").role).to.equal("info.model");
+      expect(leafCommon("smartSerial").role).to.equal("info.serial");
+      expect(leafCommon("smartFirmware").role).to.equal("info.firmware");
+      const defs = buildMetricDefs();
+      expect(commonFor(defs.find(d => d.id === "info.hostname")!).role).to.equal("info.name");
+      expect(commonFor(defs.find(d => d.id === "info.kernel")!).role).to.equal("text");
+      expect(commonFor(defs.find(d => d.id === "info.podman")!).role).to.equal("indicator");
     });
 
     it("a GPU without a vendor name falls back to its own id", async () => {
