@@ -23,6 +23,7 @@ src/lib/coerce.ts               → Boundary-Validator (NaN/Infinity/Typ-Drift) 
 src/lib/state-manager.ts        → ioBroker States erstellen/updaten/cleanup, createdIds-Cache
 src/lib/i18n.ts                 → tName(key, ...args) + tDesc(key) über I18n.getTranslatedObject() (adapter-core I18n-Framework)
 admin/i18n/<lang>.json          → Single-Source-of-Truth für UI- + State-Translations, Namen, Beschreibungen UND die Antworten des Verbindungstests (277 Keys × 11 Sprachen)
+src/lib/native-key-migration.ts → Flotten-Master (byte-gleich): nullt entfernte native-Schlüssel beim Start (Design 66)
 src/lib/message-router.ts       → onMessage-Dispatcher (default-Branch-Contract, v0.4.5 testClient-Hooks)
 src/lib/types.ts                → TypeScript Interfaces (API + Config)
 ../scripts/sync-iopackage-from-i18n.py → regeneriert io-package.json:instanceObjects.common.name + .desc aus admin/i18n/ (zentral, source: admin-i18n)
@@ -115,14 +116,14 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 65. **Eine 404 der Hub-URL heißt „falsche Adresse“ (0.19.0, Sonde am echten Hub)** — antwortet die Adresse ohne Beszel-API (Reverse-Proxy-Pfad vergessen, anderer Dienst am Port), nennt das Log den URL-Hinweis auf warn und der Verbindungstest `msgHubNotFound` statt des rohen 404-JSON.
 66. **Entfernte `native`-Schlüssel werden beim Start genullt (0.19.0, B02 Runde 38)** — `src/lib/native-key-migration.ts` + Test byte-gleich vom Flotten-Master, `NATIVE_KEY_MIGRATIONS` droppt die vier Peak-Schalter von 0.17.x; ein Schreibvorgang beendet den Start (die Instanz startet neu).
 
-## Tests (886 unit + 61 package + 1 integration + 3 inventory)
+## Tests (906 unit + 61 package + 1 integration + 3 inventory)
 
 Zusammensetzung (gemessen 2026-09-25 nach der Umsetzung des Audits 2026-09-25, `vitest run`):
-state-manager 391 · coerce 161 · main 141 · beszel-client 96 · repo-standards 29 (aus
-`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · message-router 21 · err-text 15 ·
+state-manager 391 · coerce 161 · main 143 · beszel-client 96 · repo-standards 29 (aus
+`iobroker-adapter-checks` — die Zahl steigt mit dessen Version) · message-router 21 · native-key-migration 18 · err-text 15 ·
 inventory 13 · device-icons 12 · i18n 7. Das D10-Maß `vitest list --json --staticParse=false` zählt
-ebenfalls 886. Mutationstabelle der Welle: `mutations_beszel_2026-09-25.py` (W1–W83, 82 gefangen, W32 begründet
-äquivalent); D09-Nadeldeckung seit v0.18.0 vollständig. Deckung **99,4 % Stmts · 97,9 % Branch · 97,8 % Funcs**; offen bleiben nur die
+ebenfalls 906 (darunter 18 Tests des Flotten-Helfers `native-key-migration`). Mutationstabelle der Welle:
+`mutations_beszel_2026-09-25.py` (W1–W88, 87 gefangen, W32 begründet äquivalent); D09-Nadeldeckung seit v0.18.0 vollständig. Deckung **99,4 % Stmts · 97,9 % Branch · 97,8 % Funcs**; offen bleiben nur die
 Bootstrap-/Test-Nähte in `main.ts` (Client-/Manager-Fabriken, `require.main`, `setStateSafe`-Catch)
 und der dokumentiert unerreichbare Hostname-Wächter in `validateHubUrl`. Der https-Transport ist
 über ein eingebettetes, selbst signiertes Testzertifikat (gültig bis 2126) geprüft. Das Inventar
