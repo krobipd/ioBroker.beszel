@@ -259,7 +259,7 @@ describe("BeszelAdapter onReady", () => {
     const { adapter, client } = setup({ url: "" });
     const i = internalOf(adapter);
     await i.onReady();
-    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("URL, username, and password are required"));
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("URL, e-mail and password are required"));
     expect(i.client).toBeNull();
     expect(client.getSystems).not.toHaveBeenCalled();
   });

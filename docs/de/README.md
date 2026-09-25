@@ -14,12 +14,14 @@ Alles ist rein lesend. Der Adapter schreibt nie zum Hub und legt keine beschreib
 
 Sie brauchen einen laufenden Beszel-Hub mit mindestens einem verbundenen Agenten und eine
 Anmeldung für diesen Hub. Der Adapter meldet sich als normaler Beszel-Benutzer an — mit derselben
-E-Mail-Adresse und demselben Passwort wie in der Beszel-Weboberfläche. Ein Administratorkonto ist
-nicht nötig.
+E-Mail-Adresse und demselben Passwort wie in der Beszel-Weboberfläche; einen Benutzernamen nimmt
+Beszel dort nicht an. Ein Administratorkonto ist nicht nötig, die Mehr-Faktor-Anmeldung muss für
+diesen Benutzer aber aus sein: den Einmal-Code kann der Adapter nicht beantworten.
 
-Für Container-Daten braucht dieser Benutzer zusätzlich Leserecht auf die `containers`-Sammlung des
-Hubs. Ohne das funktionieren alle anderen Metriken weiter; der Adapter warnt einmal und behält die
-bereits angelegten Container-Datenpunkte.
+Der Benutzer sieht nur die Systeme, denen er zugeordnet ist: die er selbst angelegt hat, die ein
+Hub-Administrator ihm zugeordnet hat (PocketBase-Verwaltung unter `/_/`, Sammlung `systems`, Feld
+`users`), oder alle, wenn der Hub mit `SHARE_ALL_SYSTEMS=true` läuft. Ein Benutzer ohne Zuordnung
+meldet sich problemlos an und sieht eine leere Liste — der Verbindungstest sagt das.
 
 ## Einrichtung
 
@@ -27,12 +29,15 @@ bereits angelegten Container-Datenpunkte.
    Instanz-Einstellungen öffnen.
 2. **Hub-Adresse eintragen** unter _Beszel Hub URL_ — dieselbe Adresse, mit der Sie die
    Beszel-Weboberfläche öffnen, zum Beispiel `http://192.168.1.100:8090`. Eine IPv6-Adresse steht
-   in eckigen Klammern: `http://[fd00::1]:8090`. `http` und `https` funktionieren beide.
-3. **Benutzername und Passwort eintragen.** Der Benutzername ist die E-Mail-Adresse Ihrer
-   Beszel-Anmeldung.
-4. **Auf _Test Connection_ drücken.** Es wird eine echte Anmeldung am Hub durchgeführt; bei einem
-   Problem erscheint der tatsächliche Fehler — falsches Passwort, nicht erreichbarer Host,
-   Tippfehler in der Adresse.
+   in eckigen Klammern: `http://[fd00::1]:8090`. `http` und `https` funktionieren beide; ein
+   https-Hub braucht ein Zertifikat, dem der ioBroker-Rechner vertraut. Ein Hub hinter einem
+   Reverse-Proxy behält seinen Pfad (`https://example.org/beszel`). Leerzeichen und ein
+   abschließender Schrägstrich werden entfernt; eine Adresse mit `?`, `#` oder Benutzername und
+   Passwort darin wird abgelehnt.
+3. **E-Mail und Passwort** Ihrer Beszel-Anmeldung eintragen.
+4. **Auf _Test Connection_ drücken.** Es wird eine echte Anmeldung am Hub durchgeführt; die
+   Antwort nennt, wie viele Systeme Ihr Benutzer sieht — oder bei einem Problem den tatsächlichen
+   Fehler: abgelehnte Anmeldung, nicht erreichbarer Host, Tippfehler in der Adresse.
 5. **Metriken auswählen** im Reiter _Metrics_ (siehe
    [Datenpunkte und Metrik-Schalter](datapoints.md)). Voreingestellt sind Laufzeit, CPU,
    Lastmittel, Arbeitsspeicher, Festplatte, Festplattendurchsatz, Netzwerk und Temperatur. Alles
@@ -63,7 +68,13 @@ beszel.0.
 Der Gerätename ist der Systemname vom Hub, kleingeschrieben und mit `_` für alles, was kein
 Buchstabe und keine Ziffer ist. Zwei Systeme, deren Namen auf dieselbe Kennung zusammenfallen,
 bekommen ein kurzes Hash-Anhängsel, damit sie sich nicht gegenseitig überschreiben — der Adapter
-weist einmal im Protokoll darauf hin.
+weist einmal im Protokoll darauf hin. Ein Name ohne lateinischen Buchstaben und ohne Ziffer
+(Kyrillisch, Chinesisch, …) wird zu `sys_` plus einem kurzen Hash der System-Id des Hubs und bleibt
+so über Neustarts gleich.
+
+Wird ein System am Hub umbenannt, wandert es auf eine neue Geräte-Kennung: der Adapter meldet
+`System renamed on the Hub: systems.a → systems.b`, und der alte Baum geht — mit Historie und
+anderen Einstellungen an seinen Datenpunkten. Ein am Hub entferntes System wird ebenso gemeldet.
 
 ## Wie sich der Adapter verhält, wenn etwas fehlt
 
@@ -73,12 +84,22 @@ weist einmal im Protokoll darauf hin.
 - **Der Hub ist nicht erreichbar.** `info.connection` wird falsch, jedes System geht auf
   `info.online: false` und `info.status: unknown`, die Flottenzähler fallen auf null. Dasselbe
   passiert beim Stoppen der Instanz — nichts behauptet weiter „online", während niemand liest.
-- **Der Hub antwortet mit einer leeren Liste.** Es wird nichts gelöscht. Ein Aussetzer darf den
-  Objektbaum nicht leeren; Geräte verschwinden nur, wenn der Hub tatsächlich eine kürzere Liste
-  meldet.
-- **Ein Sensor, Lüfter, eine GPU, ein Dateisystem oder Container verschwindet.** Die zugehörigen
-  Datenpunkte werden entfernt. Leert sich eine ganze Gruppe auf einmal, wartet der Adapter eine
-  zweite Abfrage ab — ein einzelner Aussetzer räumt den Baum nicht ab.
+- **Der Hub antwortet mit einer leeren Liste.** Es wird nichts gelöscht. PocketBase beantwortet
+  eine Anmeldung, die es nicht mehr annimmt (geändertes Passwort, gelöschter Benutzer,
+  zurückgespielte Hub-Datenbank), mit einer leeren Liste statt mit einem Fehler — deshalb meldet
+  sich der Adapter zuerst neu an und fragt noch einmal. Bleibt die Liste leer, bleibt der Baum,
+  wie er ist, und das Protokoll sagt einmal, dass der Benutzer keine Systeme sieht.
+- **Die Anmeldung wird abgelehnt.** Das Protokoll nennt den Grund — falsche E-Mail oder falsches
+  Passwort, Mehr-Faktor-Anmeldung, oder Passwort-Anmeldung am Hub abgeschaltet. Nach drei
+  Fehlversuchen versucht es der Adapter in wachsenden Abständen, höchstens alle 15 Minuten, statt
+  bei jeder Abfrage das Passwort zu schicken.
+- **Ein Sensor, Lüfter, eine GPU, ein Dateisystem, Container oder ein anderes Gruppenmitglied
+  verschwindet.** Die zugehörigen Datenpunkte werden entfernt, sobald es in zwei aufeinander
+  folgenden Abfragen fehlt — ein einzelner Aussetzer räumt nichts ab.
+- **Eine Liste ist länger, als der Adapter liest.** Der Adapter liest höchstens 50 Seiten je Liste
+  (bei den Listen der Systeme, Container, Units und Geräte je 1000 Einträge). Auf einem Hub, der
+  groß genug ist, das zu überschreiten, wird die abgeschnittene Liste einmal gemeldet und lässt den
+  Baum, wie er ist, statt die Systeme an ihrem Ende zu löschen.
 
 ## Beim Update
 

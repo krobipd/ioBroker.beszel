@@ -15,10 +15,10 @@ Connects to a [Beszel](https://github.com/henrygd/beszel) Hub and exposes server
 - Fetches metrics from all systems registered in your Beszel Hub
 - Per-system states: CPU, memory, disk, network, temperature, load average
 - Every system carries a pictogram of its operating system (Linux, macOS, Windows, FreeBSD) in the object tree, drawn to read in the light and the dark theme
-- Optional detail: per-core CPU, disk I/O load, per-interface traffic, fan speeds, GPU details, hardware/OS info, Docker/Podman containers, battery (incl. per-battery level), extra filesystems, CPU breakdown, systemd services
+- Optional detail: per-core CPU, disk I/O load, per-interface traffic, fan speeds, GPU details, hardware/OS info, Docker/Podman containers (incl. whether an image update is available), battery (incl. per-battery level), extra filesystems, CPU breakdown, systemd services, storage pools (ZFS and btrfs), SMART drive health, network monitors (ping/TCP/HTTP/DNS response times and loss)
 - Each option has a help text explaining the states it creates; detail options stay greyed out until their category is enabled
 - Configurable poll interval (10–300 seconds)
-- Automatic re-authentication when the token expires (including mid-poll)
+- Automatic re-authentication when the token expires or the Hub stops accepting it (e.g. after a password change), with a clear log line when the login itself is refused
 - Connection test button in the admin UI
 - Automatic cleanup of states for removed systems, stale containers and disabled metrics
 
@@ -38,6 +38,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 - **ioBroker js-controller >= 7.2.2**
 - **ioBroker Admin >= 8.0.11**
 - A running [Beszel Hub](https://github.com/henrygd/beszel) with at least one registered system
+- A Beszel user (log-in by e-mail, without multi-factor authentication) that is assigned to the systems — the ones it added, the ones a Hub admin added it to (`systems` → `users`), or all of them when the Hub runs with `SHARE_ALL_SYSTEMS=true`; a user assigned to nothing sees an empty list
 
 > The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
 
@@ -57,7 +58,7 @@ Step-by-step setup, what every metric switch creates, and the questions that kee
 | Option                  | Description                                                                             | Default |
 | ----------------------- | --------------------------------------------------------------------------------------- | ------- |
 | **Beszel Hub URL**      | Full URL of your Beszel Hub (e.g. `http://192.168.1.100:8090`)                          | —       |
-| **Username**            | Beszel Hub login email/username                                                         | —       |
+| **E-mail**              | E-mail address of your Beszel login — Beszel does not accept a username here            | —       |
 | **Password**            | Beszel Hub password                                                                     | —       |
 | **Poll Interval (s)**   | How often to fetch data from the Hub (10–300)                                           | `60`    |
 | **Request Timeout (s)** | Per-request HTTP timeout. Raise for slow Hubs or large container/stats payloads (5–120) | `15`    |
@@ -92,9 +93,10 @@ Detail options stay greyed out until their category's main metric is enabled, an
 | **Temperature** | Temperature (hottest sensors avg + hottest single)    | on      |
 |                 | Individual Temperature Sensors                        | off     |
 | **Fans**        | Fan Speeds (rpm, Beszel 0.18.8+, Linux hosts)         | off     |
-| **ZFS**         | ZFS Pools (usage, throughput, health; Beszel 0.19.0+) | off     |
-|                 | ZFS details (scrub, vdev errors, datasets)            | off     |
+| **Storage**     | Storage pools: ZFS (Beszel 0.19.0+), btrfs (0.20.0+)  | off     |
+|                 | Pool details (scrub, vdev errors, datasets)           | off     |
 | **SMART**       | SMART devices (verdict, temperature, hours, cycles)   | off     |
+| **Monitors**    | Network monitors (Beszel 0.20.0+)                     | off     |
 | **GPU**         | GPU Metrics (Usage, Memory, Power)                    | off     |
 |                 | GPU details (engines, package power)                  | off     |
 | **Containers**  | Container Monitoring incl. network (Docker / Podman)  | off     |
@@ -177,12 +179,12 @@ beszel.0.
         ├── gpu/ *                    — GPU metrics (per GPU)
         │   └── {gpu_name}/
         │       ├── usage            — GPU usage (%)
-        │       ├── memory_used      — VRAM used (MB)
-        │       ├── memory_total     — VRAM total (MB)
+        │       ├── memory_used      — VRAM used (MB, only on GPUs that report memory)
+        │       ├── memory_total     — VRAM total (MB, only on GPUs that report memory)
         │       ├── power            — Power draw (W)
         │       ├── power_package *  — Package power (W) (GPU details)
         │       └── engines/ *       — Per-engine usage (render, video, …) (%)
-        ├── filesystems/ *            — Extra filesystems (per mount)
+        ├── filesystems/ *            — Extra filesystems (named after the device or the custom name set on the agent)
         │   └── {fs_name}/
         │       ├── disk_percent     — Usage (%)
         │       ├── disk_used        — Used (GB)
@@ -191,20 +193,22 @@ beszel.0.
         │       ├── write_speed      — Write (MB/s)
         │       ├── total_read *     — Read since boot (GB, Beszel 0.19.0+)
         │       └── total_write *    — Written since boot (GB, Beszel 0.19.0+)
-        ├── zfs/ *                    — ZFS pools (Beszel 0.19.0+), one channel per pool
+        ├── zfs/ *                    — Storage pools: ZFS (Beszel 0.19.0+) and btrfs (0.20.0+), one channel per pool
         │   └── <pool>/
-        │       ├── disk_percent     — Used (%)
+        │       ├── pool_type        — zfs or btrfs
+        │       ├── disk_percent     — Used (%; not on raw-size pools)
         │       ├── disk_used        — Used (GB)
         │       ├── disk_total       — Size (GB)
+        │       ├── raw              — Size and usage are raw physical bytes of all member devices (bool)
         │       ├── read_speed       — Read (MB/s)
         │       ├── write_speed      — Write (MB/s)
-        │       ├── health           — Pool health (ONLINE, DEGRADED, …)
-        │       ├── scrub_state *    — Scrub status (NONE/SCANNING/FINISHED/CANCELED)
-        │       ├── scrub_progress * — Scrub progress as the pool reports it
+        │       ├── health           — Pool health (ONLINE, DEGRADED, …, UNKNOWN)
+        │       ├── scrub_state *    — Scrub status (SCANNING/FINISHED/CANCELED), only once a pool has been scrubbed
+        │       ├── scrub_progress * — Scrub progress as the pool reports it (e.g. 42.10%)
         │       ├── scrub_errors *   — Errors the last scrub found
-        │       ├── vdevs/ *          — one channel per vdev
+        │       ├── vdevs/ *          — one channel per vdev (or btrfs device)
         │       │   └── <vdev>/
-        │       │       ├── state             — Vdev state
+        │       │       ├── state             — Vdev state (ONLINE, …, MISSING)
         │       │       ├── read_errors       — Read errors
         │       │       ├── write_errors      — Write errors
         │       │       └── checksum_errors   — Checksum errors
@@ -215,13 +219,13 @@ beszel.0.
         │               └── mountpoint        — Mount point
         ├── smart/ *                  — SMART devices, one channel per drive
         │   └── <device>/
-        │       ├── state            — SMART verdict (PASSED / FAILED)
+        │       ├── state            — Overall verdict (PASSED / WARNING / FAILED / UNKNOWN)
         │       ├── model            — Model
         │       ├── serial           — Serial number
         │       ├── firmware         — Firmware
         │       ├── interface        — Interface (sat, nvme, …)
-        │       ├── temperature      — Temperature (°C)
-        │       ├── capacity         — Capacity (GB)
+        │       ├── temperature      — Temperature (°C, only when the drive reports one)
+        │       ├── capacity         — Capacity (GB, only when the drive reports one)
         │       ├── power_on_hours   — Power-on hours
         │       └── power_cycles     — Power cycles
         ├── services/ *               — systemd units, one channel per unit
@@ -232,17 +236,33 @@ beszel.0.
         │       ├── cpu_peak         — CPU peak (%)
         │       ├── memory           — Memory (MB)
         │       └── memory_peak      — Memory peak (MB)
-        └── containers/ *             — Docker/Podman containers
-            └── {container_name}/
-                ├── status           — Container status
-                ├── health           — Health (none/starting/healthy/unhealthy)
-                ├── cpu              — CPU usage (%)
-                ├── memory           — Memory (MB)
-                ├── image            — Image name
-                └── network          — Combined network throughput (bytes/s)
+        ├── containers/ *             — Docker/Podman containers
+        │   └── {container_name}/
+        │       ├── status           — Container status
+        │       ├── health           — Health (none/starting/healthy/unhealthy)
+        │       ├── cpu              — CPU usage (%)
+        │       ├── memory           — Memory (MB)
+        │       ├── image            — Image name
+        │       ├── network          — Combined network throughput (bytes/s)
+        │       └── update_available — Image update available (bool, Beszel 0.20.0+)
+        └── monitors/ *               — Network monitors set up on the Hub (Beszel 0.20.0+)
+            └── <protocol>_<target>/
+                ├── protocol         — icmp / tcp / http / dns
+                ├── target           — Host, address or URL
+                ├── port             — Port (tcp only)
+                ├── interval         — Probe interval (s)
+                ├── enabled          — Monitor enabled on the Hub (bool)
+                ├── response         — Latest response time (ms, empty without a successful probe)
+                ├── response_avg_1h  — Average response time, last hour (ms)
+                ├── response_min_1h  — Fastest response, last hour (ms)
+                ├── response_max_1h  — Slowest response, last hour (ms)
+                ├── loss_1h          — Loss over the last hour (%)
+                ├── last_probe_loss  — Loss of the latest probe record (%)
+                ├── last_probe       — Time of the latest probe record
+                └── last_update      — Time the Hub last updated the monitor
 ```
 
-> **Breaking change in 0.3.0:** States moved from flat paths (e.g. `cpu_usage`) to channels (e.g. `cpu.usage`). Legacy states are automatically cleaned up on first start.
+> **Breaking change in 0.3.0:** States moved from flat paths (e.g. `cpu_usage`) to channels (e.g. `cpu.usage`).
 
 ---
 
@@ -250,19 +270,22 @@ beszel.0.
 
 ### Connection failed
 
-- Verify the Hub URL is reachable from the ioBroker host
-- Check username and password (use the Test Connection button)
+- Verify the Hub URL is reachable from the ioBroker host — without `?`, `#` or a user name and password in it
+- Check e-mail and password (use the Test Connection button); the log says whether the login was refused, needs multi-factor authentication or is switched off on the Hub
+- An https Hub needs a certificate the ioBroker host trusts — a self-signed one is refused
 - Check that no firewall blocks access to the Beszel Hub port
 
 ### States not updating
 
 - Check the ioBroker log for errors from the `beszel` adapter
 - Ensure the poll interval is not too short (minimum 10 seconds)
-- Check `info.connection` state — if `false`, authentication failed
+- Check `info.connection` — `false` means the adapter cannot read the Hub right now (network, login or a Hub error; the log names which)
+- The Test Connection button reports how many systems your user can see — 0 means the user is assigned to no system
 
 ### Missing states for a system
 
-- The system may be `down` or `paused` in Beszel — no stats records exist yet
+- A system that has never connected (`pending`) has no metrics yet — they appear with its first stats record
+- A system that is `down` or `paused` keeps its last values; nothing is removed while it is away
 - Verify the metric is enabled in the adapter configuration
 - Temperature, battery, swap and ZFS ARC datapoints exist only on hosts whose agent reports that hardware
 
@@ -274,6 +297,30 @@ beszel.0.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- New: network monitors (Beszel 0.20.0) as an opt-in metric — response time, hourly average/fastest/slowest and loss for every ping, TCP, HTTP and DNS monitor set up on the Hub
+- New: containers show whether an image update is available (Beszel 0.20.0)
+- New: btrfs filesystems appear next to the ZFS pools (Beszel 0.20.0), with their own name, the pool type and a flag for raw physical sizes
+- New: the connection test tells how many systems your user can see, and says so when it is none
+- Fixed: after a password change, a deleted user or a restored Hub database the adapter kept every system green without new values for up to a day — it now logs in again right away
+- Fixed: a refused login says why — wrong e-mail or password, multi-factor authentication, or password login switched off on the Hub — and the adapter stops retrying every poll
+- Fixed: a paused or never-connected system no longer shows uptime 0 or empty system details; its last values stay
+- Fixed: on current Hubs, swap and ZFS cache datapoints appeared on hosts without swap or ZFS, and GPU memory on GPUs that report none — they are removed
+- Fixed: drives without a temperature or capacity reading showed 0; they now get no such datapoint
+- Fixed: a storage pool that was removed came back with the next detail refresh and stayed until the next restart
+- Fixed: a system whose name has no Latin letters or digits (e.g. Cyrillic or Chinese) got no object tree; it now gets a stable fallback id
+- Fixed: two containers or group members whose names turn into the same id could swap their datapoints after a restart, and a container's id suffix changed with every re-create
+- Fixed: a member of a group (sensor, container, unit, …) that was missing from a single poll was deleted at once; it now has to be missing twice
+- Fixed: spaces and a trailing slash around the Hub URL are removed; a URL with `?`, `#` or a user name and password in it is rejected with a clear message, also in the connection test
+- Fixed: on a very large Hub, a list longer than the adapter reads deleted the datapoints of the systems at its end — the adapter now reads bigger pages, and a cut-off list keeps the tree as it is and is reported once
+- Fixed: a request that trickled in slowly could run far past the configured timeout
+- Changed: short network outages and timeouts are logged at debug level; the adapter marks the systems offline as before
+- Changed: a renamed or removed system on the Hub is reported in the log
+- Changed: the login field is called E-mail — Beszel does not accept a username
+- Changed: the SMART verdict also knows WARNING and UNKNOWN, the pool health UNKNOWN and the vdev state MISSING
+- Changed: help texts, descriptions and translations corrected; drive model, serial number, firmware and host name carry more specific roles
 
 ### 0.18.0 (2026-09-15) — stable
 

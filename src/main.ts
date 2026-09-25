@@ -359,7 +359,7 @@ export class BeszelAdapter extends utils.Adapter {
       // correct answer, not a failure to recover from.
       if (!config.url || !config.username || !config.password) {
         this.log.error(
-          "URL, username, and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your username and password once.",
+          "URL, e-mail and password are required. If you are upgrading from v0.4.x or earlier v0.5.x: open the Beszel adapter settings in ioBroker Admin and re-enter your e-mail and password once.",
         );
         return;
       }
