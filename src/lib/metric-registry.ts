@@ -62,6 +62,15 @@ export interface MetricDef {
    * Hub's own bookkeeping, a field it lacks is not a dropped sample.
    */
   goneWhenAbsent?: "stats" | "system";
+  /**
+   * The value comes from the `systems` row's `info` (`"always"`), or from it when no stats
+   * record is there (`"fallback"`). The Hub replaces `info` with an all-zero `Info{}` while
+   * a system is `pending` and every time a `paused` one is updated (`system_manager.go`,
+   * measured on a 0.20.0 Hub: `{"u":0,"v":"","la":[0,0,0],…}`) — so for those two states
+   * such a def is frozen: its datapoint keeps the last value and is neither written nor
+   * removed.
+   */
+  readsInfo?: "always" | "fallback";
   /** Pull the state value from a system and its stats. */
   extract: (system: BeszelSystem, stats: SystemStats | undefined) => ioBroker.StateValue;
 }
@@ -96,10 +105,12 @@ export function systemStatusStates(): Record<string, string> {
 }
 
 /**
- * `common.states` hint of `zfs.<pool>.health`: zpool's own health words as Beszel 0.19.0
- * forwards them (`ZfsPool.Health`, from `zpool list -H -o health`). A hint for the UI, not
- * a filter — a word from a newer ZFS still lands in the state unchanged. Keys stay zpool's
- * uppercase words, labels follow the system language (see {@link systemStatusStates}).
+ * `common.states` hint of `zfs.<pool>.health`: the health words Beszel forwards for a
+ * storage pool — ZFS's own (on Linux from the kstat `state`, elsewhere from
+ * `zpool list -H -o health`) and, since Beszel 0.20.0, btrfs's `ONLINE`/`DEGRADED`/`UNKNOWN`
+ * (`agent/btrfs/btrfs_linux.go`). A hint for the UI, not a filter — a word from a newer
+ * release still lands in the state unchanged. Keys stay the uppercase words, labels follow
+ * the system language (see {@link systemStatusStates}).
  */
 export function zfsHealthStates(): Record<string, string> {
   return {
@@ -110,7 +121,21 @@ export function zfsHealthStates(): Record<string, string> {
     REMOVED: tState("zfsRemoved"),
     UNAVAIL: tState("zfsUnavailable"),
     SUSPENDED: tState("zfsSuspended"),
+    UNKNOWN: tState("zfsUnknown"),
   };
+}
+
+/**
+ * `common.states` hint of a pool member (`zfs.<pool>.vdevs.<vdev>.state`): the pool words
+ * plus btrfs's `MISSING` for a device that dropped out (Beszel 0.20.0, `btrfs_linux.go`).
+ */
+export function vdevStates(): Record<string, string> {
+  return { ...zfsHealthStates(), MISSING: tState("vdevMissing") };
+}
+
+/** `common.states` hint of `zfs.<pool>.pool_type` — the storage stack behind the pool. */
+export function poolTypeStates(): Record<string, string> {
+  return { zfs: "ZFS", btrfs: "btrfs" };
 }
 
 /**
@@ -149,22 +174,31 @@ export function containerHealthLabel(index: number): string {
 }
 
 /**
- * Scrub words the agent reads out of `zpool status` (`internal/entities/zfs`: NONE,
- * SCANNING, FINISHED, CANCELED). The KEYS are those words — that is what lands in the
- * state; only the labels follow the system language.
+ * Scrub words the agent reads out of `zpool status` (`internal/entities/zfs`). `NONE` never
+ * reaches the Hub — the agent drops a scrub record in that state (`agent/storage_pool.go`),
+ * and the adapter then creates no scrub datapoints at all. The KEYS are the words — that is
+ * what lands in the state; only the labels follow the system language.
  */
 export function scrubStates(): Record<string, string> {
   return {
-    NONE: tState("scrubNone"),
     SCANNING: tState("scrubScanning"),
     FINISHED: tState("scrubFinished"),
     CANCELED: tState("scrubCanceled"),
   };
 }
 
-/** `common.states` of a SMART device's overall verdict (smartctl: PASSED / FAILED). */
+/**
+ * `common.states` of a SMART device's overall verdict: smartctl's PASSED / FAILED, UNKNOWN
+ * when there is no verdict (`agent/smart.go`), and WARNING from the eMMC wear and mdraid
+ * readings (`agent/emmc_common.go`, `agent/mdraid_linux.go`).
+ */
 export function smartStates(): Record<string, string> {
-  return { PASSED: tState("smartPassed"), FAILED: tState("smartFailed") };
+  return {
+    PASSED: tState("smartPassed"),
+    WARNING: tState("smartWarning"),
+    FAILED: tState("smartFailed"),
+    UNKNOWN: tState("smartUnknown"),
+  };
 }
 
 /**
@@ -657,6 +691,9 @@ export const LEAF_COMMONS = {
   zfsReadSpeed: () => numCommon(tName("readSpeed"), "MB/s"),
   zfsWriteSpeed: () => numCommon(tName("writeSpeed"), "MB/s"),
   zfsHealth: () => zfsHealthCommon(),
+  // Beszel 0.20.0 — btrfs pools run through the same `z` map
+  zfsPoolType: () => ({ ...textCommon(tName("zfsPoolType"), "text"), states: poolTypeStates() }),
+  zfsRaw: () => boolCommon(tName("zfsRaw"), "indicator", tDesc("descZfsRaw")),
   containerStatus: () => textCommon(tName("status")),
   containerHealth: () => containerHealthCommon(),
   containerCpu: () => percentCommon(tName("cpuUsage"), "value", tDesc("descCpuShareOfHost")),
@@ -670,7 +707,7 @@ export const LEAF_COMMONS = {
   }),
   scrubProgress: () => textCommon(tName("scrubProgress"), "text", tDesc("descScrubProgress")),
   scrubErrors: () => numCommon(tName("scrubErrors"), undefined, "value", tDesc("descScrubErrors")),
-  vdevState: () => ({ ...textCommon(tName("vdevState"), "info.status"), states: zfsHealthStates() }),
+  vdevState: () => ({ ...textCommon(tName("vdevState"), "info.status"), states: vdevStates() }),
   vdevRead: () => numCommon(tName("vdevRead"), undefined, "value", tDesc("descVdevErrors")),
   vdevWrite: () => numCommon(tName("vdevWrite"), undefined, "value", tDesc("descVdevErrors")),
   vdevChecksum: () => numCommon(tName("vdevChecksum"), undefined, "value", tDesc("descVdevErrors")),
@@ -759,6 +796,8 @@ export const DYNAMIC_LEAF_PATTERNS: { id: DynamicLeafId; match: RegExp }[] = [
   { id: "zfsReadSpeed", match: /^zfs\.[^.]+\.read_speed$/ },
   { id: "zfsWriteSpeed", match: /^zfs\.[^.]+\.write_speed$/ },
   { id: "zfsHealth", match: /^zfs\.[^.]+\.health$/ },
+  { id: "zfsPoolType", match: /^zfs\.[^.]+\.pool_type$/ },
+  { id: "zfsRaw", match: /^zfs\.[^.]+\.raw$/ },
   { id: "containerStatus", match: /^containers\.[^.]+\.status$/ },
   { id: "containerHealth", match: /^containers\.[^.]+\.health$/ },
   { id: "containerCpu", match: /^containers\.[^.]+\.cpu$/ },
@@ -816,17 +855,21 @@ export function buildMetricDefs(): MetricDef[] {
   // verbatim across their metric defs — hoist to one predicate each.
   const hasCpub = (s: SystemStats | undefined): boolean => !!s?.cpub && s.cpub.length >= 5;
   const hasDio = (s: SystemStats | undefined, n: number): boolean => !!s?.dios && s.dios.length >= n;
-  // Hardware the machine may not have: the field is omitted on the wire, so "absent" means
-  // "not there", not "unknown" — these gate the datapoint's existence (see goneWhenAbsent).
+  // Hardware the machine may not have — these gate the datapoint's existence (see
+  // goneWhenAbsent). Since Hub 0.19.0 (built with Go's encoding/json v2) an `omitempty`
+  // NUMBER is sent as 0 instead of being left out — only empty maps/arrays/strings and
+  // `omitzero` fields are still absent (measured on 0.19.0 and 0.20.0 Hubs). So a map or an
+  // `omitzero` tuple may be judged by presence, a plain number only by its value.
   const hasSensors = (s: SystemStats | undefined): boolean => !!s?.t && Object.keys(s.t).length > 0;
   const hasBattery = (s: SystemStats | undefined, system: BeszelSystem): boolean => (s?.bat ?? system.info.bat) != null;
-  const hasSwap = (s: SystemStats | undefined): boolean => s?.s != null;
+  const hasSwap = (s: SystemStats | undefined): boolean => (s?.s ?? 0) > 0;
   // The `systems` record keeps `info` from the last contact, so these exist for a system
-  // that is down; a system that never connected (`pending`, `info: {}`) gets none of them
-  // until its first sample instead of a row of empty datapoints — and a row an older
-  // version created for such a system goes (`goneWhenAbsent: "system"`), the same way a
-  // load average an old agent never reported does.
-  const hasUptime = (_st: SystemStats | undefined, s: BeszelSystem): boolean => s.info.u != null;
+  // that is down. A `pending` or `paused` system carries the Hub's all-zero `Info{}`
+  // instead — those defs are `readsInfo` and frozen then (applyMetrics), so an uptime of 0
+  // or an empty agent version never reaches the tree. A row an older version created for
+  // a system that never reports the field goes (`goneWhenAbsent: "system"`), the same way
+  // a load average an old agent never reported does.
+  const hasUptime = (_st: SystemStats | undefined, s: BeszelSystem): boolean => (s.info.u ?? 0) > 0;
   const hasLoad = (st: SystemStats | undefined, s: BeszelSystem): boolean => la(s, st) !== undefined;
   return [
     // info (no stats required)
@@ -839,6 +882,7 @@ export function buildMetricDefs(): MetricDef[] {
       unit: "s",
       available: hasUptime,
       goneWhenAbsent: "system",
+      readsInfo: "always",
       extract: s => s.info.u ?? null,
     },
     {
@@ -849,6 +893,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "text",
       available: (_st, s) => s.info.v != null,
       goneWhenAbsent: "system",
+      readsInfo: "always",
       extract: s => s.info.v ?? null,
     },
     // F2: static hardware/OS info from the system_details collection (attached
@@ -945,7 +990,11 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "servicesTotal",
       descKey: "descServicesTotal",
       kind: "num",
+      // `sv` is an omitempty slice: an empty one is still left out, so a host without
+      // systemd sends none — and a datapoint an older version created goes.
       available: (_st, s) => s.info.sv != null,
+      goneWhenAbsent: "system",
+      readsInfo: "always",
       extract: s => s.info.sv?.[0] ?? null,
     },
     {
@@ -956,6 +1005,8 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descServicesFailed",
       kind: "num",
       available: (_st, s) => s.info.sv != null,
+      goneWhenAbsent: "system",
+      readsInfo: "always",
       extract: s => s.info.sv?.[1] ?? null,
     },
     // load average — stats.la with the info.la fallback, so a system that is down keeps it
@@ -968,6 +1019,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       available: hasLoad,
       goneWhenAbsent: "system",
+      readsInfo: "fallback",
       extract: (s, st) => la(s, st)?.[0] ?? null,
     },
     {
@@ -979,6 +1031,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       available: hasLoad,
       goneWhenAbsent: "system",
+      readsInfo: "fallback",
       extract: (s, st) => la(s, st)?.[1] ?? null,
     },
     {
@@ -990,6 +1043,7 @@ export function buildMetricDefs(): MetricDef[] {
       kind: "num",
       available: hasLoad,
       goneWhenAbsent: "system",
+      readsInfo: "fallback",
       extract: (s, st) => la(s, st)?.[2] ?? null,
     },
     // stats-gated scalar metrics
@@ -1086,8 +1140,9 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descMemoryBuffers",
       kind: "num",
       unit: "GB",
-      // `mb` is omitempty and a Linux notion — a Windows or macOS agent never sends it.
-      available: st => st?.mb != null,
+      // `mb` has no omit tag and the agent fills it on every OS (`agent/system.go`) — a host
+      // whose OS reports no buffers/cache sends 0, which is "none", not a reading.
+      available: st => (st?.mb ?? 0) > 0,
       goneWhenAbsent: "stats",
       extract: (_s, st) => st?.mb ?? null,
     },
@@ -1099,8 +1154,9 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descMemoryZfsArc",
       kind: "num",
       unit: "GB",
-      // `mz` is `omitempty`: a machine without ZFS never sends it → no datapoint.
-      available: st => st?.mz != null,
+      // `mz` is `omitempty`, which a Hub >= 0.19.0 sends as 0: a machine without ZFS has no
+      // ARC → no datapoint.
+      available: st => (st?.mz ?? 0) > 0,
       goneWhenAbsent: "stats",
       extract: (_s, st) => st?.mz ?? null,
     },
@@ -1111,9 +1167,9 @@ export function buildMetricDefs(): MetricDef[] {
       nameKey: "swapUsed",
       kind: "num",
       unit: "GB",
-      // `s`/`su` are `omitempty` on the wire: no swap configured → both absent → no
-      // datapoint (like sensors and battery). Swap configured but unused → `s` present,
-      // `su` absent → 0, the true reading.
+      // `s`/`su` are `omitempty`: absent on a Hub < 0.19.0, 0 on a newer one — either way no
+      // swap configured → no datapoint (like sensors and battery). Swap configured but
+      // unused → `s` > 0, `su` absent or 0 → 0, the true reading.
       available: hasSwap,
       goneWhenAbsent: "stats",
       extract: (_s, st) => st?.su ?? 0,
@@ -1221,6 +1277,8 @@ export function buildMetricDefs(): MetricDef[] {
       descKey: "descRootDiskName",
       kind: "text",
       available: (_st, sys) => sys.info.rdn != null,
+      goneWhenAbsent: "system",
+      readsInfo: "always",
       extract: s => s.info.rdn ?? null,
     },
     {

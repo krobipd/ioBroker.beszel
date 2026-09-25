@@ -353,6 +353,11 @@ describe("coerce", () => {
   // -----------------------------------------------------------------------
 
   describe("coerceSystemStats", () => {
+    it("reads a btrfs pool's display name and raw flag in `z` (Beszel 0.20.0)", () => {
+      const st = coerceSystemStats({ z: { "b:1c2d": { n: "data", d: 10, du: 5, h: "UNKNOWN", raw: true, hu: true } } });
+      expect(st.z?.["b:1c2d"]).to.deep.equal({ n: "data", d: 10, du: 5, h: "UNKNOWN", raw: true });
+    });
+
     it("returns fully-coerced stats", () => {
       const s = coerceSystemStats({
         cpu: 45.5,
@@ -1062,6 +1067,28 @@ describe("coerce", () => {
 
 describe("detail collections (v0.17.0)", () => {
   describe("coerceZfsPoolDetail", () => {
+    it("reads the btrfs display name and the raw flag (Beszel 0.20.0)", () => {
+      const d = coerceZfsPoolDetail({
+        id: "z",
+        system: "s",
+        name: "b:1c2d",
+        display_name: "data",
+        raw: true,
+        vdevs: [],
+        datasets: [],
+      });
+      expect(d?.displayName).to.equal("data");
+      expect(d?.raw).to.equal(true);
+    });
+
+    it("a finished or canceled scrub without an error count had 0 errors; a running one is still unknown", () => {
+      const at = (state: string): number | undefined =>
+        coerceZfsPoolDetail({ id: "z", system: "s", name: "tank", scrub: { state } })?.scrubErrors;
+      expect(at("FINISHED")).to.equal(0);
+      expect(at("CANCELED")).to.equal(0);
+      expect(at("SCANNING")).to.equal(undefined);
+    });
+
     it("reads scrub, vdevs and datasets", () => {
       const d = coerceZfsPoolDetail({
         id: "z1",
@@ -1164,10 +1191,27 @@ describe("detail collections (v0.17.0)", () => {
       expect(d?.model).to.equal("M");
     });
 
-    it("an NVMe drive without cycles reports no cycles rather than zero", () => {
-      const d = coerceSmartDevice({ id: "d", system: "s", name: "nvme0", temp: 40 });
-      expect(d?.cycles).to.equal(undefined);
-      expect(d?.temperature).to.equal(40);
+    it("the real row: every column present, 0 for what smartctl did not report", () => {
+      // The Hub writes every column (system_smart.go) — this is the wire shape.
+      const d = coerceSmartDevice({
+        id: "d",
+        system: "s",
+        name: "/dev/sdc",
+        state: "UNKNOWN",
+        model: "",
+        serial: "",
+        firmware: "",
+        type: "",
+        temp: 0,
+        capacity: 0,
+        hours: 0,
+        cycles: 0,
+      });
+      expect(d?.temperature, "0 °C is 'not reported'").to.equal(undefined);
+      expect(d?.capacity, "0 bytes is 'not reported'").to.equal(undefined);
+      expect(d?.hours, "a count stays a count").to.equal(0);
+      expect(d?.cycles).to.equal(0);
+      expect(d?.model).to.equal(undefined);
     });
   });
 

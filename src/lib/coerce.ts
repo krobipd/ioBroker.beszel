@@ -465,6 +465,14 @@ function coerceZfsPoolStats(value: unknown): ZfsPoolStats {
   if (h !== null) {
     out.h = h;
   }
+  // Beszel 0.20.0 (btrfs pools share `z` with ZFS): the display name and the raw flag.
+  const n = coerceString(obj.n);
+  if (n !== null) {
+    out.n = n;
+  }
+  if (typeof obj.raw === "boolean") {
+    out.raw = obj.raw;
+  }
   return out;
 }
 
@@ -880,6 +888,13 @@ export function coerceZfsPoolDetail(value: unknown): ZfsPoolDetail | null {
     return null;
   }
   const detail: ZfsPoolDetail = { id, system, name, vdevs: [], datasets: [] };
+  const displayName = coerceString(obj.display_name);
+  if (displayName !== null) {
+    detail.displayName = displayName;
+  }
+  if (typeof obj.raw === "boolean") {
+    detail.raw = obj.raw;
+  }
 
   const scrub = coerceObject(obj.scrub);
   if (scrub) {
@@ -894,6 +909,11 @@ export function coerceZfsPoolDetail(value: unknown): ZfsPoolDetail | null {
     }
     if (errors !== null) {
       detail.scrubErrors = errors;
+    } else if (state === "FINISHED" || state === "CANCELED") {
+      // `errors` is omitempty: a Hub encoding the old way (json v1) leaves out the 0 of a
+      // clean scrub — once a scrub has ended, "no count" is 0. While SCANNING nothing is
+      // counted yet, so the value stays unknown.
+      detail.scrubErrors = 0;
     }
   }
 
@@ -945,10 +965,11 @@ export function coerceZfsPoolDetail(value: unknown): ZfsPoolDetail | null {
 }
 
 /**
- * One `smart_devices` row → {@link SmartDevice}. Every column except the identity is
- * optional: smartctl reports different sets per transport (an NVMe drive has no
- * `cycles`, a USB bridge often has no `temp`), so an absent column yields no datapoint
- * rather than a zero that looks like a measurement.
+ * One `smart_devices` row → {@link SmartDevice}. The Hub writes EVERY column of the row
+ * (`internal/hub/systems/system_smart.go`) — a value smartctl did not report arrives as 0
+ * or "", never as a missing key. For temperature and capacity 0 means "not reported" (the
+ * Hub's own UI shows "unknown" for them, `smart-table.tsx`), so they are only taken when
+ * positive; power-on hours and power cycles stay a count even at 0, as the UI shows them.
  *
  * @param value Raw record from the collection
  */
@@ -991,10 +1012,10 @@ export function coerceSmartDevice(value: unknown): SmartDevice | null {
   if (kind !== null) {
     device.type = kind;
   }
-  if (temperature !== null) {
+  if (temperature !== null && temperature > 0) {
     device.temperature = temperature;
   }
-  if (capacity !== null) {
+  if (capacity !== null && capacity > 0) {
     device.capacity = capacity;
   }
   if (hours !== null) {

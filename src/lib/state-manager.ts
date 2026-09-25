@@ -68,14 +68,14 @@ export interface SystemExtras {
  * State ids (relative to the system device) that a release retired. Swept from the
  * startup snapshot: an id that exists gets deleted, an id that does not costs nothing.
  *
- * 0.18.0: the six peak datapoints and `info.uptime_text`. No real Hub ever delivered a
- * peak value — the `Max*` fields are `cbor:"-"` and exist only in the 10m+ aggregates
- * the adapter never reads — so for those six the sweep is a no-op on a real install; they
- * are listed because the v0.17.1 inventory fixture fabricated the fields, the promotion
- * suite seeds that inventory before the upgrade and demands that removed objects are
- * gone. `info.uptime_text` was a second rendering of `info.uptime` (krobi 2026-09-15:
- * pointless) and exists on every install that ran 0.4.x–0.17.x. Removable after the
- * 0.18.0 tag has been the last version with any of them for a while.
+ * 0.18.0: the six peak datapoints and `info.uptime_text`. The adapter created a peak only
+ * when its field was present (v0.6.0–v0.17.1, `available: st => st?.cpum != null`), and the
+ * agent never sends one (`cbor:"-"` since at least Beszel 0.18.7) — for an agent of the old
+ * JSON transport that is not provable, so the entries stay; each costs nothing (one lookup
+ * in the startup snapshot). `info.uptime_text` was a second rendering of `info.uptime`
+ * (krobi 2026-09-15: pointless) and sits on every install that ran 0.4.x–0.17.x — the
+ * ioBroker statistics still count installations on 0.7.2 and 0.12.2 (2026-09-24), so the
+ * sweep has to stay for as long as such an upgrade can come in.
  */
 const RETIRED_STATE_IDS = [
   "cpu.peak",
@@ -105,6 +105,25 @@ export class StateManager {
    * shutdown writes.
    */
   private stopped = false;
+
+  /**
+   * The storage pools the per-poll summary (`stats.z`) reported for each system in THIS
+   * poll: pool key → channel id. The detail writer uses exactly these ids and nothing else
+   * — a `zfs_pools` row outlives its pool until the Hub's next full refresh, and a detail
+   * write for a pool the summary already pruned used to bring its channel back for good.
+   */
+  private readonly activePoolIds = new Map<string, Map<string, string>>();
+
+  /**
+   * Which member owns the BARE id of a dynamic group when two members sanitize to the same
+   * segment (`<group>.<bare>` → the member's stable key). The owner keeps the bare id for
+   * as long as it exists; the other one gets the hash suffix — no matter in which order the
+   * Hub lists them. Unowned collisions go to the smaller key, so the outcome is fixed too.
+   */
+  private readonly groupOwners = new Map<string, string>();
+
+  /** Hub ids whose system name gave no usable id segment — warned once each. */
+  private readonly warnedNameFallback = new Set<string>();
 
   /**
    * v0.4.3 (SM5): per-poll resolved safeName per system.id. Built once via
@@ -203,7 +222,7 @@ export class StateManager {
    * once per poll from `cleanupSystems`.
    */
   private readonly knownDeviceIds = new Set<string>();
-  /** Whether {@link snapshotExistingStates} has run — the legacy sweep depends on it. */
+  /** Whether {@link snapshotExistingStates} has run — the retired-state sweep depends on it. */
   private snapshotTaken = false;
   private createdStatesCount = 0;
   private removedStatesCount = 0;
@@ -235,7 +254,7 @@ export class StateManager {
    */
   public async snapshotExistingStates(): Promise<void> {
     // One object LIST instead of a per-type view: it carries every type in the
-    // same round-trip, which is what lets the pre-0.3.0 sweep run without probing
+    // same round-trip, which is what lets the retired-state sweep run without probing
     // ids one by one (and made the `info.legacyMigrated` marker obsolete).
     const list = await this.adapter.getObjectListAsync({
       startkey: `${this.adapter.namespace}.`,
@@ -387,22 +406,6 @@ export class StateManager {
   }
 
   /**
-   * v0.4.3 (SM5): Sanitize + suffix with a stable hash of `uniqueKey` so two
-   * records with the same post-sanitize name don't overwrite each other.
-   *
-   * @param name Raw display name to sanitize.
-   * @param uniqueKey Stable identifier (e.g. PocketBase record id) used to
-   *   derive the suffix.
-   */
-  private sanitizeWithSuffix(name: unknown, uniqueKey: string): string {
-    const base = this.sanitize(name);
-    if (!base) {
-      return "";
-    }
-    return `${base}__${StateManager.shortHash(uniqueKey)}`;
-  }
-
-  /**
    * FNV-1a 32-bit short hash → 6 hex chars.
    *
    * @param s Input string to hash.
@@ -417,27 +420,52 @@ export class StateManager {
   }
 
   /**
-   * SEC-6: resolve one dynamic-group child id segment, disambiguating collisions
-   * the same way `prepareForPoll` does for systems. The first member with a given
-   * sanitized base keeps it; a later member that sanitizes to the SAME base (e.g.
-   * `/mnt/data` and `/mnt-data` both → `mnt_data`, or two names sharing the first
-   * 50 chars) gets a stable `__<hash>` suffix so they never overwrite each other's
-   * states. Returns "" when the name is unusable (caller skips it).
+   * SEC-6: resolve the id segments of a dynamic group's members, disambiguating
+   * collisions the same way `prepareForPoll` does for systems. Two members that sanitize
+   * to the same segment (`/mnt/data` and `/mnt-data`, two names sharing the first 50
+   * chars) must never overwrite each other's states: one keeps the bare segment, the
+   * other gets a stable `__<hash>` suffix of its key. WHICH one keeps it no longer depends
+   * on the order the Hub lists them in — the current owner keeps it, and an unowned
+   * collision goes to the smaller key. An unusable name maps to "" (caller skips it).
    *
-   * @param rawName Raw member name from the Hub.
-   * @param stableKey Stable unique key for the suffix (record id, or the raw name).
-   * @param seen Sanitized bases already used in this group's pass (mutated).
+   * @param base Group prefix (e.g. `systems.<safeName>.containers`).
+   * @param items The members: a stable key (record key / container name) and the raw name.
+   * @returns Id segment per key.
    */
-  private resolveChildId(rawName: string, stableKey: string, seen: Set<string>): string {
-    const base = this.sanitize(rawName);
-    if (!base) {
-      return "";
+  private resolveGroupIds(base: string, items: { key: string; name: string }[]): Map<string, string> {
+    const out = new Map<string, string>();
+    const byBare = new Map<string, string[]>();
+    for (const { key, name } of items) {
+      const bare = this.sanitize(name);
+      out.set(key, "");
+      if (!bare) {
+        continue;
+      }
+      const keys = byBare.get(bare) ?? [];
+      keys.push(key);
+      byBare.set(bare, keys);
     }
-    if (seen.has(base)) {
-      return this.sanitizeWithSuffix(rawName, stableKey);
+    for (const [bare, keys] of byBare) {
+      const ownerKey = `${base}.${bare}`;
+      const current = this.groupOwners.get(ownerKey);
+      const owner = current !== undefined && keys.includes(current) ? current : [...keys].sort()[0];
+      this.groupOwners.set(ownerKey, owner);
+      for (const key of keys) {
+        out.set(key, key === owner ? bare : `${bare}__${StateManager.shortHash(key)}`);
+      }
     }
-    seen.add(base);
-    return base;
+    return out;
+  }
+
+  /**
+   * The id segment a system's name gives: the sanitized name, or — when the name has no
+   * letter or digit an object id may carry (a Cyrillic or Chinese name) — `sys_<hash>` of
+   * its Hub id. Such a system used to be skipped altogether, with a warning every poll.
+   *
+   * @param system The Beszel system.
+   */
+  private systemBaseName(system: BeszelSystem): string {
+    return this.sanitize(system.name) || `sys_${StateManager.shortHash(system.id)}`;
   }
 
   /**
@@ -454,24 +482,25 @@ export class StateManager {
     // id merely sorts first must not take over an existing tree (and its history).
     // Only then id order, so the outcome stays deterministic for two new systems.
     const sorted = [...systems].sort((a, b) => {
-      const safeA = this.sanitize(a.name);
-      const ownsA = this.deviceOwners.get(safeA) === a.id ? 0 : 1;
-      const ownsB = this.deviceOwners.get(this.sanitize(b.name)) === b.id ? 0 : 1;
+      const ownsA = this.deviceOwners.get(this.systemBaseName(a)) === a.id ? 0 : 1;
+      const ownsB = this.deviceOwners.get(this.systemBaseName(b)) === b.id ? 0 : 1;
       return ownsA - ownsB || a.id.localeCompare(b.id);
     });
     const seen = new Set<string>();
     const collisions = new Map<string, BeszelSystem[]>();
     for (const sys of sorted) {
-      const safe = this.sanitize(sys.name);
-      if (!safe) {
-        this.resolvedSafeNames.set(sys.id, "");
-        continue;
+      const safe = this.systemBaseName(sys);
+      if (!this.sanitize(sys.name) && !this.warnedNameFallback.has(sys.id)) {
+        this.warnedNameFallback.add(sys.id);
+        this.adapter.log.warn(
+          `System '${sanitizeForLog(sys.name)}' has no letter or digit usable in an object id — it appears as systems.${safe}`,
+        );
       }
       if (seen.has(safe)) {
         const arr = collisions.get(safe) ?? [];
         arr.push(sys);
         collisions.set(safe, arr);
-        this.resolvedSafeNames.set(sys.id, this.sanitizeWithSuffix(sys.name, sys.id));
+        this.resolvedSafeNames.set(sys.id, `${safe}__${StateManager.shortHash(sys.id)}`);
       } else {
         seen.add(safe);
         this.resolvedSafeNames.set(sys.id, safe);
@@ -497,7 +526,7 @@ export class StateManager {
    */
   private resolvedSafeName(system: BeszelSystem): string {
     const cached = this.resolvedSafeNames.get(system.id);
-    return cached !== undefined ? cached : this.sanitize(system.name);
+    return cached !== undefined ? cached : this.systemBaseName(system);
   }
 
   /**
@@ -666,8 +695,18 @@ export class StateManager {
     // names and no descriptions — its metrics were skipped whole, so the
     // every-restart retrofit never reached them (measured on the live tree, v0.14.1).
     const touched: { def: MetricDef; writeValue: boolean }[] = [];
+    // `pending` and `paused` systems carry the Hub's all-zero `Info{}` — nothing in it is a
+    // reading, so the defs that read it keep their last value (see MetricDef.readsInfo).
+    const infoIsBlank = system.status === "pending" || system.status === "paused";
     for (const d of this.metricDefs()) {
       if (!config[d.toggle]) {
+        continue;
+      }
+      if (infoIsBlank && (d.readsInfo === "always" || (d.readsInfo === "fallback" && !stats))) {
+        const frozenId = `${sysId}.${d.id}`;
+        if (this.createdIds.has(frozenId) || this.knownStateIds.has(frozenId)) {
+          touched.push({ def: d, writeValue: false });
+        }
         continue;
       }
       if (!d.available || d.available(stats, system)) {
@@ -773,13 +812,8 @@ export class StateManager {
     // container path all see the same effective config.
     const config = this.effectiveConfig(rawConfig);
     const safeName = this.resolvedSafeName(system);
-    if (safeName.length === 0) {
-      this.adapter.log.warn(
-        `Skipping system with unusable name: ${sanitizeForLog(typeof system.name === "string" ? system.name : JSON.stringify(system.name))}`,
-      );
-      return;
-    }
     const sysId = `systems.${safeName}`;
+    this.activePoolIds.delete(sysId);
     // v0.4.4 (G1): trace the state-tree entry (after safeName resolution but
     // before any extendObjectAsync). Shows the name → safeName mapping —
     // useful when collisions cause SM5 suffix-disambiguation.
@@ -816,6 +850,15 @@ export class StateManager {
       });
       this.deviceWritten.set(sysId, deviceSig);
       this.deviceIcons.set(sysId, icon);
+      const previousOwner = this.deviceOwners.get(safeName);
+      if (previousOwner !== undefined && previousOwner !== system.id) {
+        // The system that had this name is gone from the Hub (an owner still there keeps
+        // the bare id in prepareForPoll) — the tree, with its history settings, now shows
+        // another machine. The user should hear that once.
+        this.adapter.log.info(
+          `${sysId} now shows the Hub system '${sanitizeForLog(system.name)}' — the system that had this name is no longer on the Hub`,
+        );
+      }
       this.deviceOwners.set(safeName, system.id);
       // v0.16.0: the device bookkeeping mirrors the tree, so a system the Hub just
       // added has to join it — `getExistingSystemNames` reads this set now.
@@ -900,10 +943,22 @@ export class StateManager {
     }
     const existing = this.getExistingSystemNames();
     const stale = existing.filter(name => !activeSet.has(name));
+    // Where each Hub id lives in THIS poll — a stale tree whose owner is still on the Hub
+    // under another name was renamed there, which the user should know: the old tree goes
+    // with its history and custom settings.
+    const safeById = new Map(this.resolvedSafeNames);
     // v0.4.3 (SM1): stale-system removals in parallel.
     await Promise.all(
       stale.map(async name => {
-        this.adapter.log.debug(`Removing stale system: systems.${name}`);
+        const owner = this.deviceOwners.get(name);
+        const renamedTo = owner !== undefined ? safeById.get(owner) : undefined;
+        if (renamedTo !== undefined && renamedTo !== name) {
+          this.adapter.log.info(
+            `System renamed on the Hub: systems.${name} → systems.${renamedTo} — the old tree and its settings are removed`,
+          );
+        } else {
+          this.adapter.log.info(`System no longer on the Hub: systems.${name} is removed`);
+        }
         this.noteStatesRemovedUnder(`systems.${name}`);
         await this.adapter.delObjectAsync(`systems.${name}`, { recursive: true });
         this.dropCacheUnder(`systems.${name}`);
@@ -938,6 +993,7 @@ export class StateManager {
       this.lastGroupEmpty,
       this.absentLastPoll,
       this.staleUnitObjects,
+      this.groupOwners,
     ];
     for (const cache of caches) {
       for (const id of StateManager.idsUnder(cache.keys(), prefix)) {
@@ -1354,15 +1410,19 @@ export class StateManager {
             leafCommon("gpuUsage"),
             clampPercent(gpuData.u ?? null),
           );
-          await this.createAndSetState(
+          // `mu`/`mt` are `omitzero`: a GPU without dedicated memory (Intel/AMD iGPU,
+          // Apple) sends neither — the Hub UI draws no VRAM chart then (`mt > 0`), and no
+          // datapoint stands at null for it here.
+          const hasVram = (gpuData.mt ?? 0) > 0;
+          await this.setOrRetire(
             `${sysId}.gpu.${safeId}.memory_used`,
             leafCommon("gpuMemoryUsed"),
-            gpuData.mu ?? null,
+            hasVram ? (gpuData.mu ?? 0) : null,
           );
-          await this.createAndSetState(
+          await this.setOrRetire(
             `${sysId}.gpu.${safeId}.memory_total`,
             leafCommon("gpuMemoryTotal"),
-            gpuData.mt ?? null,
+            hasVram ? (gpuData.mt ?? null) : null,
           );
           await this.createAndSetState(`${sysId}.gpu.${safeId}.power`, leafCommon("gpuPower"), gpuData.p ?? null);
           // GPU details (v0.6.0): package power + per-engine usage. Engines the
@@ -1458,6 +1518,8 @@ export class StateManager {
     // absent means idle, not unknown. Health is zpool's own word; `common.states`
     // is a hint for the UI, never a filter.
     if (config.metrics_zfs) {
+      const poolIds = new Map<string, string>();
+      this.activePoolIds.set(sysId, poolIds);
       await this.syncDynamicGroup(
         `${sysId}.zfs`,
         stats.z ? Object.entries(stats.z) : [],
@@ -1466,30 +1528,56 @@ export class StateManager {
           await this.ensureChannel(`${sysId}.zfs`, channelName("zfs"));
         },
         async (safeId, poolName, pool) => {
-          await this.ensureChannel(`${sysId}.zfs.${safeId}`, sanitizeDisplayName(poolName), API_NAMED);
+          poolIds.set(poolName, safeId);
+          const base = `${sysId}.zfs.${safeId}`;
+          await this.ensureChannel(base, StateManager.poolDisplayName(poolName, pool.n), API_NAMED);
           const total = pool.d ?? null;
           const used = pool.du ?? null;
-          await this.createAndSetState(
-            `${sysId}.zfs.${safeId}.disk_percent`,
-            leafCommon("zfsDiskPercent"),
-            usedPercent(total, used),
-          );
-          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_used`, leafCommon("zfsDiskUsed"), used);
-          await this.createAndSetState(`${sysId}.zfs.${safeId}.disk_total`, leafCommon("zfsDiskTotal"), total);
-          await this.createAndSetState(
-            `${sysId}.zfs.${safeId}.read_speed`,
-            leafCommon("zfsReadSpeed"),
-            bytesToMib(pool.rb ?? 0),
-          );
-          await this.createAndSetState(
-            `${sysId}.zfs.${safeId}.write_speed`,
-            leafCommon("zfsWriteSpeed"),
-            bytesToMib(pool.wb ?? 0),
-          );
-          await this.createAndSetState(`${sysId}.zfs.${safeId}.health`, leafCommon("zfsHealth"), pool.h ?? null);
+          await this.createAndSetState(`${base}.pool_type`, leafCommon("zfsPoolType"), StateManager.poolType(poolName));
+          await this.createAndSetState(`${base}.raw`, leafCommon("zfsRaw"), pool.raw === true);
+          if (pool.raw === true) {
+            // Raw physical bytes (a btrfs pool whose filesystem figures the agent could not
+            // read, RAID copies counted twice): the agent calls them unsuitable for alerts,
+            // so no percentage is derived from them.
+            await this.deleteStateIfKnown(`${base}.disk_percent`);
+          } else {
+            await this.createAndSetState(
+              `${base}.disk_percent`,
+              leafCommon("zfsDiskPercent"),
+              usedPercent(total, used),
+            );
+          }
+          await this.createAndSetState(`${base}.disk_used`, leafCommon("zfsDiskUsed"), used);
+          await this.createAndSetState(`${base}.disk_total`, leafCommon("zfsDiskTotal"), total);
+          await this.createAndSetState(`${base}.read_speed`, leafCommon("zfsReadSpeed"), bytesToMib(pool.rb ?? 0));
+          await this.createAndSetState(`${base}.write_speed`, leafCommon("zfsWriteSpeed"), bytesToMib(pool.wb ?? 0));
+          await this.createAndSetState(`${base}.health`, leafCommon("zfsHealth"), pool.h ?? null);
         },
       );
     }
+  }
+
+  /**
+   * The storage stack behind a pool key: Beszel 0.20.0 files a btrfs filesystem under
+   * `b:<UUID>` next to the ZFS pools (`agent/storage_pool.go`; the Hub UI tells them apart
+   * by the same prefix).
+   *
+   * @param key The pool key from `stats.z` / `zfs_pools.name`.
+   */
+  private static poolType(key: string): "zfs" | "btrfs" {
+    return key.startsWith("b:") ? "btrfs" : "zfs";
+  }
+
+  /**
+   * The name a pool channel shows: the agent's display name (a btrfs label, mount point or
+   * UUID) where there is one, else the key — a ZFS pool's key IS its name. The channel id
+   * stays the key: a label or a mount point can change, the key cannot.
+   *
+   * @param key The pool key.
+   * @param displayName `n` / `display_name`, when the agent sent one.
+   */
+  private static poolDisplayName(key: string, displayName: string | undefined): string {
+    return sanitizeDisplayName(displayName && displayName.length > 0 ? displayName : key);
   }
 
   /**
@@ -1503,19 +1591,32 @@ export class StateManager {
    * @param details Pool detail records of THIS system (already filtered).
    */
   private async updateZfsDetails(sysId: string, details: ZfsPoolDetail[]): Promise<void> {
-    const seen = new Set<string>();
+    // Only the pools the summary reported in this poll, under the ids the summary gave
+    // them. No summary this poll (no stats record — the system is down) → freeze.
+    const poolIds = this.activePoolIds.get(sysId);
+    if (!poolIds) {
+      return;
+    }
     for (const pool of details) {
-      const safeId = this.resolveChildId(pool.name, pool.name, seen);
+      const safeId = poolIds.get(pool.name);
       if (!safeId) {
         continue;
       }
       const base = `${sysId}.zfs.${safeId}`;
-      await this.ensureChannel(`${sysId}.zfs`, channelName("zfs"));
-      await this.ensureChannel(base, sanitizeDisplayName(pool.name), API_NAMED);
+      await this.ensureChannel(base, StateManager.poolDisplayName(pool.name, pool.displayName), API_NAMED);
 
-      await this.createAndSetState(`${base}.scrub_state`, leafCommon("scrubState"), pool.scrubState ?? null);
-      await this.createAndSetState(`${base}.scrub_progress`, leafCommon("scrubProgress"), pool.scrubProgress ?? null);
-      await this.createAndSetState(`${base}.scrub_errors`, leafCommon("scrubErrors"), pool.scrubErrors ?? null);
+      if (pool.scrubState !== undefined) {
+        await this.createAndSetState(`${base}.scrub_state`, leafCommon("scrubState"), pool.scrubState);
+        await this.createAndSetState(`${base}.scrub_progress`, leafCommon("scrubProgress"), pool.scrubProgress ?? null);
+        await this.createAndSetState(`${base}.scrub_errors`, leafCommon("scrubErrors"), pool.scrubErrors ?? null);
+      } else {
+        // No scrub record: a ZFS pool never scrubbed, or any btrfs pool (the agent sends
+        // none). Three datapoints that could only ever hold null would be hardware the
+        // pool does not have — and a record that went away takes its datapoints with it.
+        await this.deleteStateIfKnown(`${base}.scrub_state`);
+        await this.deleteStateIfKnown(`${base}.scrub_progress`);
+        await this.deleteStateIfKnown(`${base}.scrub_errors`);
+      }
 
       await this.syncDynamicGroup(
         `${base}.vdevs`,
@@ -1544,8 +1645,10 @@ export class StateManager {
         async (dsId, rawName, ds) => {
           const db = `${base}.datasets.${dsId}`;
           await this.ensureChannel(db, sanitizeDisplayName(rawName), API_NAMED);
-          await this.createAndSetState(`${db}.used`, leafCommon("datasetUsed"), bytesToGib(ds.used));
-          await this.createAndSetState(`${db}.avail`, leafCommon("datasetAvail"), bytesToGib(ds.avail));
+          // `used`/`avail` are omitempty: an older Hub leaves out a 0 — a full dataset
+          // must read 0 available, not "unknown".
+          await this.createAndSetState(`${db}.used`, leafCommon("datasetUsed"), bytesToGib(ds.used ?? 0));
+          await this.createAndSetState(`${db}.avail`, leafCommon("datasetAvail"), bytesToGib(ds.avail ?? 0));
           await this.createAndSetState(`${db}.mountpoint`, leafCommon("datasetMount"), ds.mountpoint ?? null);
         },
       );
@@ -1553,9 +1656,53 @@ export class StateManager {
   }
 
   /**
-   * v0.17.0 — SMART devices from the `smart_devices` collection. Every column except the
-   * device node is optional (smartctl reports different sets per transport), so a value
-   * the Hub does not carry yields `null` rather than a zero that reads like a measurement.
+   * Write a reading of hardware the machine may not have, and retire it when it is gone:
+   * without a value, a state that does not exist is not created, and an existing one is
+   * removed on the SECOND poll in a row without a value (one odd sample must not churn the
+   * tree — the same debounce as `goneWhenAbsent: "stats"`).
+   *
+   * @param id State id, namespace-relative.
+   * @param common The state's common.
+   * @param value The reading, or `null` when there is none.
+   */
+  private async setOrRetire(id: string, common: ioBroker.StateCommon, value: number | null): Promise<void> {
+    if (value !== null) {
+      this.absentLastPoll.delete(id);
+      await this.createAndSetState(id, common, value);
+      return;
+    }
+    if (!this.createdIds.has(id) && !this.knownStateIds.has(id)) {
+      return;
+    }
+    if (this.absentLastPoll.get(id) === true) {
+      this.absentLastPoll.delete(id);
+      await this.deleteStateIfKnown(id);
+    } else {
+      this.absentLastPoll.set(id, true);
+    }
+  }
+
+  /**
+   * Write a reading that a machine may simply not have: without a value, an object that
+   * does not exist yet is not created; one that exists gets `null`.
+   *
+   * @param id State id, namespace-relative.
+   * @param common The state's common.
+   * @param value The reading, or `null` when there is none.
+   */
+  private async setOptionalState(id: string, common: ioBroker.StateCommon, value: number | null): Promise<void> {
+    if (value === null && !this.createdIds.has(id) && !this.knownStateIds.has(id)) {
+      return;
+    }
+    await this.createAndSetState(id, common, value);
+  }
+
+  /**
+   * v0.17.0 — SMART devices from the `smart_devices` collection. A text column the Hub
+   * leaves empty reads `null`. Temperature and capacity are hardware a drive may not
+   * report at all (a USB bridge without temperature, an eMMC module): their datapoints are
+   * only created once there is a value — an existing one then reads `null` while the value
+   * is missing, instead of a 0 °C / 0 GB that looks like a measurement.
    *
    * @param sysId State prefix (`systems.<safeName>`).
    * @param devices SMART records of THIS system (already filtered).
@@ -1576,8 +1723,8 @@ export class StateManager {
         await this.createAndSetState(`${b}.serial`, leafCommon("smartSerial"), dev.serial ?? null);
         await this.createAndSetState(`${b}.firmware`, leafCommon("smartFirmware"), dev.firmware ?? null);
         await this.createAndSetState(`${b}.interface`, leafCommon("smartType"), dev.type ?? null);
-        await this.createAndSetState(`${b}.temperature`, leafCommon("smartTemp"), dev.temperature ?? null);
-        await this.createAndSetState(`${b}.capacity`, leafCommon("smartCapacity"), bytesToGib(dev.capacity));
+        await this.setOptionalState(`${b}.temperature`, leafCommon("smartTemp"), dev.temperature ?? null);
+        await this.setOptionalState(`${b}.capacity`, leafCommon("smartCapacity"), bytesToGib(dev.capacity));
         await this.createAndSetState(`${b}.power_on_hours`, leafCommon("smartHours"), dev.hours ?? null);
         await this.createAndSetState(`${b}.power_cycles`, leafCommon("smartCycles"), dev.cycles ?? null);
       },
@@ -1625,11 +1772,12 @@ export class StateManager {
     // SEC-6: resolve each container's id segment once (keyed by record id),
     // disambiguating any collision so the prune set and the create loop use the
     // SAME id and two same-sanitizing names never overwrite each other.
-    const seenContainers = new Set<string>();
-    const resolvedIds = new Map<string, string>();
-    for (const container of sysContainers) {
-      resolvedIds.set(container.id, this.resolveChildId(container.name, container.id, seenContainers));
-    }
+    // Keyed by NAME: Docker's container id changes on every re-create (`compose up`), so
+    // a suffix derived from it would move the container to a new channel each time.
+    const resolvedIds = this.resolveGroupIds(
+      `${sysId}.containers`,
+      sysContainers.map(c => ({ key: c.name, name: c.name })),
+    );
 
     // F1: prune containers that disappeared from the host. Build the active set
     // and prune BEFORE the early-return — otherwise a system that drops to zero
@@ -1653,7 +1801,7 @@ export class StateManager {
     await this.ensureChannel(`${sysId}.containers`, channelName("containers"));
 
     for (const container of sysContainers) {
-      const cId = resolvedIds.get(container.id) ?? "";
+      const cId = resolvedIds.get(container.name) ?? "";
       if (cId.length === 0) {
         continue;
       }
@@ -1716,9 +1864,12 @@ export class StateManager {
     const active = new Set<string>();
     if (entries.length > 0) {
       await ensureParents();
-      const seen = new Set<string>();
+      const ids = this.resolveGroupIds(
+        base,
+        entries.map(([rawId]) => ({ key: rawId, name: rawId })),
+      );
       for (const [rawId, data] of entries) {
-        const safeId = this.resolveChildId(rawId, rawId, seen);
+        const safeId = ids.get(rawId) ?? "";
         if (!safeId) {
           continue;
         }
@@ -1730,11 +1881,13 @@ export class StateManager {
   }
 
   /**
-   * H2: prune a dynamic group's disappeared children, with a drop-to-zero
-   * debounce. A NON-empty group prunes immediately (drops members that vanished
-   * among the ones still present). An EMPTY group (all members gone) prunes only
-   * on the SECOND consecutive empty poll — a single transient empty response
-   * must not wipe every state. Used by every dynamic group incl. containers.
+   * H2: prune a dynamic group's disappeared children, debounced over two polls — for the
+   * whole group AND for each member. An EMPTY group (all members gone) prunes only on the
+   * SECOND consecutive empty poll; a single member that is missing from a non-empty group
+   * is also only removed when it is still missing on the next poll (a GPU whose
+   * temperature reads 0 °C drops out of the sensor map for a sample, a sleeping NVMe, a
+   * briefly vanished interface — removing and re-creating it lost its history settings).
+   * Used by every dynamic group incl. containers.
    *
    * @param base Group prefix (e.g. `systems.<safeName>.gpu`).
    * @param activeIds Sanitized direct-child segments currently present.
@@ -1750,7 +1903,8 @@ export class StateManager {
     const wasEmpty = this.lastGroupEmpty.get(base) ?? false;
     this.lastGroupEmpty.set(base, isEmpty);
     if (!isEmpty || wasEmpty) {
-      await this.pruneDynamicChildren(base, activeIds, childType);
+      // A group confirmed empty over two polls has served its debounce already.
+      await this.pruneDynamicChildren(base, activeIds, childType, isEmpty && wasEmpty);
     }
   }
 
@@ -1769,11 +1923,14 @@ export class StateManager {
    * @param base Group prefix (e.g. `systems.<safeName>.containers`)
    * @param activeIds Sanitized direct-child segments currently present
    * @param childType Object type of the direct children (`channel` or `state`)
+   * @param confirmed The absence is already confirmed (the whole group was empty twice):
+   *   remove at once instead of waiting a poll per member.
    */
   private async pruneDynamicChildren(
     base: string,
     activeIds: Set<string>,
     childType: "channel" | "state",
+    confirmed = false,
   ): Promise<void> {
     let known = this.dynamicChildren.get(base);
     if (!known) {
@@ -1794,7 +1951,23 @@ export class StateManager {
         }
       }
     }
-    const stale = [...known].filter(cId => !activeIds.has(cId));
+    for (const cId of activeIds) {
+      this.absentLastPoll.delete(`${base}.${cId}`);
+    }
+    const missing = [...known].filter(cId => !activeIds.has(cId));
+    // First poll without a member: remember it and keep it; second poll in a row: remove.
+    const stale: string[] = [];
+    const waiting: string[] = [];
+    for (const cId of missing) {
+      const key = `${base}.${cId}`;
+      if (confirmed || this.absentLastPoll.get(key) === true) {
+        this.absentLastPoll.delete(key);
+        stale.push(cId);
+      } else {
+        this.absentLastPoll.set(key, true);
+        waiting.push(cId);
+      }
+    }
     await Promise.all(
       stale.map(async cId => {
         this.adapter.log.debug(`Removing stale ${childType} ${base}.${cId} (no longer reported)`);
@@ -1807,14 +1980,14 @@ export class StateManager {
     // now-empty parent group channel too — otherwise an empty `<sysId>.gpu` /
     // `.containers` / `.filesystems` … object lingers. Gated on the emptying
     // transition (something was removed AND nothing is left active).
-    if (stale.length > 0 && activeIds.size === 0 && this.knownChannelIds.has(base)) {
+    if (stale.length > 0 && activeIds.size === 0 && waiting.length === 0 && this.knownChannelIds.has(base)) {
       await this.adapter.delObjectAsync(base);
       this.dropCacheUnder(base);
       // …and the parent channel with it when the group was its last member (a machine
       // whose sensors vanished keeps no empty `temperature` channel either).
       await this.deleteChannelIfEmpty(base.slice(0, base.lastIndexOf(".")));
     }
-    this.dynamicChildren.set(base, new Set(activeIds));
+    this.dynamicChildren.set(base, new Set([...activeIds, ...waiting]));
   }
 
   /**

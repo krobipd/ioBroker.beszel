@@ -5403,7 +5403,9 @@
       "write": false,
       "states": {
         "PASSED": "Passed",
-        "FAILED": "Failed"
+        "WARNING": "Warning",
+        "FAILED": "Failed",
+        "UNKNOWN": "Unknown"
       }
     },
     "native": {},
@@ -5614,17 +5616,17 @@
     "type": "channel",
     "common": {
       "name": {
-        "de": "ZFS-Pools",
-        "en": "ZFS Pools",
-        "es": "Pools ZFS",
-        "fr": "Pools ZFS",
-        "it": "Pool ZFS",
-        "nl": "ZFS-pools",
-        "pl": "Pule ZFS",
-        "pt": "Pools ZFS",
-        "ru": "Пулы ZFS",
-        "uk": "Пули ZFS",
-        "zh-cn": "ZFS 存储池"
+        "de": "Speicherpools",
+        "en": "Storage pools",
+        "es": "Pools de almacenamiento",
+        "fr": "Pools de stockage",
+        "it": "Pool di archiviazione",
+        "nl": "Opslagpools",
+        "pl": "Pule pamięci masowej",
+        "pt": "Pools de armazenamento",
+        "ru": "Пулы хранения",
+        "uk": "Пули зберігання",
+        "zh-cn": "存储池"
       }
     },
     "native": {},
@@ -5734,17 +5736,17 @@
         "zh-cn": "健康状态"
       },
       "desc": {
-        "de": "Zustand des Pools laut ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL oder SUSPENDED.",
-        "en": "Pool health as reported by ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL or SUSPENDED.",
-        "es": "Estado del pool según ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
-        "fr": "État du pool selon ZFS : ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
-        "it": "Stato del pool secondo ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
-        "nl": "Toestand van de pool volgens ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL of SUSPENDED.",
-        "pl": "Stan puli według ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL lub SUSPENDED.",
-        "pt": "Estado do pool segundo o ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
-        "ru": "Состояние пула по данным ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL или SUSPENDED.",
-        "uk": "Стан пулу за даними ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL або SUSPENDED.",
-        "zh-cn": "ZFS 报告的存储池健康状态：ONLINE、DEGRADED、FAULTED、OFFLINE、REMOVED、UNAVAIL 或 SUSPENDED。"
+        "de": "Zustand des Pools laut Speicherschicht: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED oder UNKNOWN (btrfs: ONLINE, DEGRADED oder UNKNOWN).",
+        "en": "Pool health as the storage stack reports it: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED or UNKNOWN (btrfs: ONLINE, DEGRADED or UNKNOWN).",
+        "es": "Estado del pool según la capa de almacenamiento: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED o UNKNOWN (btrfs: ONLINE, DEGRADED o UNKNOWN).",
+        "fr": "État du pool selon la couche de stockage : ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED ou UNKNOWN (btrfs : ONLINE, DEGRADED ou UNKNOWN).",
+        "it": "Stato del pool secondo lo strato di archiviazione: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED o UNKNOWN (btrfs: ONLINE, DEGRADED o UNKNOWN).",
+        "nl": "Toestand van de pool volgens de opslaglaag: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED of UNKNOWN (btrfs: ONLINE, DEGRADED of UNKNOWN).",
+        "pl": "Stan puli według warstwy pamięci masowej: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED lub UNKNOWN (btrfs: ONLINE, DEGRADED lub UNKNOWN).",
+        "pt": "Estado do pool segundo a camada de armazenamento: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED ou UNKNOWN (btrfs: ONLINE, DEGRADED ou UNKNOWN).",
+        "ru": "Состояние пула по данным системы хранения: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED или UNKNOWN (btrfs: ONLINE, DEGRADED или UNKNOWN).",
+        "uk": "Стан пулу за даними системи зберігання: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED або UNKNOWN (btrfs: ONLINE, DEGRADED або UNKNOWN).",
+        "zh-cn": "存储层报告的存储池健康状态：ONLINE、DEGRADED、FAULTED、OFFLINE、REMOVED、UNAVAIL、SUSPENDED 或 UNKNOWN（btrfs：ONLINE、DEGRADED 或 UNKNOWN）。"
       },
       "type": "string",
       "role": "info.status",
@@ -5757,11 +5759,77 @@
         "OFFLINE": "Offline",
         "REMOVED": "Removed",
         "UNAVAIL": "Unavailable",
-        "SUSPENDED": "Suspended"
+        "SUSPENDED": "Suspended",
+        "UNKNOWN": "Unknown"
       }
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.health"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.pool_type": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool-Typ",
+        "en": "Pool type",
+        "es": "Tipo de pool",
+        "fr": "Type de pool",
+        "it": "Tipo di pool",
+        "nl": "Pooltype",
+        "pl": "Typ puli",
+        "pt": "Tipo de pool",
+        "ru": "Тип пула",
+        "uk": "Тип пулу",
+        "zh-cn": "存储池类型"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "zfs": "ZFS",
+        "btrfs": "btrfs"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.pool_type"
+  },
+  "beszel.0.systems.homelab_server.zfs.backup_pool.raw": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Rohkapazität",
+        "en": "Raw capacity",
+        "es": "Capacidad bruta",
+        "fr": "Capacité brute",
+        "it": "Capacità grezza",
+        "nl": "Ruwe capaciteit",
+        "pl": "Pojemność surowa",
+        "pt": "Capacidade bruta",
+        "ru": "Сырая ёмкость",
+        "uk": "Сира ємність",
+        "zh-cn": "原始容量"
+      },
+      "desc": {
+        "de": "Wahr, wenn Gesamt und Belegt die rohen physischen Bytes der Geräte sind (der Agent konnte die Werte des Dateisystems nicht lesen) — dann gibt es keinen Prozentwert, und die Werte taugen nicht für Plattenalarme.",
+        "en": "True when total and used are the raw physical bytes of the devices (the agent could not read the filesystem's own figures) — then no percentage is given, and the values are not suited for disk alerts.",
+        "es": "Verdadero cuando total y usado son los bytes físicos brutos de los dispositivos (el agente no pudo leer las cifras del sistema de archivos) — entonces no hay porcentaje y los valores no sirven para alertas de disco.",
+        "fr": "Vrai quand total et utilisé sont les octets physiques bruts des périphériques (l'agent n'a pas pu lire les valeurs du système de fichiers) — aucun pourcentage n'est alors donné, et les valeurs ne conviennent pas aux alertes disque.",
+        "it": "Vero quando totale e usato sono i byte fisici grezzi dei dispositivi (l'agente non ha potuto leggere i valori del file system) — allora non viene fornita alcuna percentuale e i valori non sono adatti agli allarmi disco.",
+        "nl": "Waar wanneer totaal en gebruikt de ruwe fysieke bytes van de apparaten zijn (de agent kon de eigen cijfers van het bestandssysteem niet lezen) — dan is er geen percentage, en de waarden zijn niet geschikt voor schijfalarmen.",
+        "pl": "Prawda, gdy łącznie i zajęte to surowe bajty fizyczne urządzeń (agent nie mógł odczytać danych systemu plików) — wtedy nie ma wartości procentowej, a wartości nie nadają się do alarmów dyskowych.",
+        "pt": "Verdadeiro quando total e usado são os bytes físicos brutos dos dispositivos (o agente não conseguiu ler os valores do sistema de ficheiros) — então não há percentagem, e os valores não servem para alertas de disco.",
+        "ru": "Истина, если «всего» и «занято» — это сырые физические байты устройств (агент не смог прочитать данные файловой системы) — тогда процент не указывается, и значения не подходят для оповещений о диске.",
+        "uk": "Істина, коли «усього» й «зайнято» — це сирі фізичні байти пристроїв (агент не зміг прочитати дані файлової системи) — тоді відсоток не наводиться, і значення не придатні для сповіщень про диск.",
+        "zh-cn": "当总量和已用量是设备的原始物理字节时为真（代理无法读取文件系统自身的数值）——此时不提供百分比，这些值也不适合用于磁盘告警。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.backup_pool.raw"
   },
   "beszel.0.systems.homelab_server.zfs.backup_pool.read_speed": {
     "type": "state",
@@ -6021,17 +6089,17 @@
         "zh-cn": "健康状态"
       },
       "desc": {
-        "de": "Zustand des Pools laut ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL oder SUSPENDED.",
-        "en": "Pool health as reported by ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL or SUSPENDED.",
-        "es": "Estado del pool según ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
-        "fr": "État du pool selon ZFS : ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
-        "it": "Stato del pool secondo ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL o SUSPENDED.",
-        "nl": "Toestand van de pool volgens ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL of SUSPENDED.",
-        "pl": "Stan puli według ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL lub SUSPENDED.",
-        "pt": "Estado do pool segundo o ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL ou SUSPENDED.",
-        "ru": "Состояние пула по данным ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL или SUSPENDED.",
-        "uk": "Стан пулу за даними ZFS: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL або SUSPENDED.",
-        "zh-cn": "ZFS 报告的存储池健康状态：ONLINE、DEGRADED、FAULTED、OFFLINE、REMOVED、UNAVAIL 或 SUSPENDED。"
+        "de": "Zustand des Pools laut Speicherschicht: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED oder UNKNOWN (btrfs: ONLINE, DEGRADED oder UNKNOWN).",
+        "en": "Pool health as the storage stack reports it: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED or UNKNOWN (btrfs: ONLINE, DEGRADED or UNKNOWN).",
+        "es": "Estado del pool según la capa de almacenamiento: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED o UNKNOWN (btrfs: ONLINE, DEGRADED o UNKNOWN).",
+        "fr": "État du pool selon la couche de stockage : ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED ou UNKNOWN (btrfs : ONLINE, DEGRADED ou UNKNOWN).",
+        "it": "Stato del pool secondo lo strato di archiviazione: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED o UNKNOWN (btrfs: ONLINE, DEGRADED o UNKNOWN).",
+        "nl": "Toestand van de pool volgens de opslaglaag: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED of UNKNOWN (btrfs: ONLINE, DEGRADED of UNKNOWN).",
+        "pl": "Stan puli według warstwy pamięci masowej: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED lub UNKNOWN (btrfs: ONLINE, DEGRADED lub UNKNOWN).",
+        "pt": "Estado do pool segundo a camada de armazenamento: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED ou UNKNOWN (btrfs: ONLINE, DEGRADED ou UNKNOWN).",
+        "ru": "Состояние пула по данным системы хранения: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED или UNKNOWN (btrfs: ONLINE, DEGRADED или UNKNOWN).",
+        "uk": "Стан пулу за даними системи зберігання: ONLINE, DEGRADED, FAULTED, OFFLINE, REMOVED, UNAVAIL, SUSPENDED або UNKNOWN (btrfs: ONLINE, DEGRADED або UNKNOWN).",
+        "zh-cn": "存储层报告的存储池健康状态：ONLINE、DEGRADED、FAULTED、OFFLINE、REMOVED、UNAVAIL、SUSPENDED 或 UNKNOWN（btrfs：ONLINE、DEGRADED 或 UNKNOWN）。"
       },
       "type": "string",
       "role": "info.status",
@@ -6044,11 +6112,77 @@
         "OFFLINE": "Offline",
         "REMOVED": "Removed",
         "UNAVAIL": "Unavailable",
-        "SUSPENDED": "Suspended"
+        "SUSPENDED": "Suspended",
+        "UNKNOWN": "Unknown"
       }
     },
     "native": {},
     "_id": "beszel.0.systems.homelab_server.zfs.tank.health"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.pool_type": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool-Typ",
+        "en": "Pool type",
+        "es": "Tipo de pool",
+        "fr": "Type de pool",
+        "it": "Tipo di pool",
+        "nl": "Pooltype",
+        "pl": "Typ puli",
+        "pt": "Tipo de pool",
+        "ru": "Тип пула",
+        "uk": "Тип пулу",
+        "zh-cn": "存储池类型"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "zfs": "ZFS",
+        "btrfs": "btrfs"
+      }
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.pool_type"
+  },
+  "beszel.0.systems.homelab_server.zfs.tank.raw": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Rohkapazität",
+        "en": "Raw capacity",
+        "es": "Capacidad bruta",
+        "fr": "Capacité brute",
+        "it": "Capacità grezza",
+        "nl": "Ruwe capaciteit",
+        "pl": "Pojemność surowa",
+        "pt": "Capacidade bruta",
+        "ru": "Сырая ёмкость",
+        "uk": "Сира ємність",
+        "zh-cn": "原始容量"
+      },
+      "desc": {
+        "de": "Wahr, wenn Gesamt und Belegt die rohen physischen Bytes der Geräte sind (der Agent konnte die Werte des Dateisystems nicht lesen) — dann gibt es keinen Prozentwert, und die Werte taugen nicht für Plattenalarme.",
+        "en": "True when total and used are the raw physical bytes of the devices (the agent could not read the filesystem's own figures) — then no percentage is given, and the values are not suited for disk alerts.",
+        "es": "Verdadero cuando total y usado son los bytes físicos brutos de los dispositivos (el agente no pudo leer las cifras del sistema de archivos) — entonces no hay porcentaje y los valores no sirven para alertas de disco.",
+        "fr": "Vrai quand total et utilisé sont les octets physiques bruts des périphériques (l'agent n'a pas pu lire les valeurs du système de fichiers) — aucun pourcentage n'est alors donné, et les valeurs ne conviennent pas aux alertes disque.",
+        "it": "Vero quando totale e usato sono i byte fisici grezzi dei dispositivi (l'agente non ha potuto leggere i valori del file system) — allora non viene fornita alcuna percentuale e i valori non sono adatti agli allarmi disco.",
+        "nl": "Waar wanneer totaal en gebruikt de ruwe fysieke bytes van de apparaten zijn (de agent kon de eigen cijfers van het bestandssysteem niet lezen) — dan is er geen percentage, en de waarden zijn niet geschikt voor schijfalarmen.",
+        "pl": "Prawda, gdy łącznie i zajęte to surowe bajty fizyczne urządzeń (agent nie mógł odczytać danych systemu plików) — wtedy nie ma wartości procentowej, a wartości nie nadają się do alarmów dyskowych.",
+        "pt": "Verdadeiro quando total e usado são os bytes físicos brutos dos dispositivos (o agente não conseguiu ler os valores do sistema de ficheiros) — então não há percentagem, e os valores não servem para alertas de disco.",
+        "ru": "Истина, если «всего» и «занято» — это сырые физические байты устройств (агент не смог прочитать данные файловой системы) — тогда процент не указывается, и значения не подходят для оповещений о диске.",
+        "uk": "Істина, коли «усього» й «зайнято» — це сирі фізичні байти пристроїв (агент не зміг прочитати дані файлової системи) — тоді відсоток не наводиться, і значення не придатні для сповіщень про диск.",
+        "zh-cn": "当总量和已用量是设备的原始物理字节时为真（代理无法读取文件系统自身的数值）——此时不提供百分比，这些值也不适合用于磁盘告警。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "beszel.0.systems.homelab_server.zfs.tank.raw"
   },
   "beszel.0.systems.homelab_server.zfs.tank.read_speed": {
     "type": "state",
@@ -6183,7 +6317,6 @@
       "read": true,
       "write": false,
       "states": {
-        "NONE": "No scrub",
         "SCANNING": "Running",
         "FINISHED": "Finished",
         "CANCELED": "Canceled"
@@ -6323,7 +6456,9 @@
         "OFFLINE": "Offline",
         "REMOVED": "Removed",
         "UNAVAIL": "Unavailable",
-        "SUSPENDED": "Suspended"
+        "SUSPENDED": "Suspended",
+        "UNKNOWN": "Unknown",
+        "MISSING": "Missing"
       }
     },
     "native": {},

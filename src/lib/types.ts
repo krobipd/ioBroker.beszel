@@ -208,6 +208,16 @@ export interface ZfsPoolStats {
   wb?: number;
   /** pool health word */
   h?: string;
+  /**
+   * Beszel 0.20.0: display name of a btrfs pool (label, else first mount point, else UUID —
+   * `agent/btrfs/btrfs_linux.go`); empty for ZFS, whose name is the map key itself.
+   */
+  n?: string;
+  /**
+   * Beszel 0.20.0: capacity and usage are raw physical bytes (statfs failed on the pool),
+   * "unsuitable for disk alerts" per the agent — no percentage is derived from them.
+   */
+  raw?: boolean;
 }
 
 /**
@@ -453,13 +463,23 @@ export interface ZfsPoolDetail {
   id: string;
   /** Reference to systems.id */
   system: string;
-  /** Pool name as `zpool` reports it */
+  /**
+   * Pool key: the zpool name, or `b:<UUID>` for a btrfs pool (Beszel 0.20.0) — the same key
+   * as in `stats.z`.
+   */
   name: string;
-  /** Scrub/resilver state: NONE | SCANNING | FINISHED | CANCELED (absent → no scrub info) */
+  /** Beszel 0.20.0: display name (btrfs: label, mount point or UUID; empty for ZFS). */
+  displayName?: string;
+  /** Beszel 0.20.0: capacity/usage are raw physical bytes. */
+  raw?: boolean;
+  /**
+   * Scrub/resilver state: SCANNING | FINISHED | CANCELED. Absent → the pool has no scrub
+   * record (a ZFS pool never scrubbed; a btrfs pool always — the agent drops `NONE`).
+   */
   scrubState?: string;
-  /** Free-text progress the agent read from `zpool status` (e.g. "12.3% done") */
+  /** Progress the agent read from `zpool status` while scanning, as "NN.NN%" */
   scrubProgress?: string;
-  /** Errors the last scrub found */
+  /** Errors the last scrub found (0 once a scrub finished without errors) */
   scrubErrors?: number;
   /** vdevs of the pool, each with its own error counters */
   vdevs: ZfsVdev[];
