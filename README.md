@@ -308,17 +308,17 @@ beszel.0.
 - Fixed: after a password change, a deleted user or a restored Hub database the adapter kept every system green without new values for up to a day — it now logs in again right away
 - Fixed: a refused login says why — wrong e-mail or password, multi-factor authentication, or password login switched off on the Hub — and the adapter stops retrying every poll
 - Fixed: a paused or never-connected system no longer shows uptime 0 or empty system details; its last values stay
-- Fixed: on current Hubs, swap and ZFS cache datapoints appeared on hosts without swap or ZFS, GPU memory on GPUs that report none and GPU package power at 0 W on GPUs without a package sensor — they are removed
+- Fixed: on current Hubs, swap, ZFS cache, GPU memory and GPU package power appeared on hosts that do not have them — they are removed
 - Fixed: drives without a temperature or capacity reading showed 0; they now get no such datapoint
 - Fixed: a storage pool that was removed came back with the next detail refresh and stayed until the next restart
 - Fixed: a system whose name has no Latin letters or digits (e.g. Cyrillic or Chinese) got no object tree; it now gets a stable fallback id
 - Fixed: two containers or group members whose names turn into the same id could swap their datapoints after a restart, and a container's id suffix changed with every re-create
 - Fixed: a member of a group (sensor, container, unit, …) that was missing from a single poll was deleted at once; it now has to be missing twice
 - Fixed: spaces and a trailing slash around the Hub URL are removed; a URL with `?`, `#` or a user name and password in it is rejected with a clear message, also in the connection test
-- Fixed: on a very large Hub, a list longer than the adapter reads deleted the datapoints of the systems at its end — the adapter now reads bigger pages, and a cut-off list keeps the tree as it is and is reported once
+- Fixed: on a very large Hub, the systems at the end of a long list lost their datapoints — a cut-off list now leaves the tree as it is and is reported once
 - Fixed: a request that trickled in slowly could run far past the configured timeout
-- Changed: a Hub URL that answers without the Beszel API (404, e.g. a missing reverse-proxy path) is named as such in the log and in the connection test
-- Changed: short network outages and timeouts are logged at debug level; the adapter marks the systems offline as before
+- Changed: a Hub URL that does not lead to the Beszel API (e.g. a missing reverse-proxy path) is named as such in the log and in the connection test
+- Changed: a short network outage no longer fills the log with warnings; the systems are still marked offline
 - Changed: a renamed or removed system on the Hub is reported in the log
 - Changed: the login field is called E-mail — Beszel does not accept a username
 - Changed: the SMART verdict also knows WARNING and UNKNOWN, the pool health UNKNOWN and the vdev state MISSING
