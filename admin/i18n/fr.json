@@ -271,8 +271,10 @@
   "help_metric_smart": "Verdict SMART global, température, capacité, heures de fonctionnement et cycles d'alimentation par disque. Nécessite smartctl sur l'hôte ; lu au plus toutes les 15 minutes.",
   "metric_servicesDetails": "Détails des services",
   "help_metric_servicesDetails": "État, sous-état, processeur et mémoire par unité systemd — un canal par unité. Sur un hôte chargé, cela peut faire beaucoup de points de données.",
-  "msgConnected": "Connexion réussie",
+  "msgConnected": "Connecté — %s système(s) visible(s) pour ce compte",
   "msgConnectionFailed": "Échec de la connexion : %s",
+  "msgConnectedNoSystems": "Connecté, mais ce compte ne voit aucun système — attribuez l'utilisateur aux systèmes dans le Hub (ou lancez le Hub avec SHARE_ALL_SYSTEMS=true)",
+  "msgUrlInvalid": "URL du Hub non valide : %s",
   "msgCredentialsRequired": "L'URL, le nom d'utilisateur et le mot de passe sont requis",
   "msgAdminOnly": "Le test de connexion n'est disponible que depuis l'interface d'administration",
   "msgUnknownCommand": "Commande inconnue"

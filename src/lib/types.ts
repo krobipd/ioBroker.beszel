@@ -386,6 +386,14 @@ export interface PocketBaseList<T> {
    * unusable — only the former ends the pagination walk.
    */
   rawCount: number;
+  /** Total number of records across all pages, as the Hub counts them (0 when absent). */
+  totalItems: number;
+  /**
+   * `false` when the body is not a PocketBase list at all (no object, or no `items` array)
+   * — a proxy page or another service at the URL. Such a body must not read as
+   * "zero records", which the empty-list guards would then take at face value.
+   */
+  valid: boolean;
 }
 
 /**
@@ -404,7 +412,31 @@ export interface AuthResponse {
  * uses ETIMEDOUT so classification no longer depends on a message substring (N6).
  */
 export type BeszelErrorCode =
-  "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMITED" | "HTTP_ERROR" | "INVALID_AUTH_RESPONSE" | "ETIMEDOUT";
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "RATE_LIMITED"
+  | "HTTP_ERROR"
+  | "INVALID_AUTH_RESPONSE"
+  | "ETIMEDOUT"
+  // The login itself, told apart by what PocketBase answers (measured on a 0.20.0 Hub):
+  // 400 "Failed to authenticate." (wrong e-mail/password, a user name instead of the
+  // e-mail, superuser credentials), 401 with `mfaId` (one-time-password login on),
+  // 403 "not configured to allow password authentication" (password login off) and any
+  // other 403 (e.g. the account is not verified).
+  | "AUTH_FAILED"
+  | "MFA_REQUIRED"
+  | "PASSWORD_AUTH_DISABLED"
+  | "AUTH_FORBIDDEN"
+  // A body that is not the Beszel API (proxy page, SPA fallback, other service).
+  | "INVALID_RESPONSE"
+  | "INVALID_URL"
+  | "RESPONSE_TOO_LARGE"
+  // cancelAll() on shutdown — the request never reached an answer.
+  | "ABORTED"
+  // More records than the adapter reads in one walk: the list is incomplete and must
+  // not be treated as the full set (a missing entry would read as "gone").
+  | "TRUNCATED";
 
 /**
  * One row of the Hub's `zfs_pools` collection — the DETAIL record the agent refreshes

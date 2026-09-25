@@ -100,6 +100,13 @@ export class StateManager {
   private readonly createdIds = new Set<string>();
 
   /**
+   * Set by {@link stop} when the adapter unloads. A system update still running in the
+   * parallel fan-out must not write `info.online = true` over the offline markers the
+   * shutdown writes.
+   */
+  private stopped = false;
+
+  /**
    * v0.4.3 (SM5): per-poll resolved safeName per system.id. Built once via
    * `prepareForPoll(systems)` before per-system updates run in parallel.
    */
@@ -730,6 +737,13 @@ export class StateManager {
   }
 
   /**
+   * The adapter is unloading: no update started after this writes a system's online state.
+   */
+  public stop(): void {
+    this.stopped = true;
+  }
+
+  /**
    * Update all states for a single system.
    *
    * @param system Beszel system record
@@ -811,6 +825,9 @@ export class StateManager {
     // Info channel (always created)
     await this.ensureChannel(`${sysId}.info`, channelName("info"));
 
+    if (this.stopped) {
+      return;
+    }
     // Always: online + status
     await this.createAndSetState(
       `${sysId}.info.online`,

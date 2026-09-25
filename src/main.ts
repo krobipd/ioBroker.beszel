@@ -6,8 +6,10 @@ import {
   coercePollInterval,
   coerceTimeoutMs,
   errText,
+  normalizeHubUrl,
   sanitizeForLog,
   shouldFetchSystemDetails,
+  urlForLog,
   validateHubUrl,
 } from "./lib/coerce";
 import { dispatchMessage, makeTestClientFactory } from "./lib/message-router";
@@ -15,7 +17,7 @@ import { tDesc, tName } from "./lib/i18n";
 import { SYSTEM_STATUS_UNKNOWN } from "./lib/metric-registry";
 import { StateManager } from "./lib/state-manager";
 import type { SystemExtras } from "./lib/state-manager";
-import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails } from "./lib/types";
+import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails, SystemStats } from "./lib/types";
 
 /**
  * How often the two SLOW detail collections (`zfs_pools`, `smart_devices`) are read.
@@ -24,6 +26,40 @@ import type { AdapterConfig, BeszelContainer, BeszelSystem, SystemDetails } from
  */
 const DETAIL_REFRESH_MS = 15 * 60 * 1000;
 
+/** Longest pause between two login attempts once the login keeps failing. */
+const AUTH_BACKOFF_MAX_MS = 15 * 60 * 1000;
+
+/** Error classes that mean "the login itself failed" — they share the auth back-off. */
+const AUTH_ERROR_CODES: ReadonlySet<string> = new Set([
+  "UNAUTHORIZED",
+  "AUTH_FAILED",
+  "MFA_REQUIRED",
+  "PASSWORD_AUTH_DISABLED",
+  "AUTH_FORBIDDEN",
+]);
+
+/** Node's codes for a TLS certificate the Hub presents but this host does not trust. */
+const TLS_ERROR_CODES: ReadonlySet<string> = new Set([
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+]);
+
+/**
+ * A collection read failed for good — the Hub does not serve it (404, older release) or
+ * does not let this account read it (403). Everything else (network, timeout, 5xx, an
+ * unexpected body) is worth another try. One rule for the extra collections and for
+ * `system_details`, which used to apply it the other way round.
+ *
+ * @param code The classified error.
+ */
+export function isDefinitiveFailure(code: string): boolean {
+  return code === "NOT_FOUND" || code === "FORBIDDEN";
+}
 /**
  * Beszel adapter — polls a Beszel Hub (PocketBase) and mirrors systems,
  * stats and containers into ioBroker states. Exported so the orchestration
@@ -67,8 +103,8 @@ export class BeszelAdapter extends utils.Adapter {
   /**
    * Set first thing in `onUnload`. A poll that is still in flight when the host stops
    * us gets its requests aborted by `cancelAll()` — that rejection is not a Hub
-   * problem and must neither log an error (which Sentry would report) nor write
-   * states after the final shutdown writes.
+   * problem and must neither log an error nor write states after the final shutdown
+   * writes.
    */
   private unloaded = false;
   private lastSystemCount = 0;
@@ -91,6 +127,26 @@ export class BeszelAdapter extends utils.Adapter {
   /** L3: warn once when the container fetch starts failing (403 / transient), trace thereafter. */
   private containersUnavailable = false;
   private authFailCount = 0;
+  /**
+   * Once the login has failed three times, the next attempt waits (1, 2, 4 … poll
+   * intervals, at most 15 minutes) instead of sending the password every poll — the Hub
+   * rate-limits logins, and with one-time-password login on every attempt leaves an MFA
+   * record behind.
+   */
+  private authRetryAt = 0;
+  /** The poll interval in ms (for the auth back-off). */
+  private pollIntervalMs = 60_000;
+  /**
+   * An empty system list while systems are known is what a dead token looks like:
+   * PocketBase serves an invalid token as a guest and filters every list to nothing
+   * (HTTP 200, measured on a 0.20.0 Hub — no 401 ever comes). The poll logs in afresh
+   * once per such streak; a list that stays empty after that is real.
+   */
+  private emptyListRetried = false;
+  /** The "this account sees no systems" line went out for the current empty streak. */
+  private emptyListNoticed = false;
+  /** Extra collections whose "more records than read" warning went out already. */
+  private truncatedWarned = new Set<string>();
   private failedSystems = new Set<string>();
   /**
    * v0.6.0 (F2): cache of the `system_details` collection (hardware/OS) keyed by system
@@ -264,7 +320,7 @@ export class BeszelAdapter extends utils.Adapter {
       const config = this.config as unknown as AdapterConfig;
 
       this.log.debug(
-        `onReady: starting (url='${config.url}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`,
+        `onReady: starting (url='${urlForLog(config.url)}', pollInterval=${JSON.stringify(config.pollInterval)}s, requestTimeout=${JSON.stringify(config.requestTimeout)}s)`,
       );
 
       // Straight after the translations are loaded: an existing installation must pick
@@ -308,7 +364,10 @@ export class BeszelAdapter extends utils.Adapter {
       }
       const timeoutMs = coerceTimeoutMs(config.requestTimeout);
       this.log.debug(`timeoutMs: raw=${JSON.stringify(config.requestTimeout)} resolved=${timeoutMs}ms`);
-      this.client = this.makeClient(config.url, config.username, config.password, timeoutMs);
+      // The validated, normalised form — a pasted trailing space passed the check but
+      // broke every request when the raw field went to the client.
+      this.client = this.makeClient(normalizeHubUrl(config.url), config.username, config.password, timeoutMs);
+      this.pollIntervalMs = coercePollInterval(config.pollInterval) * 1000;
 
       // F3: the system devices come from the startup snapshot, and both the retired-state
       // sweep and the metric cleanup reuse that one list.
@@ -352,6 +411,9 @@ export class BeszelAdapter extends utils.Adapter {
   private onUnload(callback: () => void): void {
     try {
       this.unloaded = true;
+      // A system update still running in the parallel fan-out must not write
+      // `info.online = true` after the offline markers below.
+      this.stateManager?.stop();
       if (this.pollTimer) {
         this.clearInterval(this.pollTimer);
         this.pollTimer = undefined;
@@ -441,13 +503,8 @@ export class BeszelAdapter extends utils.Adapter {
       return "UNKNOWN";
     }
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "UNAUTHORIZED") {
-      return "UNAUTHORIZED";
-    }
-    // v0.4.3 (B4'): 403 is a permissions issue — distinct from auth so the
-    // poll-handler can give a useful "check user role" hint.
-    if (code === "FORBIDDEN") {
-      return "FORBIDDEN";
+    if (typeof code === "string" && TLS_ERROR_CODES.has(code)) {
+      return "TLS_ERROR";
     }
     // v0.4.3 (B3): 429 surfaces if the in-client retry also got rate-limited.
     if (code === "RATE_LIMITED") {
@@ -505,7 +562,7 @@ export class BeszelAdapter extends utils.Adapter {
         return null;
       }
       const code = this.classifyError(err);
-      const msg = `Container fetch failed (non-fatal, ${code}) — other metrics still update, existing container states are kept. Check the configured user's permission for the containers collection.`;
+      const msg = `Container fetch failed (non-fatal, ${code}) — other metrics still update, container datapoints keep their last values`;
       if (this.containersUnavailable) {
         this.log.debug(msg);
       } else {
@@ -599,24 +656,50 @@ export class BeszelAdapter extends utils.Adapter {
     // v0.4.4 (E1): poll-entry anchor with last-error-context + system count.
     this.log.debug(`poll: starting (lastErrorCode='${this.lastErrorCode}', lastSystemCount=${this.lastSystemCount})`);
 
+    if (Date.now() < this.authRetryAt) {
+      // The login keeps failing: wait for the back-off instead of sending the password
+      // again. The offline markers were written when the failure happened.
+      this.log.debug(`poll: login back-off, next attempt in ${this.authRetryAt - Date.now()}ms`);
+      return;
+    }
+
     this.isPolling = true;
     try {
       const config = this.config as unknown as AdapterConfig;
 
-      // v0.4.3 (M3): all three API calls in parallel. With B1's auth-mutex
-      // they share a single auth round-trip if the token is missing.
-      // Earlier `getLatestStats` waited for `getSystems` to finish even
-      // though the API endpoint doesn't actually need the system IDs.
-      const [systems, containersResult, statsMap] = await Promise.all([
-        this.client.getSystems(),
-        this.fetchContainersSafe(config),
-        this.client.getLatestStats(),
-      ]);
+      let [systems, containersResult, statsMap] = await this.fetchCore(config);
       if (this.unloaded) {
         // The host stopped us while the requests were in flight: onUnload has
         // already written the final states and reported "done" — nothing from
         // this run may land on top of that.
         return;
+      }
+      if (
+        systems.length === 0 &&
+        !this.emptyListRetried &&
+        (this.lastSystemCount > 0 || this.stateManager.knownSystemIds().length > 0)
+      ) {
+        // A dead token (password changed, account deleted, token secret reset, database
+        // restored) reads as an empty list, not as a 401 — log in afresh once and ask again.
+        this.emptyListRetried = true;
+        this.log.debug("poll: the Hub returned no systems although some are known — logging in again once");
+        this.client.invalidateToken();
+        [systems, containersResult, statsMap] = await this.fetchCore(config);
+        if (this.unloaded) {
+          return;
+        }
+      }
+      if (systems.length > 0) {
+        this.emptyListRetried = false;
+        this.emptyListNoticed = false;
+      } else if (!this.emptyListNoticed) {
+        // Logged in, and still nothing: the account is assigned to no system (and the Hub
+        // does not share all systems). The tree stays as it is — an empty answer never
+        // deletes devices (v0.13.0) — but the user learns why nothing updates.
+        this.emptyListNoticed = true;
+        this.log.info(
+          "The Hub returns no systems for this account — is the user assigned to the systems on the Hub (or SHARE_ALL_SYSTEMS set)? Existing datapoints keep their last values.",
+        );
       }
 
       // Update connection state (L1: setStateChanged → no event when unchanged).
@@ -643,6 +726,10 @@ export class BeszelAdapter extends utils.Adapter {
       // than a side effect of the fetch). `null` = never read in this process: the
       // `info.*` states then freeze and the device icon is left as it is.
       const details = await this.fetchSystemDetails(systems);
+      if (this.unloaded) {
+        // cancelAll() aborted the details request; the next requests must not go out.
+        return;
+      }
       const detailsAvailable = details !== null;
       for (const system of systems) {
         const d = details?.get(system.id);
@@ -693,6 +780,11 @@ export class BeszelAdapter extends utils.Adapter {
             this.failedSystems.delete(system.id);
           } catch (err) {
             const msg = `Failed to update system '${sanitizeForLog(system.name)}': ${errText(err)}`;
+            if (this.unloaded) {
+              // The databases close under a shutdown — that is not the system's fault.
+              this.log.debug(msg);
+              return;
+            }
             if (this.failedSystems.has(system.id)) {
               this.log.debug(msg);
             } else {
@@ -739,10 +831,16 @@ export class BeszelAdapter extends utils.Adapter {
 
       this.lastSystemCount = systems.length;
       this.authFailCount = 0;
+      this.authRetryAt = 0;
 
-      // Clear error state on success
+      // Clear error state on success. A Hub that was merely unreachable is a state
+      // (info.connection carries it), so its return is not news either.
       if (this.lastErrorCode) {
-        this.log.info("Connection restored");
+        if (this.lastErrorCode === "TRANSIENT") {
+          this.log.debug("Connection restored");
+        } else {
+          this.log.info("Connection restored");
+        }
         this.lastErrorCode = "";
       }
       this.log.debug(`Polled ${systems.length} systems successfully`);
@@ -751,6 +849,18 @@ export class BeszelAdapter extends utils.Adapter {
     } finally {
       this.isPolling = false;
     }
+  }
+
+  /**
+   * The three reads every poll needs, in parallel. With B1's auth mutex they share one
+   * login when the token is missing.
+   *
+   * @param config Adapter configuration.
+   */
+  private fetchCore(
+    config: AdapterConfig,
+  ): Promise<[BeszelSystem[], BeszelContainer[] | null, Map<string, SystemStats>]> {
+    return Promise.all([this.client!.getSystems(), this.fetchContainersSafe(config), this.client!.getLatestStats()]);
   }
 
   /**
@@ -856,7 +966,14 @@ export class BeszelAdapter extends utils.Adapter {
    */
   private noteExtrasFailure(key: "zfs" | "smart" | "services", collection: string, err: unknown): void {
     const code = this.classifyError(err);
-    if (code === "NOT_FOUND" || code === "FORBIDDEN") {
+    if (code === "TRUNCATED" && !this.truncatedWarned.has(key)) {
+      this.truncatedWarned.add(key);
+      this.log.warn(
+        `The Hub holds more ${collection} records than the adapter reads in one go — those datapoints keep their last values`,
+      );
+      return;
+    }
+    if (isDefinitiveFailure(code)) {
       this.extrasUnsupported.add(key);
       this.log.info(
         `The Hub does not serve the ${collection} collection (${code}) — not asked again until the adapter restarts`,
@@ -904,11 +1021,12 @@ export class BeszelAdapter extends utils.Adapter {
         this.systemDetails = await this.client!.getSystemDetails();
         this.log.debug(`system_details: fetched ${this.systemDetails.size} record(s)`);
       } catch (err) {
-        // F3: only a DEFINITIVE failure (e.g. a 404 on an older Hub without the
-        // collection) marks the systems attempted so we stop refetching. A
-        // transient NETWORK/TIMEOUT failure must be retried next poll instead.
+        // F3: only a DEFINITIVE failure (a 404 on an older Hub without the collection,
+        // a 403) marks the systems attempted so we stop refetching — the same rule as
+        // the extra collections. Anything else (network, timeout, a 502 from a proxy, an
+        // unexpected body) is retried next poll.
         const code = this.classifyError(err);
-        markAttempted = code !== "NETWORK" && code !== "TIMEOUT";
+        markAttempted = isDefinitiveFailure(code);
         this.log.debug(
           `system_details fetch failed (non-fatal, ${code}, willRetry=${!markAttempted}): ${errText(err)}`,
         );
@@ -920,6 +1038,26 @@ export class BeszelAdapter extends utils.Adapter {
       }
     }
     return this.systemDetails;
+  }
+
+  /**
+   * The login failure in the user's terms — the likely cause, in one clause.
+   *
+   * @param code The classified error.
+   */
+  private static loginHint(code: string): string {
+    switch (code) {
+      case "AUTH_FAILED":
+        return "wrong e-mail or password? (Beszel logs in with the e-mail address)";
+      case "MFA_REQUIRED":
+        return "the account needs a one-time password (MFA); use an account without it";
+      case "PASSWORD_AUTH_DISABLED":
+        return "password login is switched off on the Hub";
+      case "AUTH_FORBIDDEN":
+        return "the Hub refused this account (not verified?)";
+      default:
+        return "the Hub rejected the login";
+    }
   }
 
   /**
@@ -940,34 +1078,49 @@ export class BeszelAdapter extends utils.Adapter {
     }
     const errMsg = errText(err);
     const errorCode = this.classifyError(err);
-    const isRepeat = errorCode === this.lastErrorCode;
-    this.lastErrorCode = errorCode;
+    // An unreachable Hub is a STATE (info.connection carries it): NETWORK and TIMEOUT share
+    // one dedup key and stay at debug level, first time and every time.
+    const transient = errorCode === "NETWORK" || errorCode === "TIMEOUT";
+    const dedupKey = transient ? "TRANSIENT" : errorCode;
+    const isRepeat = dedupKey === this.lastErrorCode;
+    this.lastErrorCode = dedupKey;
 
-    if (errorCode === "UNAUTHORIZED") {
+    if (AUTH_ERROR_CODES.has(errorCode)) {
       this.client?.invalidateToken();
       this.authFailCount++;
       if (this.authFailCount <= 3) {
-        this.log.error("Authentication failed — check username and password");
+        this.log.error(`Login to the Beszel Hub failed — ${BeszelAdapter.loginHint(errorCode)}`);
+        this.log.debug(`Login failed: ${errMsg}`);
       } else if (this.authFailCount === 4) {
-        this.log.error("Authentication keeps failing — suppressing further auth errors");
+        this.log.error("Login keeps failing — suppressing further login errors and trying less often");
       } else {
-        this.log.debug(`Auth still failing (attempt ${this.authFailCount})`);
+        this.log.debug(`Login still failing (attempt ${this.authFailCount}): ${errMsg}`);
       }
+      if (this.authFailCount >= 3) {
+        const waitMs = Math.min(this.pollIntervalMs * 2 ** (this.authFailCount - 3), AUTH_BACKOFF_MAX_MS);
+        this.authRetryAt = Date.now() + waitMs;
+      }
+    } else if (transient) {
+      this.log.debug(`Beszel Hub not reachable (${errorCode}): ${errMsg}`);
     } else if (isRepeat) {
       this.log.debug(`Poll failed (ongoing): ${errMsg}`);
     } else if (errorCode === "FORBIDDEN") {
-      // v0.4.3 (B4'): permission issue — reauth wouldn't help. Hint the user.
-      this.log.error(
-        `Beszel Hub returned 403 Forbidden — the configured user has no permission for these collections. Check the user role on the Hub admin UI.`,
-      );
+      this.log.warn("The Beszel Hub refused a data request (403)");
+      this.log.debug(`Poll failed: ${errMsg}`);
     } else if (errorCode === "RATE_LIMITED") {
       this.log.warn("Beszel Hub rate-limited the request — slowing down. Consider increasing the poll interval.");
-    } else if (errorCode === "NETWORK") {
-      this.log.warn("Cannot reach Beszel Hub — will keep retrying");
+    } else if (errorCode === "TLS_ERROR") {
+      this.log.warn("Cannot connect to the Beszel Hub over HTTPS — its certificate is not trusted (self-signed?)");
+      this.log.debug(`Poll failed: ${errMsg}`);
+    } else if (errorCode === "INVALID_RESPONSE") {
+      this.log.warn("The answer is not the Beszel Hub API — does the URL point at the Hub?");
+      this.log.debug(`Poll failed: ${errMsg}`);
+    } else if (errorCode === "TRUNCATED") {
+      this.log.warn("The Hub holds more records than the adapter reads in one go — no update this time");
+      this.log.debug(`Poll failed: ${errMsg}`);
     } else {
       // SEC-1: the dynamic message can carry a Hub response snippet / URL —
-      // keep it at debug; the error-level line (captured by opt-in Sentry)
-      // carries only the error class, no Hub-supplied content.
+      // keep it at debug; the error-level line carries only the error class.
       this.log.error(`Poll failed (${errorCode})`);
       this.log.debug(`Poll failed: ${errMsg}`);
     }

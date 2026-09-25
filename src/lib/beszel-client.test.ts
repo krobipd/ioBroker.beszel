@@ -1,5 +1,5 @@
 import * as http from "node:http";
-import { BeszelClient, hostnameForRequest, portForRequest } from "./beszel-client";
+import { BeszelClient, hostnameForRequest, portForRequest, tokenExpiryMs } from "./beszel-client";
 
 // ---------------------------------------------------------------------------
 // Test HTTP server — simulates Beszel PocketBase API
@@ -124,9 +124,10 @@ function defaultAuthHandler(body: string): MockReply {
       }),
     };
   }
+  // PocketBase's answer to wrong credentials (measured on a 0.20.0 Hub): 400, not 401.
   return {
-    status: 401,
-    body: JSON.stringify({ message: "Invalid credentials" }),
+    status: 400,
+    body: JSON.stringify({ data: {}, message: "Failed to authenticate.", status: 400 }),
   };
 }
 
@@ -364,9 +365,15 @@ describe("BeszelClient", () => {
       // URL.hostname keeps the brackets; handed to Node's http client verbatim, the
       // resolver looks up the literal "[::1]" and fails. A real server on the IPv6
       // loopback proves the connect, not just the helper.
-      const server = http.createServer((_req, res) => {
+      const server = http.createServer((req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ token: "v6-token" }));
+        res.end(
+          JSON.stringify(
+            (req.url ?? "").includes("auth-with-password")
+              ? { token: "v6-token" }
+              : { page: 1, perPage: 1, totalItems: 3, totalPages: 3, items: [] },
+          ),
+        );
       });
       await new Promise<void>((resolve, reject) => {
         server.once("error", reject);
@@ -376,7 +383,7 @@ describe("BeszelClient", () => {
       try {
         const client = new BeszelClient(`http://[::1]:${port}`, "admin", "secret");
         const result = await client.checkConnection();
-        expect(result, "the IPv6 literal must be usable as a Hub address").to.deep.equal({ success: true });
+        expect(result, "the IPv6 literal must be usable as a Hub address").to.deep.equal({ success: true, systems: 3 });
       } finally {
         await new Promise<void>(resolve => server.close(() => resolve()));
       }
@@ -451,8 +458,8 @@ describe("BeszelClient", () => {
         expect.fail("Should have thrown");
       } catch (err) {
         expect(err).to.be.instanceOf(Error);
-        expect((err as Error).message).to.include("401");
-        expect((err as NodeJS.ErrnoException).code).to.equal("UNAUTHORIZED");
+        expect((err as Error).message).to.include("Failed to authenticate");
+        expect((err as NodeJS.ErrnoException).code).to.equal("AUTH_FAILED");
       }
     });
   });
@@ -489,7 +496,23 @@ describe("BeszelClient", () => {
 
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
       const result = await client.checkConnection();
-      expect(result).to.deep.equal({ success: true });
+      // A login alone proves nothing — the test also asks how many systems the account sees.
+      expect(result).to.deep.equal({ success: true, systems: 2 });
+      expect(mock.requestLog.some(r => r.path.includes("/systems/records") && r.path.includes("perPage=1"))).to.equal(
+        true,
+      );
+    });
+
+    it("reports zero systems for an account that is assigned to none", async () => {
+      mock = createMockServer({
+        systemsHandler: () => ({
+          status: 200,
+          body: JSON.stringify({ page: 1, perPage: 1, totalItems: 0, totalPages: 0, items: [] }),
+        }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      expect(await client.checkConnection()).to.deep.equal({ success: true, systems: 0 });
     });
 
     it("should return failure on invalid credentials", async () => {
@@ -499,7 +522,7 @@ describe("BeszelClient", () => {
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "wrong", "wrong");
       const result = await client.checkConnection();
       expect(result.success).to.be.false;
-      expect(result.success === false && result.reason).to.include("401");
+      expect(result.success === false && result.reason).to.include("Failed to authenticate");
     });
 
     it("should return failure on connection error", async () => {
@@ -961,7 +984,7 @@ describe("BeszelClient", () => {
       }
     });
 
-    it("returns empty systems array when items is missing", async () => {
+    it("refuses a body without an items list — it is not a PocketBase list, and not 'no systems'", async () => {
       mock = createMockServer({
         systemsHandler: () => ({
           status: 200,
@@ -971,11 +994,14 @@ describe("BeszelClient", () => {
       const port = await mock.start();
 
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
-      const systems = await client.getSystems();
-      expect(systems).to.deep.equal([]);
+      const err = await client.getSystems().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as NodeJS.ErrnoException).code).to.equal("INVALID_RESPONSE");
     });
 
-    it("returns empty systems array when items is not an array", async () => {
+    it("refuses a body whose items are not an array", async () => {
       mock = createMockServer({
         systemsHandler: () => ({
           status: 200,
@@ -985,8 +1011,24 @@ describe("BeszelClient", () => {
       const port = await mock.start();
 
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
-      const systems = await client.getSystems();
-      expect(systems).to.deep.equal([]);
+      const err = await client.getSystems().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as NodeJS.ErrnoException).code).to.equal("INVALID_RESPONSE");
+    });
+
+    it("tags an HTML answer (proxy page, SPA fallback) as INVALID_RESPONSE", async () => {
+      mock = createMockServer({
+        systemsHandler: () => ({ status: 200, body: "<!doctype html><html></html>" }),
+      });
+      const port = await mock.start();
+      const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
+      const err = await client.getSystems().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as NodeJS.ErrnoException).code).to.equal("INVALID_RESPONSE");
     });
 
     it("skips system records without id or name", async () => {
@@ -1150,7 +1192,7 @@ describe("BeszelClient", () => {
       expect(containers[0].health).to.equal(0);
     });
 
-    it("returns empty list when stats response is a JSON array instead of object", async () => {
+    it("refuses a stats response that is a JSON array instead of a list object", async () => {
       mock = createMockServer({
         statsHandler: () => ({
           status: 200,
@@ -1160,8 +1202,11 @@ describe("BeszelClient", () => {
       const port = await mock.start();
 
       const client = new BeszelClient(`http://127.0.0.1:${port}`, "admin", "secret");
-      const stats = await client.getLatestStats();
-      expect(stats.size).to.equal(0);
+      const err = await client.getLatestStats().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as NodeJS.ErrnoException).code).to.equal("INVALID_RESPONSE");
     });
   });
 
@@ -1478,6 +1523,7 @@ describe("BeszelClient", () => {
         await client.getSystems();
         expect.fail("Should have thrown");
       } catch (err) {
+        // A 401 without an `mfaId` stays a plain UNAUTHORIZED.
         expect((err as NodeJS.ErrnoException).code).to.equal("UNAUTHORIZED");
       }
       // The auth POST (token === null) must not be retried by the F6 path.
@@ -1686,9 +1732,10 @@ describe("BeszelClient", () => {
   });
 
   describe("pagination cap (MAX_PAGES)", () => {
-    it("stops at 50 pages and warns that the data is truncated", async () => {
-      // A Hub reporting 10 000 pages must not lock the poll into an endless
-      // walk. Both the cap and the warn were unguarded (audit 2026-08-22).
+    it("stops at 50 pages and refuses the partial list (TRUNCATED) instead of handing it out", async () => {
+      // A Hub reporting 10 000 pages must not lock the poll into an endless walk — and a
+      // partial list must not leave as if complete: every record behind the cap would
+      // read as "gone" and be pruned.
       let pageRequests = 0;
       mock = createMockServer({
         systemsHandler: () => {
@@ -1711,10 +1758,13 @@ describe("BeszelClient", () => {
         debug: () => {},
         warn: msg => warns.push(msg),
       });
-      const systems = await client.getSystems();
+      const err = await client.getSystems().then(
+        () => null,
+        (e: unknown) => e,
+      );
       expect(pageRequests).to.equal(50);
-      expect(systems).to.have.lengthOf(50);
-      expect(warns.some(w => w.includes("MAX_PAGES=50") && w.includes("may be incomplete"))).to.equal(true);
+      expect((err as NodeJS.ErrnoException).code).to.equal("TRUNCATED");
+      expect(warns, "the adapter logs it, once — the client stays quiet").to.deep.equal([]);
     }, 10000);
   });
 
@@ -1965,5 +2015,259 @@ describe("pagination capacity and cost", () => {
     } finally {
       await new Promise<void>(resolve => server.close(() => resolve()));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.19.0 — what a real PocketBase Hub does (measured on 0.20.0), and the
+// client's answers to it.
+// ---------------------------------------------------------------------------
+
+/**
+ * A PocketBase-like JWT with the given `exp`. The signature is never checked.
+ *
+ * @param expSec Expiry in epoch seconds.
+ */
+function jwtWithExp(expSec: number): string {
+  const b64 = (o: object): string => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ exp: expSec, type: "auth" })}.sig`;
+}
+
+interface Hub {
+  port: number;
+  log: Array<{ path: string; auth: string | undefined }>;
+  close: () => Promise<void>;
+}
+
+/**
+ * A small Hub: `route(path, authHeader)` answers every request.
+ *
+ * @param route The request handler.
+ */
+async function startHub(
+  route: (path: string, auth: string | undefined) => { status: number; body: string; trickleMs?: number },
+): Promise<Hub> {
+  const log: Hub["log"] = [];
+  const server = http.createServer((req, res) => {
+    const path = req.url ?? "";
+    const auth = req.headers.authorization;
+    log.push({ path, auth });
+    req.resume();
+    req.on("end", () => {
+      const r = route(path, auth);
+      res.writeHead(r.status, { "Content-Type": "application/json" });
+      if (r.trickleMs) {
+        // One byte at a time — never silent long enough for the socket timeout.
+        let i = 0;
+        const timer = setInterval(() => {
+          if (i >= r.body.length || res.destroyed) {
+            clearInterval(timer);
+            res.end();
+            return;
+          }
+          res.write(r.body[i++]);
+        }, r.trickleMs);
+        res.on("close", () => clearInterval(timer));
+        return;
+      }
+      res.end(r.body);
+    });
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", () => resolve()));
+  return {
+    port: (server.address() as { port: number }).port,
+    log,
+    close: () => {
+      server.closeAllConnections();
+      return new Promise<void>(resolve => server.close(() => resolve()));
+    },
+  };
+}
+
+const list = (items: unknown[], extra: Record<string, unknown> = {}): string =>
+  JSON.stringify({ page: 1, perPage: 1000, totalItems: items.length, totalPages: 1, items, ...extra });
+
+describe("BeszelClient — PocketBase behaviour (v0.19.0)", () => {
+  let hub: Hub | undefined;
+  afterEach(async () => {
+    await hub?.close();
+    hub = undefined;
+  });
+
+  it("reads tokenExpiryMs from a JWT and refuses anything else", () => {
+    expect(tokenExpiryMs(jwtWithExp(1_700_000_000))).to.equal(1_700_000_000_000);
+    expect(tokenExpiryMs("not-a-jwt")).to.equal(null);
+    expect(tokenExpiryMs("a.b.c")).to.equal(null);
+    const noExp = `${Buffer.from("{}").toString("base64url")}.${Buffer.from('{"id":"x"}').toString("base64url")}.s`;
+    expect(tokenExpiryMs(noExp)).to.equal(null);
+  });
+
+  it("renews the token five minutes before its own exp — not only after 23 h", async () => {
+    let now = 1_000_000_000_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      let logins = 0;
+      hub = await startHub(path => {
+        if (path.includes("auth-with-password")) {
+          logins++;
+          // A token that lives one hour.
+          return { status: 200, body: JSON.stringify({ token: jwtWithExp(now / 1000 + 3600) }) };
+        }
+        return { status: 200, body: list([]) };
+      });
+      const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+      await client.getSystems();
+      now += 54 * 60 * 1000; // 54 min: still fine
+      await client.getSystems();
+      expect(logins).to.equal(1);
+      now += 2 * 60 * 1000; // 56 min: inside the 5-minute margin
+      await client.getSystems();
+      expect(logins).to.equal(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("still renews after 23 h when the token carries no readable exp", async () => {
+    let now = 1_000_000_000_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      let logins = 0;
+      hub = await startHub(path => {
+        if (path.includes("auth-with-password")) {
+          logins++;
+          return { status: 200, body: JSON.stringify({ token: "opaque-token" }) };
+        }
+        return { status: 200, body: list([]) };
+      });
+      const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+      await client.getSystems();
+      now += 22 * 60 * 60 * 1000;
+      await client.getSystems();
+      expect(logins).to.equal(1);
+      now += 2 * 60 * 60 * 1000;
+      await client.getSystems();
+      expect(logins).to.equal(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  const loginCases: Array<[string, number, object, string]> = [
+    ["wrong credentials (400)", 400, { data: {}, message: "Failed to authenticate.", status: 400 }, "AUTH_FAILED"],
+    ["one-time-password login (401 + mfaId)", 401, { mfaId: "50wnxkwut7ggnxh" }, "MFA_REQUIRED"],
+    [
+      "password login switched off (403)",
+      403,
+      { data: {}, message: "The collection is not configured to allow password authentication.", status: 403 },
+      "PASSWORD_AUTH_DISABLED",
+    ],
+    [
+      "an account the auth rule refuses (403)",
+      403,
+      {
+        data: {},
+        message: "The request doesn't satisfy the collection requirements to authenticate.",
+        status: 403,
+      },
+      "AUTH_FORBIDDEN",
+    ],
+  ];
+  for (const [label, status, body, code] of loginCases) {
+    it(`classifies ${label} as ${code}`, async () => {
+      hub = await startHub(path =>
+        path.includes("auth-with-password") ? { status, body: JSON.stringify(body) } : { status: 200, body: list([]) },
+      );
+      const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+      const err = await client.getSystems().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as NodeJS.ErrnoException).code).to.equal(code);
+    });
+  }
+
+  it("asks for the newest 1m records first and every other list in pages of 1000", async () => {
+    hub = await startHub(path =>
+      path.includes("auth-with-password")
+        ? { status: 200, body: JSON.stringify({ token: "t" }) }
+        : { status: 200, body: list([]) },
+    );
+    const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+    await client.getLatestStats();
+    await client.getSystems();
+    await client.getSystemDetails();
+    const stats = hub.log.find(r => r.path.includes("/system_stats/records"))?.path ?? "";
+    // Without the filter the walk reads 10m/20m/120m aggregates; without the descending
+    // sort it reads the OLDEST record of the hour and the early exit keeps it there.
+    expect(stats).to.include("sort=-updated");
+    expect(decodeURIComponent(stats)).to.include("filter=type='1m'");
+    expect(stats).to.include("perPage=200");
+    expect(hub.log.find(r => r.path.includes("/systems/records"))?.path).to.include("perPage=1000");
+    expect(hub.log.find(r => r.path.includes("/system_details/records"))?.path).to.include("sort=system");
+  });
+
+  it("a 401 retry always carries a token — never a guest request, which PocketBase answers with an empty list", async () => {
+    let logins = 0;
+    let firstSystems = true;
+    hub = await startHub((path, auth) => {
+      if (path.includes("auth-with-password")) {
+        logins++;
+        return { status: 200, body: JSON.stringify({ token: `tok-${logins}` }) };
+      }
+      if (path.includes("/systems/records") && firstSystems) {
+        firstSystems = false;
+        return { status: 401, body: JSON.stringify({ message: "expired" }) };
+      }
+      if (!auth) {
+        return { status: 200, body: list([]) }; // what a guest gets
+      }
+      return { status: 200, body: list([{ id: "s1", name: "S", status: "up", host: "h", info: {} }]) };
+    });
+    const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+    const [systems] = await Promise.all([client.getSystems(), client.getContainers()]);
+    expect(systems).to.have.lengthOf(1);
+    const dataRequests = hub.log.filter(r => !r.path.includes("auth-with-password"));
+    expect(
+      dataRequests.every(r => typeof r.auth === "string" && r.auth.length > 0),
+      "every data request carries a token",
+    ).to.equal(true);
+  });
+
+  it("refuses every request after cancelAll — nothing goes out once the adapter unloads", async () => {
+    hub = await startHub(() => ({ status: 200, body: JSON.stringify({ token: "t" }) }));
+    const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw");
+    client.cancelAll();
+    const err = await client.getSystems().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as NodeJS.ErrnoException).code).to.equal("ABORTED");
+    expect(hub.log).to.have.lengthOf(0);
+  });
+
+  it("gives a trickling peer the same budget as a silent one (whole-request deadline)", async () => {
+    hub = await startHub(path =>
+      path.includes("auth-with-password")
+        ? { status: 200, body: JSON.stringify({ token: "t" }) }
+        : { status: 200, body: list([]).padEnd(400, " "), trickleMs: 100 },
+    );
+    const client = new BeszelClient(`http://127.0.0.1:${hub.port}`, "a@b.c", "pw", 1000);
+    const started = Date.now();
+    const err = await client.getSystems().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as NodeJS.ErrnoException).code).to.equal("ETIMEDOUT");
+    expect(Date.now() - started, "ends near the budget, not after the whole trickle").to.be.lessThan(3000);
+  }, 10000);
+
+  it("tags a URL that cannot be built as INVALID_URL", async () => {
+    const client = new BeszelClient("http://exa mple", "a@b.c", "pw");
+    const err = await client.getSystems().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as NodeJS.ErrnoException).code).to.equal("INVALID_URL");
   });
 });

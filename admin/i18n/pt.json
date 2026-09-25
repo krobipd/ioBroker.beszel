@@ -271,8 +271,10 @@
   "help_metric_smart": "Veredicto SMART global, temperatura, capacidade, horas ligado e ciclos de energia por disco. Requer smartctl no anfitrião; lido no máximo a cada 15 minutos.",
   "metric_servicesDetails": "Detalhes dos serviços",
   "help_metric_servicesDetails": "Estado, subestado, CPU e memória por unidade systemd — um canal por unidade. Num anfitrião ocupado podem ser muitos pontos de dados.",
-  "msgConnected": "Ligação estabelecida com sucesso",
+  "msgConnected": "Conectado — %s sistema(s) visível(eis) para esta conta",
   "msgConnectionFailed": "Falha na ligação: %s",
+  "msgConnectedNoSystems": "Sessão iniciada, mas esta conta não vê nenhum sistema — atribua o utilizador aos sistemas no Hub (ou execute o Hub com SHARE_ALL_SYSTEMS=true)",
+  "msgUrlInvalid": "URL do Hub inválido: %s",
   "msgCredentialsRequired": "URL, nome de utilizador e palavra-passe são obrigatórios",
   "msgAdminOnly": "O teste de ligação só está disponível a partir da interface de administração",
   "msgUnknownCommand": "Comando desconhecido"

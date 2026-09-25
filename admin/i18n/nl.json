@@ -271,8 +271,10 @@
   "help_metric_smart": "Algemeen SMART-oordeel, temperatuur, capaciteit, bedrijfsuren en inschakelcycli per schijf. Vereist smartctl op de host; hooguit elke 15 minuten gelezen.",
   "metric_servicesDetails": "Dienstdetails",
   "help_metric_servicesDetails": "Status, substatus, CPU en geheugen per systemd-unit — één kanaal per unit. Op een drukke host kunnen dat veel datapunten zijn.",
-  "msgConnected": "Verbinding geslaagd",
+  "msgConnected": "Verbonden — %s systeem/systemen zichtbaar voor dit account",
   "msgConnectionFailed": "Verbinding mislukt: %s",
+  "msgConnectedNoSystems": "Ingelogd, maar dit account ziet geen systemen — wijs de gebruiker in de hub toe aan de systemen (of draai de hub met SHARE_ALL_SYSTEMS=true)",
+  "msgUrlInvalid": "Hub-URL is ongeldig: %s",
   "msgCredentialsRequired": "URL, gebruikersnaam en wachtwoord zijn vereist",
   "msgAdminOnly": "De verbindingstest is alleen beschikbaar vanuit de beheerinterface",
   "msgUnknownCommand": "Onbekende opdracht"

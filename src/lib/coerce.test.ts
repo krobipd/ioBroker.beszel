@@ -15,8 +15,10 @@ import {
   coerceSystemStats,
   coerceSystemStatsRecord,
   coerceTimeoutMs,
+  normalizeHubUrl,
   sanitizeForLog,
   sanitizeDisplayName,
+  urlForLog,
   shouldFetchSystemDetails,
   validateHubUrl,
   coerceSmartDevice,
@@ -863,6 +865,55 @@ describe("coerce", () => {
     it("returns empty list when items key is missing", () => {
       const result = coercePocketBaseList({ page: 1 }, coerceSystem);
       expect(result.items).to.deep.equal([]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // v0.19.0 — the URL the client uses, and the URL a log line may show
+  // -----------------------------------------------------------------------
+
+  describe("normalizeHubUrl / urlForLog / the stricter validateHubUrl", () => {
+    it("trims and strips trailing slashes — the form validator and client share", () => {
+      expect(normalizeHubUrl(" http://hub:8090/ ")).to.equal("http://hub:8090");
+      expect(normalizeHubUrl("http://hub:8090//")).to.equal("http://hub:8090");
+      expect(normalizeHubUrl(42)).to.equal("");
+    });
+
+    it("accepts a pasted trailing space (it is trimmed for the client too)", () => {
+      expect(validateHubUrl("http://hub:8090 ")).to.equal(null);
+    });
+
+    it("refuses a query, a fragment and credentials in the URL, naming the reason", () => {
+      expect(validateHubUrl("http://hub:8090/?x=1")).to.include("query");
+      expect(validateHubUrl("http://hub:8090/?")).to.include("query");
+      expect(validateHubUrl("http://hub:8090/#frag")).to.include("fragment");
+      expect(validateHubUrl("http://user:pw@hub:8090")).to.include("user name or password");
+    });
+
+    it("keeps a path prefix behind a reverse proxy", () => {
+      expect(validateHubUrl("https://proxy.lan/beszel/")).to.equal(null);
+    });
+
+    it("blanks credentials for the log and keeps everything else", () => {
+      expect(urlForLog("http://user:secret@hub:8090/x")).to.equal("http://hub:8090/x");
+      expect(urlForLog("http://hub:8090")).to.equal("http://hub:8090/");
+      expect(urlForLog("not a url\nwith a break")).to.equal("not a url with a break");
+      expect(urlForLog(undefined)).to.equal("undefined");
+    });
+  });
+
+  describe("coercePocketBaseList — valid + totalItems (v0.19.0)", () => {
+    it("marks a body without an items array as not a list", () => {
+      expect(coercePocketBaseList({ page: 1 }, coerceSystem).valid).to.equal(false);
+      expect(coercePocketBaseList({ items: "x" }, coerceSystem).valid).to.equal(false);
+      expect(coercePocketBaseList([1, 2], coerceSystem).valid).to.equal(false);
+      expect(coercePocketBaseList(null, coerceSystem).valid).to.equal(false);
+    });
+
+    it("reports the Hub's totalItems for a real list", () => {
+      const l = coercePocketBaseList({ items: [], totalItems: 7, totalPages: 1 }, coerceSystem);
+      expect(l.valid).to.equal(true);
+      expect(l.totalItems).to.equal(7);
     });
   });
 

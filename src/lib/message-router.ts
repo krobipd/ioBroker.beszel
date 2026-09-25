@@ -1,5 +1,5 @@
 import { BeszelClient, type BeszelClientLogger } from "./beszel-client";
-import { coerceObject, coerceTimeoutMs, errText } from "./coerce";
+import { coerceObject, coerceTimeoutMs, errText, normalizeHubUrl, validateHubUrl } from "./coerce";
 import { tText } from "./i18n";
 import type { AdapterConfig } from "./types";
 
@@ -111,7 +111,7 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         // fields fall through to the "missing url/username/password" branch.
         const msg = coerceObject(obj.message) ?? {};
         const config = msg as Partial<AdapterConfig>;
-        const url = typeof config.url === "string" ? config.url : "";
+        const url = normalizeHubUrl(config.url);
         const username = typeof config.username === "string" ? config.username : "";
         const password = typeof config.password === "string" ? config.password : "";
 
@@ -119,6 +119,15 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
           // v0.4.4 (H2): trace missing-config before sendTo.
           deps.log.debug("checkConnection: missing url/username/password in message");
           deps.sendTo(obj.from, obj.command, { error: tText("msgCredentialsRequired") }, obj.callback);
+          return;
+        }
+
+        // The same URL check the instance runs at start — a URL the adapter would refuse
+        // must not pass the test (a trailing space, a query, credentials in the URL).
+        const urlError = validateHubUrl(url);
+        if (urlError) {
+          deps.log.debug(`checkConnection: invalid URL — ${urlError}`);
+          deps.sendTo(obj.from, obj.command, { error: tText("msgUrlInvalid", urlError) }, obj.callback);
           return;
         }
 
@@ -132,7 +141,9 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
         try {
           const result = await testClient.checkConnection();
           // v0.4.4 (H3): trace checkConnection result.
-          deps.log.debug(`checkConnection: result=${result.success ? "ok" : `fail (${result.reason})`}`);
+          deps.log.debug(
+            `checkConnection: result=${result.success ? `ok (${result.systems} system(s))` : `fail (${result.reason})`}`,
+          );
           // H1: the admin ConfigSendto component reads ONLY response.error/result —
           // never success/message. Map the outcome to that contract so a FAILED test
           // shows the real error instead of a false-positive "Ok" (fleet fix, see
@@ -140,7 +151,13 @@ export async function dispatchMessage(obj: ioBroker.Message, deps: MessageRouter
           deps.sendTo(
             obj.from,
             obj.command,
-            result.success ? { result: tText("msgConnected") } : { error: tText("msgConnectionFailed", result.reason) },
+            !result.success
+              ? { error: tText("msgConnectionFailed", result.reason) }
+              : result.systems > 0
+                ? { result: tText("msgConnected", String(result.systems)) }
+                : // A login that sees nothing is not a working connection: the poll would read
+                  // an empty list forever. Shown as an error so the user notices.
+                  { error: tText("msgConnectedNoSystems") },
             obj.callback,
           );
         } finally {

@@ -271,8 +271,10 @@
   "help_metric_smart": "SMART-Gesamturteil, Temperatur, Kapazität, Betriebsstunden und Einschaltvorgänge je Laufwerk. Braucht smartctl auf dem Host; wird höchstens alle 15 Minuten gelesen.",
   "metric_servicesDetails": "Dienst-Details",
   "help_metric_servicesDetails": "Zustand, Unterzustand, CPU und Speicher je systemd-Unit — ein Kanal pro Unit. Auf einem gut gefüllten Host können das viele Datenpunkte sein.",
-  "msgConnected": "Verbindung erfolgreich",
+  "msgConnected": "Verbunden — %s System(e) für dieses Konto sichtbar",
   "msgConnectionFailed": "Verbindung fehlgeschlagen: %s",
+  "msgConnectedNoSystems": "Angemeldet, aber dieses Konto sieht keine Systeme — den Benutzer im Hub den Systemen zuordnen (oder den Hub mit SHARE_ALL_SYSTEMS=true betreiben)",
+  "msgUrlInvalid": "Hub-URL ist ungültig: %s",
   "msgCredentialsRequired": "URL, Benutzername und Passwort sind erforderlich",
   "msgAdminOnly": "Der Verbindungstest ist nur aus der Admin-Oberfläche möglich",
   "msgUnknownCommand": "Unbekannter Befehl"

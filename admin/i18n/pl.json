@@ -271,8 +271,10 @@
   "help_metric_smart": "Ogólny werdykt SMART, temperatura, pojemność, godziny pracy i cykle zasilania na dysk. Wymaga smartctl na hoście; odczyt najwyżej co 15 minut.",
   "metric_servicesDetails": "Szczegóły usług",
   "help_metric_servicesDetails": "Stan, podstan, CPU i pamięć na jednostkę systemd — jeden kanał na jednostkę. Na obciążonym hoście może to być wiele punktów danych.",
-  "msgConnected": "Połączono pomyślnie",
+  "msgConnected": "Połączono — systemy widoczne dla tego konta: %s",
   "msgConnectionFailed": "Połączenie nie powiodło się: %s",
+  "msgConnectedNoSystems": "Zalogowano, ale to konto nie widzi żadnych systemów — przypisz użytkownika do systemów w hubie (lub uruchom hub z SHARE_ALL_SYSTEMS=true)",
+  "msgUrlInvalid": "Nieprawidłowy adres URL huba: %s",
   "msgCredentialsRequired": "Wymagane są adres URL, nazwa użytkownika i hasło",
   "msgAdminOnly": "Test połączenia jest dostępny tylko z interfejsu administracyjnego",
   "msgUnknownCommand": "Nieznane polecenie"

@@ -35,7 +35,9 @@ interface TestHarness {
  *
  * @param checkConnectionResult Canned answer of the connection check, omitted = success
  */
-function makeHarness(checkConnectionResult?: { success: true } | { success: false; reason: string }): TestHarness {
+function makeHarness(
+  checkConnectionResult?: { success: true; systems: number } | { success: false; reason: string },
+): TestHarness {
   const sends: SentMessage[] = [];
   const logs: { level: "debug" | "warn"; msg: string }[] = [];
   const createdClients: { url: string; username: string; password: string; timeoutMs: number }[] = [];
@@ -53,7 +55,7 @@ function makeHarness(checkConnectionResult?: { success: true } | { success: fals
     createTestClient: (url, username, password, timeoutMs) => {
       createdClients.push({ url, username, password, timeoutMs });
       return {
-        checkConnection: () => Promise.resolve(checkConnectionResult ?? { success: true }),
+        checkConnection: () => Promise.resolve(checkConnectionResult ?? { success: true, systems: 2 }),
       } as unknown as BeszelClient;
     },
     onTestClientCreated: client => registered.push(client),
@@ -135,7 +137,7 @@ describe("dispatchMessage", () => {
     });
 
     it("complete config → creates testClient with creds and forwards the result", async () => {
-      const h = makeHarness({ success: true });
+      const h = makeHarness({ success: true, systems: 2 });
       await dispatchMessage(
         buildMessage({
           command: "checkConnection",
@@ -148,11 +150,42 @@ describe("dispatchMessage", () => {
       expect(h.sends).to.have.lengthOf(1);
       // H1: success maps to the { result } contract the admin ConfigSendto reads —
       // as the translated catalog text, not an English constant.
-      expect(h.sends[0].response).to.deep.equal({ result: "msgConnected" });
+      expect(h.sends[0].response).to.deep.equal({ result: "msgConnected:2" });
+    });
+
+    it("a login that sees no systems is shown as an error with the assignment hint", async () => {
+      const h = makeHarness({ success: true, systems: 0 });
+      await dispatchMessage(
+        buildMessage({ command: "checkConnection", message: { url: "http://h", username: "u", password: "p" } }),
+        h.deps,
+      );
+      expect(h.sends[0].response).to.deep.equal({ error: "msgConnectedNoSystems" });
+    });
+
+    it("tests the URL the instance will use: trimmed, and refused with the instance's own reasons", async () => {
+      const trimmed = makeHarness({ success: true, systems: 1 });
+      await dispatchMessage(
+        buildMessage({
+          command: "checkConnection",
+          message: { url: " http://h:8090/ ", username: "u", password: "p" },
+        }),
+        trimmed.deps,
+      );
+      expect(trimmed.createdClients[0].url).to.equal("http://h:8090");
+
+      for (const url of ["http://h/?x=1", "http://h/#frag", "http://user:pw@h", "ftp://h"]) {
+        const h = makeHarness({ success: true, systems: 1 });
+        await dispatchMessage(
+          buildMessage({ command: "checkConnection", message: { url, username: "u", password: "p" } }),
+          h.deps,
+        );
+        expect(h.createdClients, url).to.have.lengthOf(0);
+        expect(String((h.sends[0].response as { error?: string }).error), url).to.match(/^msgUrlInvalid:/);
+      }
     });
 
     it("runs the test with the timeout the instance is configured with (v0.18.0)", async () => {
-      const h = makeHarness({ success: true });
+      const h = makeHarness({ success: true, systems: 2 });
       await dispatchMessage(
         buildMessage({
           command: "checkConnection",
@@ -214,7 +247,7 @@ describe("dispatchMessage", () => {
 
   describe("test-client lifecycle hooks (v0.4.5 cancelAll-Latency)", () => {
     it("calls onTestClientCreated then onTestClientDone — adapter can track + abort at onUnload", async () => {
-      const h = makeHarness({ success: true });
+      const h = makeHarness({ success: true, systems: 2 });
       await dispatchMessage(
         buildMessage({
           command: "checkConnection",
@@ -284,7 +317,7 @@ describe("dispatchMessage", () => {
 
   describe("origin gate (SEC-3a)", () => {
     it("rejects checkConnection from a non-UI origin (e.g. a script) without making the request", async () => {
-      const h = makeHarness({ success: true });
+      const h = makeHarness({ success: true, systems: 2 });
       await dispatchMessage(
         buildMessage({
           from: "system.adapter.javascript.0",
@@ -301,7 +334,7 @@ describe("dispatchMessage", () => {
     });
 
     it("allows checkConnection when the origin is missing (fail-safe — button must work)", async () => {
-      const h = makeHarness({ success: true });
+      const h = makeHarness({ success: true, systems: 2 });
       await dispatchMessage(
         buildMessage({
           from: undefined,
@@ -313,7 +346,7 @@ describe("dispatchMessage", () => {
     });
 
     it("allows checkConnection from the web config UI", async () => {
-      const h = makeHarness({ success: true });
+      const h = makeHarness({ success: true, systems: 2 });
       await dispatchMessage(
         buildMessage({
           from: "system.adapter.web.0",

@@ -271,8 +271,10 @@
   "help_metric_smart": "Veredicto SMART global, temperatura, capacidad, horas de encendido y ciclos por unidad. Requiere smartctl en el host; se lee como mucho cada 15 minutos.",
   "metric_servicesDetails": "Detalles de servicios",
   "help_metric_servicesDetails": "Estado, subestado, CPU y memoria por unidad de systemd — un canal por unidad. En un host ocupado pueden ser muchos puntos de datos.",
-  "msgConnected": "Conexión establecida",
+  "msgConnected": "Conectado — %s sistema(s) visible(s) para esta cuenta",
   "msgConnectionFailed": "Error de conexión: %s",
+  "msgConnectedNoSystems": "Sesión iniciada, pero esta cuenta no ve ningún sistema — asigna el usuario a los sistemas en el Hub (o ejecuta el Hub con SHARE_ALL_SYSTEMS=true)",
+  "msgUrlInvalid": "URL del Hub no válida: %s",
   "msgCredentialsRequired": "Se requieren URL, usuario y contraseña",
   "msgAdminOnly": "La prueba de conexión solo está disponible desde la interfaz de administración",
   "msgUnknownCommand": "Comando desconocido"

@@ -63,6 +63,7 @@ interface FakeStateMgr {
   takeChangeCounts: ReturnType<typeof vi.fn>;
   markAllOffline: ReturnType<typeof vi.fn>;
   knownSystemIds: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
 }
 
 function makeSystem(overrides: Partial<BeszelSystem> = {}): BeszelSystem {
@@ -87,6 +88,7 @@ function internalOf(adapter: BeszelAdapter): {
   lastSystemCount: number;
   lastErrorCode: string;
   authFailCount: number;
+  authRetryAt: number;
   failedSystems: Set<string>;
   systemDetails: Map<string, SystemDetails> | null;
   detailsAttempted: Set<string>;
@@ -162,6 +164,7 @@ function setup(configOverrides: Record<string, unknown> = {}): {
     snapshotExistingStates: vi.fn(async () => {}),
     markAllOffline: vi.fn(async () => {}),
     knownSystemIds: vi.fn(() => ["systems.server_a"]),
+    stop: vi.fn(),
     // v0.11.0: default "nothing changed" so the datapoint line stays silent in
     // tests that don't exercise it; the counter tests override this.
     takeChangeCounts: vi.fn(() => ({ created: 0, removed: 0 })),
@@ -207,6 +210,15 @@ describe("BeszelAdapter classifyError", () => {
     ["EHOSTUNREACH", errnoError("host", "EHOSTUNREACH"), "NETWORK"],
     ["EAI_AGAIN", errnoError("dns-temp", "EAI_AGAIN"), "NETWORK"],
     ["ETIMEDOUT", errnoError("slow", "ETIMEDOUT"), "TIMEOUT"],
+    ["self-signed certificate", errnoError("cert", "DEPTH_ZERO_SELF_SIGNED_CERT"), "TLS_ERROR"],
+    ["certificate chain", errnoError("cert", "SELF_SIGNED_CERT_IN_CHAIN"), "TLS_ERROR"],
+    ["unverifiable leaf", errnoError("cert", "UNABLE_TO_VERIFY_LEAF_SIGNATURE"), "TLS_ERROR"],
+    ["expired certificate", errnoError("cert", "CERT_HAS_EXPIRED"), "TLS_ERROR"],
+    ["host name mismatch", errnoError("cert", "ERR_TLS_CERT_ALTNAME_INVALID"), "TLS_ERROR"],
+    ["a rejected login", errnoError("400", "AUTH_FAILED"), "AUTH_FAILED"],
+    ["an MFA login", errnoError("401", "MFA_REQUIRED"), "MFA_REQUIRED"],
+    ["a non-API answer", errnoError("html", "INVALID_RESPONSE"), "INVALID_RESPONSE"],
+    ["a truncated list", errnoError("pages", "TRUNCATED"), "TRUNCATED"],
     // N6: the client's own timeout now carries ETIMEDOUT (see above); a bare
     // "timed out" message with no code is no longer special-cased → UNKNOWN.
     ["timed-out message without a code", new Error("Request to /api timed out"), "UNKNOWN"],
@@ -224,6 +236,21 @@ describe("BeszelAdapter classifyError", () => {
 });
 
 describe("BeszelAdapter onReady", () => {
+  it("hands the client the trimmed URL — a pasted trailing space no longer breaks every request", async () => {
+    const { clientArgs } = await setupReady({ url: " http://192.168.1.5:8090/ " });
+    expect(clientArgs[0][0]).toBe("http://192.168.1.5:8090");
+  });
+
+  it("refuses credentials in the URL and never writes them to the log", async () => {
+    const { adapter, clientArgs } = setup({ url: "http://user:topsecret@192.168.1.5:8090" });
+    const i = internalOf(adapter);
+    await i.onReady();
+    expect(clientArgs).toHaveLength(0);
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("user name or password"));
+    const logged = [...i.log.debug.mock.calls, ...i.log.error.mock.calls].flat().join("\n");
+    expect(logged).not.toContain("topsecret");
+  });
+
   it("refuses to start without url/username/password (upgrade hint)", async () => {
     const { adapter, client } = setup({ url: "" });
     const i = internalOf(adapter);
@@ -400,6 +427,15 @@ describe("BeszelAdapter onReady", () => {
 });
 
 describe("BeszelAdapter onUnload", () => {
+  it("stops the state manager first, so a running system update cannot write online after the markers", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    const callback = vi.fn();
+    i.onUnload(callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+    expect(stateMgr.stop).toHaveBeenCalledTimes(1);
+  });
+
   it("clears the poll timer, cancels prod + test clients and always calls back", async () => {
     const { adapter, client } = await setupReady();
     const i = internalOf(adapter);
@@ -484,6 +520,33 @@ describe("BeszelAdapter onUnload", () => {
 });
 
 describe("BeszelAdapter shutdown while a poll is in flight", () => {
+  it("a system update that fails because the shutdown closed the databases is no warning, and nothing follows it", async () => {
+    const { adapter, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    let release: () => void = () => {};
+    stateMgr.updateSystem.mockClear();
+    stateMgr.updateSystem.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          release = () => reject(new Error("DB closed"));
+        }),
+    );
+    stateMgr.cleanupSystems.mockClear();
+    i.log.warn.mockClear();
+    i.setStateChangedAsync.mockClear();
+    const polling = i.poll();
+    await vi.waitFor(() => expect(stateMgr.updateSystem).toHaveBeenCalled());
+    const callback = vi.fn();
+    i.onUnload(callback);
+    release();
+    await polling;
+    expect(i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("Failed to update system"));
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Failed to update system"));
+    // The third unloaded check: no cleanup and no rollup after the shutdown.
+    expect(stateMgr.cleanupSystems).not.toHaveBeenCalled();
+    expect(i.setStateChangedAsync).not.toHaveBeenCalledWith("info.systemsTotal", expect.anything());
+  });
+
   it("does not log the aborted poll as an error and writes nothing after onUnload", async () => {
     // onUnload → cancelAll() aborts the request in flight; the poll's Promise.all
     // rejects with a code-less "Request aborted". That used to reach handlePollError
@@ -876,17 +939,116 @@ describe("BeszelAdapter poll — error classification routing", () => {
 
     for (let n = 1; n <= 3; n++) {
       i.log.error.mockClear();
+      i.authRetryAt = 0; // step over the back-off — this test is about the log lines
       await i.poll();
       expect(client.invalidateToken).toHaveBeenCalled();
-      expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("Authentication failed"));
+      expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("Login to the Beszel Hub failed"));
     }
     i.log.error.mockClear();
+    i.authRetryAt = 0;
     await i.poll(); // 4th
-    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("suppressing further auth errors"));
+    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("suppressing further login errors"));
     i.log.error.mockClear();
+    i.authRetryAt = 0;
     await i.poll(); // 5th
     expect(i.log.error).not.toHaveBeenCalled();
-    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Auth still failing (attempt 5)"));
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Login still failing (attempt 5)"));
+  });
+
+  it("names the likely cause of each kind of failed login", async () => {
+    const hints: Array<[string, string]> = [
+      ["AUTH_FAILED", "wrong e-mail or password"],
+      ["MFA_REQUIRED", "one-time password"],
+      ["PASSWORD_AUTH_DISABLED", "password login is switched off"],
+      ["AUTH_FORBIDDEN", "not verified"],
+      ["UNAUTHORIZED", "rejected the login"],
+    ];
+    for (const [code, hint] of hints) {
+      const { adapter, client } = await setupReady();
+      const i = internalOf(adapter);
+      client.getSystems.mockRejectedValue(errnoError("login", code));
+      i.log.error.mockClear();
+      await i.poll();
+      expect(i.log.error, code).toHaveBeenCalledWith(expect.stringContaining(hint));
+      expect(i.authFailCount, code).toBe(1);
+    }
+  });
+
+  it("stops sending the password every poll once the login keeps failing (1, 2, 4 … intervals, at most 15 min)", async () => {
+    const { adapter, client } = await setupReady({ pollInterval: 60 });
+    const i = internalOf(adapter);
+    let now = 1_000_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      client.getSystems.mockRejectedValue(errnoError("400", "AUTH_FAILED"));
+      await i.poll();
+      await i.poll();
+      expect(i.authRetryAt, "no back-off before the third failure").toBe(0);
+      await i.poll(); // third failure: wait one interval
+      expect(i.authRetryAt).toBe(now + 60_000);
+
+      client.getSystems.mockClear();
+      await i.poll(); // inside the back-off
+      expect(client.getSystems, "no login attempt while backing off").not.toHaveBeenCalled();
+
+      now += 60_000;
+      await i.poll(); // fourth failure: two intervals
+      expect(client.getSystems).toHaveBeenCalled();
+      expect(i.authRetryAt).toBe(now + 120_000);
+
+      for (let n = 0; n < 10; n++) {
+        now = i.authRetryAt;
+        await i.poll();
+      }
+      expect(i.authRetryAt - now, "capped at 15 minutes").toBe(15 * 60 * 1000);
+
+      client.getSystems.mockResolvedValue([makeSystem()]);
+      now = i.authRetryAt;
+      await i.poll();
+      expect(i.authFailCount).toBe(0);
+      expect(i.authRetryAt).toBe(0);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("logs in afresh ONCE when a Hub that had systems suddenly returns none (dead token)", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    client.invalidateToken.mockClear();
+    client.getSystems.mockReset();
+    // The dead token reads as an empty list; after the new login the list is back.
+    client.getSystems.mockResolvedValueOnce([]).mockResolvedValueOnce([makeSystem()]);
+    await i.poll();
+    expect(client.invalidateToken).toHaveBeenCalledTimes(1);
+    expect(client.getSystems).toHaveBeenCalledTimes(2);
+    expect(stateMgr.updateSystem).toHaveBeenCalled();
+    expect(i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("returns no systems"));
+  });
+
+  it("tells once that the account sees no systems when the list stays empty after a fresh login", async () => {
+    const { adapter, client, stateMgr } = await setupReady();
+    const i = internalOf(adapter);
+    client.getSystems.mockResolvedValue([]);
+    client.invalidateToken.mockClear();
+    stateMgr.cleanupSystems.mockClear();
+    await i.poll();
+    expect(client.invalidateToken).toHaveBeenCalledTimes(1);
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("returns no systems for this account"));
+    // An empty answer never deletes devices (v0.13.0).
+    expect(stateMgr.cleanupSystems).not.toHaveBeenCalled();
+
+    i.log.info.mockClear();
+    client.invalidateToken.mockClear();
+    await i.poll();
+    expect(client.invalidateToken, "one fresh login per empty streak").not.toHaveBeenCalled();
+    expect(i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("returns no systems"));
+
+    client.getSystems.mockResolvedValue([makeSystem()]);
+    await i.poll(); // the streak ends
+    client.getSystems.mockResolvedValue([]);
+    await i.poll();
+    expect(client.invalidateToken, "a new streak may log in again").toHaveBeenCalledTimes(1);
   });
 
   it("auth-fail counter resets after a successful poll", async () => {
@@ -899,12 +1061,29 @@ describe("BeszelAdapter poll — error classification routing", () => {
     expect(i.authFailCount).toBe(0);
   });
 
-  it("FORBIDDEN surfaces the check-user-role hint", async () => {
+  it("FORBIDDEN on a data request warns without a role hint (Beszel's lists filter, they do not refuse)", async () => {
     const { adapter, client } = await setupReady();
     const i = internalOf(adapter);
     client.getSystems.mockRejectedValue(errnoError("403", "FORBIDDEN"));
     await i.poll();
-    expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("Check the user role"));
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("refused a data request (403)"));
+    expect(i.log.error).not.toHaveBeenCalledWith(expect.stringContaining("role"));
+  });
+
+  it("names the likely cause of an untrusted certificate, a non-API answer and a truncated list", async () => {
+    const cases: Array<[string, string]> = [
+      ["DEPTH_ZERO_SELF_SIGNED_CERT", "certificate is not trusted"],
+      ["INVALID_RESPONSE", "does the URL point at the Hub"],
+      ["TRUNCATED", "more records than the adapter reads"],
+    ];
+    for (const [code, text] of cases) {
+      const { adapter, client } = await setupReady();
+      const i = internalOf(adapter);
+      client.getSystems.mockRejectedValue(errnoError("x", code));
+      await i.poll();
+      expect(i.log.warn, code).toHaveBeenCalledWith(expect.stringContaining(text));
+      expect(i.setStateChangedAsync, code).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
+    }
   });
 
   it("RATE_LIMITED suggests increasing the poll interval (warn)", async () => {
@@ -915,17 +1094,22 @@ describe("BeszelAdapter poll — error classification routing", () => {
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("rate-limited"));
   });
 
-  it("NETWORK errors warn once and demote repeats to debug", async () => {
+  it("an unreachable Hub is a state, not a log line: NETWORK and TIMEOUT stay at debug, also when they alternate", async () => {
     const { adapter, client } = await setupReady();
     const i = internalOf(adapter);
-    client.getSystems.mockRejectedValue(errnoError("refused", "ECONNREFUSED"));
-    await i.poll();
-    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Cannot reach Beszel Hub"));
-
     i.log.warn.mockClear();
+    i.log.error.mockClear();
+    client.getSystems.mockRejectedValueOnce(errnoError("refused", "ECONNREFUSED"));
+    await i.poll();
+    client.getSystems.mockRejectedValueOnce(errnoError("slow", "ETIMEDOUT"));
+    await i.poll();
+    client.getSystems.mockRejectedValueOnce(errnoError("dns", "ENOTFOUND"));
     await i.poll();
     expect(i.log.warn).not.toHaveBeenCalled();
-    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Poll failed (ongoing)"));
+    expect(i.log.error).not.toHaveBeenCalled();
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("not reachable (NETWORK)"));
+    expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("not reachable (TIMEOUT)"));
+    expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
   });
 
   it("marks disconnected on failure and logs the recovery exactly once", async () => {
@@ -941,9 +1125,16 @@ describe("BeszelAdapter poll — error classification routing", () => {
     expect(i.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
 
     await i.poll(); // success
-    expect(i.log.info).toHaveBeenCalledWith("Connection restored");
+    // The Hub was merely unreachable — its return is a state change, not news.
+    expect(i.log.info).not.toHaveBeenCalledWith("Connection restored");
+    expect(i.log.debug).toHaveBeenCalledWith("Connection restored");
     expect(i.lastErrorCode).toBe("");
 
+    // After a real failure the recovery is reported, exactly once.
+    client.getSystems.mockRejectedValueOnce(errnoError("502", "HTTP_ERROR"));
+    await i.poll();
+    await i.poll();
+    expect(i.log.info).toHaveBeenCalledWith("Connection restored");
     i.log.info.mockClear();
     await i.poll(); // steady state — no repeated restore info
     expect(i.log.info).not.toHaveBeenCalledWith("Connection restored");
@@ -1032,7 +1223,7 @@ describe("BeszelAdapter poll — system_details cadence (F2)", () => {
   it("a failed details fetch is non-fatal and not retried every poll (attempted marker)", async () => {
     const { adapter, client, stateMgr } = setup({ metrics_agentVersion: true });
     const i = internalOf(adapter);
-    client.getSystemDetails.mockRejectedValue(errnoError("404", "HTTP_ERROR"));
+    client.getSystemDetails.mockRejectedValue(errnoError("404", "NOT_FOUND"));
 
     await i.onReady(); // first poll hits the 404
     expect(i.log.debug).toHaveBeenCalledWith(expect.stringContaining("system_details fetch failed (non-fatal"));
@@ -1041,6 +1232,15 @@ describe("BeszelAdapter poll — system_details cadence (F2)", () => {
 
     await i.poll();
     expect(client.getSystemDetails).toHaveBeenCalledTimes(1); // 404'd Hub → no hammering
+  });
+
+  it("a 5xx from a proxy on the details read is retried, not taken as final (same rule as the extras)", async () => {
+    const { adapter, client } = setup({ metrics_agentVersion: true });
+    const i = internalOf(adapter);
+    client.getSystemDetails.mockRejectedValueOnce(errnoError("502", "HTTP_ERROR"));
+    await i.onReady();
+    await i.poll();
+    expect(client.getSystemDetails).toHaveBeenCalledTimes(2);
   });
 
   it("F3: a TRANSIENT details fetch error is NOT marked attempted and is retried next poll", async () => {

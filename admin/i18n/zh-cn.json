@@ -271,8 +271,10 @@
   "help_metric_smart": "每个硬盘的 SMART 总体判定、温度、容量、通电小时数和通电次数。需要主机上安装 smartctl；最多每 15 分钟读取一次。",
   "metric_servicesDetails": "服务详情",
   "help_metric_servicesDetails": "每个 systemd 单元的状态、子状态、CPU 和内存——每个单元一个通道。在繁忙主机上可能产生大量数据点。",
-  "msgConnected": "连接成功",
+  "msgConnected": "已连接 — 此账户可见 %s 个系统",
   "msgConnectionFailed": "连接失败：%s",
+  "msgConnectedNoSystems": "已登录，但此账户看不到任何系统 — 请在 Hub 中将该用户分配给系统（或以 SHARE_ALL_SYSTEMS=true 运行 Hub）",
+  "msgUrlInvalid": "Hub URL 无效：%s",
   "msgCredentialsRequired": "需要 URL、用户名和密码",
   "msgAdminOnly": "连接测试仅可在管理界面中执行",
   "msgUnknownCommand": "未知命令"

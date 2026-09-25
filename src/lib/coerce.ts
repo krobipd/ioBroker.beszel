@@ -675,20 +675,70 @@ export function coerceContainer(value: unknown): BeszelContainer | null {
 }
 
 /**
+ * The Hub URL as the client uses it: trimmed, without trailing slashes. The admin text
+ * field stores what was pasted — a trailing space passed the old check (which trimmed)
+ * and then broke every request (the client did not trim). Validator and client read the
+ * SAME normalised string now.
+ *
+ * @param url The raw URL value from admin config.
+ */
+export function normalizeHubUrl(url: unknown): string {
+  return typeof url === "string" ? url.trim().replace(/\/+$/, "") : "";
+}
+
+/**
+ * The URL for a log line: credentials in the userinfo part (`http://user:pw@hub`) are
+ * blanked, anything unparseable is only made log-safe.
+ *
+ * @param url The raw URL value from admin config.
+ */
+export function urlForLog(url: unknown): string {
+  if (typeof url !== "string") {
+    return sanitizeForLog(url);
+  }
+  try {
+    const u = new URL(url.trim());
+    if (u.username || u.password) {
+      u.username = "";
+      u.password = "";
+    }
+    return sanitizeForLog(u.toString());
+  } catch {
+    return sanitizeForLog(url);
+  }
+}
+
+/**
  * v0.5.0 (S1): URL-shape validator. Returns a short reason string when the
  * URL is unusable, or null when it's OK to hand to the client. Moved from
  * main.ts so the validator can be unit-tested without an adapter instance.
  *
+ * Judges the NORMALISED form ({@link normalizeHubUrl}) — the one the client gets.
+ * A query or fragment would swallow every API path the client appends (`?x=1` puts
+ * `/api/…` into the query, `#frag` sends every request to `/`), and credentials in the
+ * URL are never sent (the client authenticates with its own login) while they would
+ * land in logs — all three are refused with their reason.
+ *
  * @param url The raw URL value from admin config.
  */
 export function validateHubUrl(url: unknown): string | null {
-  if (typeof url !== "string" || url.trim().length === 0) {
+  const normalized = normalizeHubUrl(url);
+  if (normalized.length === 0) {
     return "URL is empty";
   }
   try {
-    const u = new URL(url.trim());
+    const u = new URL(normalized);
     if (u.protocol !== "http:" && u.protocol !== "https:") {
       return `protocol '${u.protocol}' is not http(s)`;
+    }
+    if (u.search || normalized.includes("?")) {
+      return "URL must not contain a query (?…)";
+    }
+    if (u.hash || normalized.includes("#")) {
+      return "URL must not contain a fragment (#…)";
+    }
+    if (u.username || u.password) {
+      return "URL must not contain a user name or password — use the login fields";
     }
     if (!u.hostname) {
       // Not reachable for http(s) and therefore deliberately untested (audit
@@ -765,10 +815,11 @@ export function coerceTimeoutMs(raw: unknown): number {
  */
 export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unknown) => T | null): PocketBaseList<T> {
   const obj = coerceObject(value);
-  if (!obj) {
-    return { totalPages: 0, items: [], rawCount: 0 };
+  const listItems = obj ? coerceArray(obj.items) : null;
+  if (!obj || listItems === null) {
+    return { totalPages: 0, items: [], rawCount: 0, totalItems: 0, valid: false };
   }
-  const rawItems = coerceArray(obj.items) ?? [];
+  const rawItems = listItems;
   const items: T[] = [];
   for (const raw of rawItems) {
     const item = itemCoercer(raw);
@@ -784,6 +835,8 @@ export function coercePocketBaseList<T>(value: unknown, itemCoercer: (raw: unkno
     // "a page whose records were all unusable" (raw > 0, coerced 0) — treating
     // the latter as the end silently truncated everything behind it.
     rawCount: rawItems.length,
+    totalItems: coerceFiniteNumber(obj.totalItems) ?? 0,
+    valid: true,
   };
 }
 
