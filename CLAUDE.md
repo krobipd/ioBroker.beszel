@@ -113,6 +113,7 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 63. **`containers.updatable` wird `update_available` (0.19.0, Beszel 0.20.0)** — nur angelegt, wenn der Hub die Spalte liefert; `false` heißt „kein Update bekannt“.
 64. **Kurze Ausfälle sind ein Zustand, keine Warnung (0.19.0, Flottenregel 2026-09-22)** — `NETWORK`/`TIMEOUT` loggen auf debug unter einem gemeinsamen Dedup-Schlüssel, „Connection restored“ danach ebenfalls; warn bleibt für Anmelde-, HTTP-, TLS-, Antwort- und Kürzungsfehler.
 65. **Eine 404 der Hub-URL heißt „falsche Adresse“ (0.19.0, Sonde am echten Hub)** — antwortet die Adresse ohne Beszel-API (Reverse-Proxy-Pfad vergessen, anderer Dienst am Port), nennt das Log den URL-Hinweis auf warn und der Verbindungstest `msgHubNotFound` statt des rohen 404-JSON.
+66. **Entfernte `native`-Schlüssel werden beim Start genullt (0.19.0, B02 Runde 38)** — `src/lib/native-key-migration.ts` + Test byte-gleich vom Flotten-Master, `NATIVE_KEY_MIGRATIONS` droppt die vier Peak-Schalter von 0.17.x; ein Schreibvorgang beendet den Start (die Instanz startet neu).
 
 ## Tests (886 unit + 61 package + 1 integration + 3 inventory)
 
