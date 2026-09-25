@@ -318,7 +318,6 @@ beszel.0.
 - Fixed: on a very large Hub, the systems at the end of a long list lost their datapoints — a cut-off list now leaves the tree as it is and is reported once
 - Fixed: a request that trickled in slowly could run far past the configured timeout
 - Changed: a Hub URL that does not lead to the Beszel API (e.g. a missing reverse-proxy path) is named as such in the log and in the connection test
-- Changed: a short network outage no longer fills the log with warnings; the systems are still marked offline
 - Changed: a renamed or removed system on the Hub is reported in the log
 - Changed: the login field is called E-mail — Beszel does not accept a username
 - Changed: the SMART verdict also knows WARNING and UNKNOWN, the pool health UNKNOWN and the vdev state MISSING
