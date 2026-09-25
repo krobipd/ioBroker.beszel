@@ -433,9 +433,9 @@ export class BeszelClient {
       await this.authInFlight;
       return;
     }
-    // v0.4.4 (B2): trace fresh-auth start with token-age (oder "none" wenn
-    // noch keiner da war). Maintainer sieht "token expired after 23h" oder
-    // "no token yet (first request)" eindeutig.
+    // v0.4.4 (B2): trace the fresh-auth start with the token age ("none" when there
+    // was no token yet), so a report shows at a glance whether the token ran out or
+    // this is the first request.
     const tokenAge = this.token ? `${Date.now() - this.tokenTime}ms` : "none";
     this.log?.debug(`ensureToken: fresh authentication (previous token age=${tokenAge})`);
     this.authInFlight = this.authenticate().finally(() => {

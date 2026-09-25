@@ -376,8 +376,8 @@ export const DYNAMIC_SUBCHANNEL_TOGGLES: Record<string, keyof AdapterConfig> = {
  * v0.6.0: each detail toggle depends on its category's base toggle — when
  * the category is off, the detail is off too. This mirrors the admin grey-out
  * (`disabled` in jsonConfig) in the DATA logic, so a sub-metric never creates
- * states while its category is disabled (krobi: "Kategorie aus → Unterkategorie
- * automatisch mit aus"). Must stay in sync with the `disabled` conditions in
+ * states while its category is disabled (krobi: a category that is off takes its
+ * sub-categories with it). Must stay in sync with the `disabled` conditions in
  * admin/jsonConfig.json. Every non-base metric in a category gates on the
  * category's base/usage metric — including the default-on co-metrics `loadAvg`
  * (→ CPU) and `diskSpeed` (→ Disk): krobi wants a category to switch off
